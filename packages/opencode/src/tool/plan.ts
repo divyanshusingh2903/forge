@@ -41,7 +41,10 @@ export const PresentPlanTool = Tool.define(
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
           const info = yield* session.get(ctx.sessionID)
-          const plan = path.relative(instance.worktree, Session.plan(info, instance))
+          const plan = path.relative(
+            instance.worktree,
+            Session.plan(Session.planCycleAnchor(ctx.messages, info) ?? info, instance),
+          )
           const answers = yield* question.ask({
             sessionID: ctx.sessionID,
             questions: [

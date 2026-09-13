@@ -51,7 +51,7 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   const assistantMessage = input.messages.findLast((msg) => msg.info.role === "assistant")
   if (input.agent.name !== "plan" && assistantMessage?.info.agent === "plan") {
     const ctx = yield* InstanceState.context
-    const plan = Session.plan(input.session, ctx)
+    const plan = Session.plan(Session.planCycleAnchor(input.messages, input.session) ?? input.session, ctx)
     const exists = yield* fsys.existsSafe(plan)
     const part = yield* sessions.updatePart({
       id: PartID.ascending(),
