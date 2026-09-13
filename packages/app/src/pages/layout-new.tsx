@@ -14,6 +14,7 @@ import { createHomeController } from "@/pages/home/home-controller"
 import { createHomeProjectsController } from "@/pages/home/home-projects-controller"
 import { HomeProjects } from "@/pages/home/home-projects"
 import { createHomeScrollController } from "@/pages/home/home-scroll-controller"
+import { createPinnedSessions } from "@/pages/home/pinned-sessions"
 
 export default function NewLayout(props: ParentProps) {
   const platform = usePlatform()
@@ -24,6 +25,7 @@ export default function NewLayout(props: ParentProps) {
   const home = createHomeController()
   const projects = createHomeProjectsController(home)
   const scroll = createHomeScrollController(() => [])
+  const pinned = createPinnedSessions()
 
   const openSession = (server: ServerConnection.Any, session: Session) => {
     const ctx = global.ensureServerCtx(server)
@@ -31,6 +33,12 @@ export default function NewLayout(props: ParentProps) {
     ctx.projects.touch(session.directory)
     const tab = tabs.addSessionTab({ server: ServerConnection.key(server), sessionId: session.id })
     tabs.select(tab)
+  }
+
+  const deleteSession = async (server: ServerConnection.Any, session: Session) => {
+    const ctx = global.ensureServerCtx(server)
+    await ctx.sdk.api.session.remove({ sessionID: session.id })
+    pinned.remove(ServerConnection.key(server), session.id)
   }
 
   const currentSession = () => {
@@ -68,7 +76,14 @@ export default function NewLayout(props: ParentProps) {
         }
       />
       <div class="flex-1 min-h-0 min-w-0 flex flex-row">
-        <HomeProjects projects={projects} scroll={scroll} onOpenSession={openSession} currentSession={currentSession} />
+        <HomeProjects
+          projects={projects}
+          scroll={scroll}
+          onOpenSession={openSession}
+          onDeleteSession={deleteSession}
+          currentSession={currentSession}
+          pinned={pinned}
+        />
         <main class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-strict">
           <Suspense>{props.children}</Suspense>
         </main>

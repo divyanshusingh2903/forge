@@ -1,6 +1,7 @@
 import type { Accessor } from "solid-js"
 import type { ServerConnection } from "@/context/server"
 import type { Session } from "@opencode-ai/sdk/v2/client"
+import type { PinnedSessions } from "./pinned-sessions"
 import type { HomeProjectsController } from "./home-projects-controller"
 import { HomeProjectsView } from "./home-projects-view"
 import type { HomeScrollController } from "./home-scroll-controller"
@@ -9,7 +10,9 @@ export function HomeProjects(props: {
   projects: HomeProjectsController
   scroll: HomeScrollController
   onOpenSession: (server: ServerConnection.Any, session: Session) => void
+  onDeleteSession: (server: ServerConnection.Any, session: Session) => void | Promise<void>
   currentSession?: Accessor<{ server?: string; id?: string } | undefined>
+  pinned: PinnedSessions
 }) {
   return (
     <HomeProjectsView
@@ -44,7 +47,9 @@ export function HomeProjects(props: {
       onOpenSettings={props.projects.utility.settings}
       onOpenHelp={props.projects.utility.help}
       onOpenSession={props.onOpenSession}
+      onDeleteSession={props.onDeleteSession}
       currentSession={props.currentSession}
+      pinned={props.pinned}
     />
   )
 }

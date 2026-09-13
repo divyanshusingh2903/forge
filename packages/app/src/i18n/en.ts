@@ -646,7 +646,7 @@ export const dict = {
   "notification.session.error.fallbackDescription": "An error occurred",
 
   "home.recentProjects": "Recent projects",
-  "home.recentSessions": "Recent",
+  "home.pinnedSessions": "Pinned",
   "home.empty.title": "No recent projects",
   "home.empty.description": "Get started by opening a local project",
   "home.title": "Home",
@@ -816,6 +816,8 @@ export const dict = {
   "common.reset": "Reset",
   "common.archive": "Archive",
   "common.delete": "Delete",
+  "common.pin": "Pin",
+  "common.unpin": "Unpin",
   "common.close": "Close",
   "common.edit": "Edit",
   "common.loadMore": "Load more",
