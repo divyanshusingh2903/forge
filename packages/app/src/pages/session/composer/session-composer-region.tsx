@@ -3,6 +3,7 @@ import { useLanguage } from "@/context/language"
 import { useSettings } from "@/context/settings"
 import { SessionPermissionDock } from "@/pages/session/composer/session-permission-dock"
 import { SessionQuestionDock } from "@/pages/session/composer/session-question-dock"
+import { SessionPlanQuestionDock } from "@/pages/session/composer/session-plan-question-dock"
 import { SessionFollowupDock } from "@/pages/session/composer/session-followup-dock"
 import { SessionRevertDock } from "@/pages/session/composer/session-revert-dock"
 import { SessionTodoDock } from "@/pages/session/composer/session-todo-dock"
@@ -39,7 +40,15 @@ export function SessionComposerRegion(props: {
         <Show when={controller.state.questionRequest()} keyed>
           {(request) => (
             <div>
-              <SessionQuestionDock request={request} onSubmit={controller.onResponseSubmit} />
+              <Show
+                when={
+                  controller.state.questionToolName() === "present_plan" ||
+                  controller.state.questionToolName() === "plan_enter"
+                }
+                fallback={<SessionQuestionDock request={request} onSubmit={controller.onResponseSubmit} />}
+              >
+                <SessionPlanQuestionDock request={request} onSubmit={controller.onResponseSubmit} />
+              </Show>
             </div>
           )}
         </Show>
