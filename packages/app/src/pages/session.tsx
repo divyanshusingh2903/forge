@@ -378,14 +378,19 @@ export default function Page() {
   const sessionOwnership = createSessionOwnership(sessionKey)
   const newSessionDesign = createMemo(() => settings.general.newLayoutDesigns())
 
-  // Reacts to present_plan tool calls: opens the plan panel the first time
-  // one goes pending (so the user sees the plan and the accept/deny/revise
-  // question without having to go find it), and applies "Accept (Auto)"
-  // once resolved -- the tool itself can only switch the session's agent,
-  // since auto-accept is a client-side permission setting the server has no
-  // concept of, so the client watches for the completed call and flips it.
+  // Reacts to present_plan/plan_enter tool calls. Both switch the session's
+  // agent server-side via a synthetic message, but the composer's mode
+  // dropdown reads local.agent.current(), which is a client-persisted
+  // preference (context/local.tsx's saved.session[id].agent) -- it does NOT
+  // automatically follow the session's actual agent field, so without this
+  // the dropdown would keep showing whatever the user last picked even
+  // after the tool switches agents. Also opens the plan panel the first
+  // time a present_plan call goes pending, and applies "Accept (Auto)" once
+  // resolved -- auto-accept is a client-side permission setting the server
+  // has no concept of, so that too has to be applied here once observed.
   const openedForPresentPlan = new Set<string>()
   const handledPresentPlanAutoAccept = new Set<string>()
+  const handledPresentPlanAgentSync = new Set<string>()
   const handledPlanEnter = new Set<string>()
   createEffect(() => {
     const id = params.id
@@ -404,6 +409,14 @@ export default function Page() {
           }
           if (
             part.state.status === "completed" &&
+            part.state.metadata?.switched === true &&
+            !handledPresentPlanAgentSync.has(part.callID)
+          ) {
+            handledPresentPlanAgentSync.add(part.callID)
+            local.agent.set("build")
+          }
+          if (
+            part.state.status === "completed" &&
             part.state.metadata?.autoAccept === true &&
             !handledPresentPlanAutoAccept.has(part.callID)
           ) {
@@ -418,6 +431,7 @@ export default function Page() {
           part.state.metadata?.switched === true &&
           !handledPlanEnter.has(part.callID)
         ) {
+          local.agent.set("plan")
           handledPlanEnter.add(part.callID)
           showToast({
             variant: "default",
