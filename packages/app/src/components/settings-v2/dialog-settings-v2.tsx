@@ -90,6 +90,13 @@ export const DialogSettings: Component<{
             <div class="settings-v2-nav-footer">
               <span>{language.t("app.name.desktop")}</span>
               <span>v{platform.version}</span>
+              <button
+                type="button"
+                class="settings-v2-nav-footer-credit"
+                onClick={() => platform.openExternal("https://github.com/anomalyco/opencode")}
+              >
+                {language.t("settings.desktop.builtOn")}
+              </button>
             </div>
           </div>
         </TabsV2.List>

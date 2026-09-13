@@ -905,7 +905,7 @@ export const dict = {
   "debugBar.direction.tip": "بدون تغییر زبان انتخابی، جهت طرح بندی کامل برنامه را اجباری کنید",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "دسکتاپ",
   "settings.section.server": "سرور",
   "settings.tab.general": "ژنرال",

@@ -912,7 +912,7 @@ export const dict = {
   "debugBar.direction.tip": "Forțează direcția completă a layoutului aplicației fără a schimba limba selectată",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "Desktop",
   "settings.section.server": "Server",
   "settings.tab.general": "General",

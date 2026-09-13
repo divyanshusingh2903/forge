@@ -902,7 +902,7 @@ export const dict = {
   "debugBar.direction.tip": "ບັງຄັບທິດທາງການຈັດວາງແອັບເຕັມໂດຍບໍ່ປ່ຽນພາສາທີ່ເລືອກ",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "ເດັສທັອບ",
   "settings.section.server": "ເຊີບເວີ",
   "settings.tab.general": "ທົ່ວໄປ",

@@ -918,7 +918,7 @@ export const dict = {
     "Επιβολή της κατεύθυνσης της πλήρους διάταξης εφαρμογής χωρίς αλλαγή της επιλεγμένης γλώσσας",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Επιτραπέζιος υπολογιστής",
+  "app.name.desktop": "Forge Επιτραπέζιος υπολογιστής",
   "settings.section.desktop": "Επιτραπέζιος",
   "settings.section.server": "Διακομιστής",
   "settings.tab.general": "Γενικά",

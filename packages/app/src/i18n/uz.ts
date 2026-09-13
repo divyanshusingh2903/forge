@@ -915,7 +915,7 @@ export const dict = {
   "debugBar.direction.tip": "Tanlangan tilni oʻzgartirmasdan ilovaning toʻliq joylashuvi yoʻnalishini majburlang",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "Ish stoli",
   "settings.section.server": "Server",
   "settings.tab.general": "Umumiy",

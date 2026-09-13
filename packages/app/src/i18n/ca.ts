@@ -917,7 +917,7 @@ export const dict = {
   "debugBar.direction.tip": "Força la direcció completa del disseny de l'aplicació sense canviar l'idioma seleccionat",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Escriptori",
+  "app.name.desktop": "Forge Escriptori",
   "settings.section.desktop": "Escriptori",
   "settings.section.server": "Servidor",
   "settings.tab.general": "General",

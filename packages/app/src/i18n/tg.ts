@@ -911,7 +911,7 @@ export const dict = {
   "debugBar.direction.tip": "Бе тағир додани забони интихобшуда самти тарҳбандии пурраи барномаро маҷбур кунед",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "Мизи корӣ",
   "settings.section.server": "Сервер",
   "settings.tab.general": "Генерал",

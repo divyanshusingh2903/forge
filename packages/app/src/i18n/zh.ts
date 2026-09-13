@@ -875,7 +875,7 @@ export const dict = {
   "sidebar.empty.title": "没有打开的项目",
   "sidebar.empty.description": "打开一个项目以开始使用",
 
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
 
   "settings.section.desktop": "桌面",
   "settings.section.server": "服务器",

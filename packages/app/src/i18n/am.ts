@@ -889,7 +889,7 @@ export const dict = {
   "debugBar.direction.tip": "የተመረጠውን ቋንቋ ሳይቀይሩ ሙሉውን የመተግበሪያ አቀማመጥ አቅጣጫ ያስገድዱ",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode ዴስክቶፕ",
+  "app.name.desktop": "Forge ዴስክቶፕ",
   "settings.section.desktop": "ዴስክቶፕ",
   "settings.section.server": "አገልጋይ",
   "settings.tab.general": "አጠቃላይ",

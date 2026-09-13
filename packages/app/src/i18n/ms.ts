@@ -907,7 +907,7 @@ export const dict = {
   "debugBar.direction.tip": "Paksa arah tataletak aplikasi penuh tanpa menukar bahasa terpilih",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "Desktop",
   "settings.section.server": "Pelayan",
   "settings.tab.general": "Umum",

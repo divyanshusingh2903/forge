@@ -897,7 +897,7 @@ export const dict = {
   "sidebar.empty.title": "Açık proje yok",
   "sidebar.empty.description": "Başlamak için bir proje açın",
 
-  "app.name.desktop": "OpenCode Masaüstü",
+  "app.name.desktop": "Forge Masaüstü",
 
   "settings.section.desktop": "Masaüstü",
   "settings.section.server": "Sunucu",
