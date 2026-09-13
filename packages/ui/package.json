@@ -61,6 +61,7 @@
     "test": "bun test src --only-failures",
     "dev": "vite",
     "generate:tailwind": "bun run script/tailwind.ts",
+    "generate:tailwind-v2": "bun run script/tailwind-v2.ts",
     "generate:v2-oc2": "bun run script/build-oc2-v2-overrides.ts"
   },
   "devDependencies": {
