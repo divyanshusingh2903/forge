@@ -24,7 +24,7 @@ import type { GlobTool } from "@/tool/glob"
 import type { GrepTool } from "@/tool/grep"
 import type { InvalidTool } from "@/tool/invalid"
 import type { LspTool } from "@/tool/lsp"
-import type { PlanExitTool } from "@/tool/plan"
+import type { PresentPlanTool } from "@/tool/plan"
 import type { QuestionTool } from "@/tool/question"
 import type { ReadTool } from "@/tool/read"
 import type { SkillTool } from "@/tool/skill"
@@ -109,7 +109,7 @@ type ToolDefs = {
   webfetch: typeof WebFetchTool
   websearch: typeof WebSearchTool
   skill: typeof SkillTool
-  plan_exit: typeof PlanExitTool
+  present_plan: typeof PresentPlanTool
 }
 
 type ToolName = keyof ToolDefs
@@ -470,7 +470,7 @@ function runLsp(p: ToolProps<typeof LspTool>): ToolInline {
   }
 }
 
-function runPlanExit(p: ToolProps<typeof PlanExitTool>): ToolInline {
+function runPresentPlan(p: ToolProps<typeof PresentPlanTool>): ToolInline {
   return {
     icon: "→",
     title: text(p.frame.state.title) || "Switching to build agent",
@@ -1219,12 +1219,12 @@ const TOOL_RULES = {
       start: scrollSkillStart,
     },
   },
-  plan_exit: {
+  present_plan: {
     view: {
       output: true,
       final: false,
     },
-    run: runPlanExit,
+    run: runPresentPlan,
     scroll: {
       start: () => "",
     },

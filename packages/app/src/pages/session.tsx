@@ -378,11 +378,14 @@ export default function Page() {
   const sessionOwnership = createSessionOwnership(sessionKey)
   const newSessionDesign = createMemo(() => settings.general.newLayoutDesigns())
 
-  // Reacts to plan_exit tool calls that resolved to "Accept (Auto)": the tool
-  // itself can only switch the session's agent, since auto-accept is a
-  // client-side permission setting the server has no concept of -- so the
-  // client watches for the completed call and flips it here.
-  const handledPlanExitAutoAccept = new Set<string>()
+  // Reacts to present_plan tool calls: opens the plan panel the first time
+  // one goes pending (so the user sees the plan and the accept/deny/revise
+  // question without having to go find it), and applies "Accept (Auto)"
+  // once resolved -- the tool itself can only switch the session's agent,
+  // since auto-accept is a client-side permission setting the server has no
+  // concept of, so the client watches for the completed call and flips it.
+  const openedForPresentPlan = new Set<string>()
+  const handledPresentPlanAutoAccept = new Set<string>()
   createEffect(() => {
     const id = params.id
     if (!id) return
@@ -390,11 +393,16 @@ export default function Page() {
     for (const message of messages) {
       const parts = (sync().data.part[message.id] ?? []) as Part[]
       for (const part of parts) {
-        if (part.type !== "tool" || part.tool !== "plan_exit") continue
+        if (part.type !== "tool" || part.tool !== "present_plan") continue
+        if (part.state.status === "running" && !openedForPresentPlan.has(part.callID)) {
+          openedForPresentPlan.add(part.callID)
+          if (!view().reviewPanel.opened()) view().reviewPanel.open()
+          tabs().setActive("plan")
+        }
         if (part.state.status !== "completed") continue
         if (part.state.metadata?.autoAccept !== true) continue
-        if (handledPlanExitAutoAccept.has(part.callID)) continue
-        handledPlanExitAutoAccept.add(part.callID)
+        if (handledPresentPlanAutoAccept.has(part.callID)) continue
+        handledPresentPlanAutoAccept.add(part.callID)
         permission.enableAutoAccept(id, sdk().directory)
       }
     }

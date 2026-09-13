@@ -125,7 +125,7 @@ const layer = Layer.effect(
           },
           question: "deny",
           plan_enter: "deny",
-          plan_exit: "deny",
+          present_plan: "deny",
           // mirrors github.com/github/gitignore Node.gitignore pattern for .env files
           read: {
             "*": "allow",
@@ -161,7 +161,7 @@ const layer = Layer.effect(
               defaults,
               Permission.fromConfig({
                 question: "allow",
-                plan_exit: "allow",
+                present_plan: "allow",
                 task: {
                   general: "deny",
                 },
