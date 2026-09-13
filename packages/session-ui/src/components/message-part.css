@@ -373,13 +373,14 @@
   direction: ltr;
   unicode-bidi: isolate;
   width: 100%;
-  border: 1px solid var(--v2-grey-900);
-  border-radius: 6px;
-  /* Deliberately theme-invariant (raw palette, not a light/dark-aware
-     semantic token) -- a terminal block reads as a terminal because it's
-     dark regardless of whether the app itself is in light or dark mode,
-     matching the convention most coding-agent UIs use for shell output. */
-  background: var(--v2-grey-1100);
+  /* Matches Claude Code's own rendering of shell tool calls: a light,
+     clean card defined by a crisp border and rounded corners rather than
+     a dark terminal fill -- tried the dark-terminal convention first,
+     turned out to read as heavy/out of place against this app's light
+     theme rather than distinctive. */
+  border: 1px solid var(--v2-border-border-strong);
+  border-radius: 8px;
+  background: var(--v2-background-bg-base);
   position: relative;
   overflow: hidden;
 
@@ -390,14 +391,6 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
-
-    [data-slot="icon-svg"] {
-      color: var(--v2-grey-400);
-    }
-
-    &:hover [data-slot="icon-svg"] {
-      color: var(--v2-grey-100);
-    }
   }
 
   &:hover [data-slot="bash-copy"],
@@ -411,21 +404,21 @@
     align-items: flex-start;
     gap: 8px;
     padding: 10px 40px 10px 12px;
-    background: var(--v2-grey-1000);
-    border-bottom: 1px solid var(--v2-grey-900);
+    background: var(--v2-background-bg-layer-01);
+    border-bottom: 1px solid var(--v2-border-border-strong);
     font-family: var(--font-family-mono);
     font-feature-settings: var(--font-family-mono--font-feature-settings);
     font-size: 13px;
     font-weight: 500;
     line-height: var(--line-height-large);
-    color: var(--v2-grey-100);
+    color: var(--v2-text-text-base);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
   [data-slot="bash-command-prompt"] {
     flex-shrink: 0;
-    color: var(--v2-orange-500);
+    color: var(--v2-orange-800);
     user-select: none;
   }
 
@@ -453,7 +446,7 @@
     line-height: var(--line-height-large);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    color: var(--v2-grey-300);
+    color: var(--v2-text-text-muted);
   }
 }
 
