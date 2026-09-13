@@ -769,7 +769,7 @@ export const dict = {
   "sidebar.empty.title": "Ingen åbne projekter",
   "sidebar.empty.description": "Åbn et projekt for at komme i gang",
 
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "Desktop",
   "settings.section.server": "Server",
   "settings.tab.general": "Generelt",

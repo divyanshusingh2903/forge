@@ -907,7 +907,7 @@ export const dict = {
   "debugBar.direction.tip": "აპის სრული განლაგების მიმართულების იძულება არჩეული ენის შეცვლის გარეშე",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode სამუშაო მაგიდა",
+  "app.name.desktop": "Forge სამუშაო მაგიდა",
   "settings.section.desktop": "დესკტოპი",
   "settings.section.server": "სერვერი",
   "settings.tab.general": "ზოგადი",

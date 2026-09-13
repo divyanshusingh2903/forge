@@ -916,7 +916,7 @@ export const dict = {
   "debugBar.direction.tip": "चुनी गई भाषा बदले बिना पूरे ऐप की लेआउट दिशा ज़बरदस्ती सेट करें",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "डेस्कटॉप",
   "settings.section.server": "सर्वर",
   "settings.tab.general": "सामान्य",

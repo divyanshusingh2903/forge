@@ -911,7 +911,7 @@ export const dict = {
   "debugBar.direction.tip": "Forco drejtimin e plotë të paraqitjes së aplikacionit pa ndryshuar gjuhën e zgjedhur",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "Desktop",
   "settings.section.server": "Serveri",
   "settings.tab.general": "Gjeneral",

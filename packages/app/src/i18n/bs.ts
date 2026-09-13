@@ -892,7 +892,7 @@ export const dict = {
   "sidebar.empty.title": "Nema otvorenih projekata",
   "sidebar.empty.description": "Otvori projekat za početak",
 
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
 
   "settings.section.desktop": "Desktop",
   "settings.section.server": "Server",

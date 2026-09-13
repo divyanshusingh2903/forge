@@ -904,7 +904,7 @@ export const dict: Record<string, string> = {
   "debugBar.direction.tip": "තෝරාගත් භාෂාව වෙනස් නොකර සම්පූර්ණ යෙදුම් පිරිසැලසුම් දිශාව බල කරන්න",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode ඩෙස්ක්ටොප්",
+  "app.name.desktop": "Forge ඩෙස්ක්ටොප්",
   "settings.section.desktop": "ඩෙස්ක්ටොප්",
   "settings.section.server": "සේවාදායකය",
   "settings.tab.general": "ජෙනරාල්",

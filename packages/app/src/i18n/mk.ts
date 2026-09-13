@@ -912,7 +912,7 @@ export const dict = {
     "Присилете ја насоката на целосниот распоред на апликацијата без да го менувате избраниот јазик",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "Десктоп",
   "settings.section.server": "Сервер",
   "settings.tab.general": "Општо",

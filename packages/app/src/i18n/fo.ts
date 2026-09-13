@@ -907,7 +907,7 @@ export const dict = {
   "debugBar.direction.tip": "Tvinga alla app-uppsetingina uttan at broyta valda málið",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Skrivaraborð",
+  "app.name.desktop": "Forge Skrivaraborð",
   "settings.section.desktop": "Skrivaraborð",
   "settings.section.server": "Ambætari",
   "settings.tab.general": "Almenn",

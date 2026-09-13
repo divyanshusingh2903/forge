@@ -913,7 +913,7 @@ export const dict = {
   "debugBar.direction.tip": "Piespiedu kārtā lietot pilnu lietotnes izkārtojuma virzienu, nemainot izvēlēto valodu",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode darbvirsma",
+  "app.name.desktop": "Forge darbvirsma",
   "settings.section.desktop": "Darbvirsma",
   "settings.section.server": "Serveris",
   "settings.tab.general": "Vispārīgi",

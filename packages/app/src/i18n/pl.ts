@@ -831,7 +831,7 @@ export const dict = {
   "sidebar.project.clearNotifications": "Wyczyść powiadomienia",
   "sidebar.empty.title": "Brak otwartych projektów",
   "sidebar.empty.description": "Otwórz projekt, aby rozpocząć",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "Aplikacja komputerowa",
   "settings.section.server": "Serwer",
   "settings.tab.general": "Ogólne",

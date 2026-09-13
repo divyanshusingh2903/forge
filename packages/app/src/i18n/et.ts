@@ -904,7 +904,7 @@ export const dict = {
   "debugBar.direction.tip": "Sunnige kogu rakenduse paigutuse suund valitud keelt muutmata",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Töölaud",
+  "app.name.desktop": "Forge Töölaud",
   "settings.section.desktop": "Töölaud",
   "settings.section.server": "Server",
   "settings.tab.general": "Kindral",

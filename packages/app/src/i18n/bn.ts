@@ -906,7 +906,7 @@ export const dict: Record<string, string> = {
   "debugBar.direction.tip": "নির্বাচিত ভাষা পরিবর্তন না করে সম্পূর্ণ অ্যাপ লেআউটের দিকনির্দেশ জোর করে",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode ডেস্কটপ",
+  "app.name.desktop": "Forge ডেস্কটপ",
   "settings.section.desktop": "ডেস্কটপ",
   "settings.section.server": "সার্ভার",
   "settings.tab.general": "সাধারণ",

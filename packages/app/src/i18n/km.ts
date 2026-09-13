@@ -905,7 +905,7 @@ export const dict = {
   "debugBar.direction.tip": "បង្ខំទិសដៅប្លង់កម្មវិធីពេញលេញដោយមិនផ្លាស់ប្តូរភាសាដែលបានជ្រើសរើស",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "ផ្ទៃតុ",
   "settings.section.server": "ម៉ាស៊ីនមេ",
   "settings.tab.general": "ទូទៅ",

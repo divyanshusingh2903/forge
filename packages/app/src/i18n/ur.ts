@@ -917,7 +917,7 @@ export const dict = {
   "debugBar.direction.tip": "منتخب زبان تبدیل کیے بغیر پوری ایپ کے لے آؤٹ کی سمت لازماً مقرر کریں",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode ڈیسک ٹاپ",
+  "app.name.desktop": "Forge ڈیسک ٹاپ",
   "settings.section.desktop": "ڈیسک ٹاپ",
   "settings.section.server": "سرور",
   "settings.tab.general": "عمومی",

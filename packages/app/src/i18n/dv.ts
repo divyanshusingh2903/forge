@@ -922,7 +922,7 @@ export const dict = {
   "debugBar.direction.tip": "ހޮވާފައިވާ ބަހަށް ބަދަލެއް ނުގެނެސް ފުލް އެޕް ލޭއައުޓް ޑިރެކްޝަން ފޯސް ކުރާށެވެ",
   "debugBar.direction.ltr": "LTR އެވެ",
   "debugBar.direction.rtl": "RTL އެވެ",
-  "app.name.desktop": "OpenCode Desktop އެވެ",
+  "app.name.desktop": "Forge Desktop އެވެ",
   "settings.section.desktop": "ޑެސްކްޓޮޕް",
   "settings.section.server": "ސަރވަރ އެވެ",
   "settings.tab.general": "އާންމު",

@@ -920,7 +920,7 @@ export const dict = {
     "ရွေးချယ်ထားသောဘာသာစကားကို မပြောင်းလဲဘဲ အက်ပ်အပြင်အဆင် လမ်းညွှန်ချက်အပြည့်အစုံကို တွန်းအားပေးပါ။",
   "debugBar.direction.ltr": "LTR",
   "debugBar.direction.rtl": "RTL",
-  "app.name.desktop": "OpenCode Desktop",
+  "app.name.desktop": "Forge Desktop",
   "settings.section.desktop": "ဒက်စ်တော့",
   "settings.section.server": "ဆာဗာ",
   "settings.tab.general": "အထွေထွေ",
