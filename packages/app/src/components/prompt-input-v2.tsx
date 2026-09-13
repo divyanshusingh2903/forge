@@ -20,6 +20,7 @@ import { useCommand } from "@/context/command"
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePermission } from "@/context/permission"
+import { useSettings } from "@/context/settings"
 import { type ImageAttachmentPart, usePrompt } from "@/context/prompt"
 import { usePlatform } from "@/context/platform"
 import { useSDK } from "@/context/sdk"
@@ -87,6 +88,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
   const dialog = useDialog()
   const command = useCommand()
   const permission = usePermission()
+  const settings = useSettings()
   const language = useLanguage()
   const platform = usePlatform()
   const prompt = props.state ?? usePrompt()
@@ -395,7 +397,15 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
           : undefined
       },
       get mode() {
-        if (!props.controls.agents.visible) return undefined
+        // Deliberately NOT gated on props.controls.agents.visible -- that
+        // flag hides the native agent *selector* when the user has no
+        // custom agents (a UI-declutter default), but this mode control is
+        // a distinct, always-relevant concept. It does share the same
+        // underlying local.agent state for its "plan" option though, and
+        // that state's read path (local.tsx's agent.current()) ignores
+        // whatever was set while agentsVisible() is false -- forces "build"
+        // regardless -- so selecting "plan" here also has to flip
+        // showCustomAgents on, or the selection would silently not apply.
         const buildAgent = () =>
           props.controls.agents.available.find((item) => item.mode === "primary" && item.name !== "plan")?.name ??
           "build"
@@ -419,6 +429,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
             const id = props.controls.session.id
             const directory = sdk().directory
             if (value === "plan") {
+              settings.general.setShowCustomAgents(true)
               props.controls.agents.select("plan")
               return
             }

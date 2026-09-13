@@ -230,7 +230,38 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
   gate: false,
   init: () => {
     const platform = usePlatform()
-    const [store, setStore, settingsInit, ready] = persisted("settings.v3", createStore<Settings>(defaultSettings))
+    const [store, setStore, settingsInit, ready] = persisted(
+      {
+        key: "settings.v3",
+        // One-time correction: showReasoningSummaries/shellToolPartsExpanded/
+        // editToolPartsExpanded shipped defaulting false upstream, got
+        // snapshotted to disk the first time settings loaded (before this
+        // fork changed the default to true), and the stored value now wins
+        // over the new code default via the normal merge. Force them true
+        // exactly once, guarded by a marker, so this doesn't also clobber a
+        // real user choice to turn them back off afterward.
+        migrate(value) {
+          if (!value || typeof value !== "object" || Array.isArray(value)) return value
+          const data = value as Record<string, unknown>
+          if (data.verboseDefaultsMigratedV1) return data
+          const general = (data.general && typeof data.general === "object" ? data.general : {}) as Record<
+            string,
+            unknown
+          >
+          return {
+            ...data,
+            general: {
+              ...general,
+              showReasoningSummaries: true,
+              shellToolPartsExpanded: true,
+              editToolPartsExpanded: true,
+            },
+            verboseDefaultsMigratedV1: true,
+          }
+        },
+      },
+      createStore<Settings>(defaultSettings),
+    )
     const [launch, setLaunch, , launchReady] = persisted(
       "app-version.v1",
       createStore<{ version?: string }>({ version: undefined }),
