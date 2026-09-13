@@ -183,7 +183,12 @@ export const { use: useLocal, provider: LocalProvider } = createSimpleContext({
       list,
       visible: agentsVisible,
       current() {
-        return pickAgent(agentsVisible() ? (scope()?.agent ?? store.current) : "build")
+        const selected = scope()?.agent ?? store.current
+        // "plan" is a first-class mode driven by the composer's own mode
+        // dropdown, not the custom-agent picker, so it applies regardless
+        // of whether that picker is visible.
+        if (selected === "plan") return pickAgent(selected)
+        return pickAgent(agentsVisible() ? selected : "build")
       },
       set(name: string | undefined) {
         const item = pickAgent(name)
