@@ -60,6 +60,7 @@ import { normalize } from "@opencode-ai/session-ui/session-diff"
 import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { shouldMarkBoundaryGesture, normalizeWheelDelta } from "@/pages/session/message-gesture"
 import { SessionContextUsage } from "@/components/session-context-usage"
+import { SessionHeaderQuickActions, type SessionHeaderReviewDiff } from "@/components/session/session-header"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLanguage } from "@/context/language"
 import { useSessionKey } from "@/pages/session/session-layout"
@@ -255,6 +256,7 @@ export function MessageTimeline(props: {
   setRevealMessage?: (fn: (id: string) => void) => void
   setScrollToEnd?: (fn: () => void) => void
   setHistoryAnchor?: (handlers: { capture: () => void; restore: (done: boolean) => void }) => void
+  reviewDiffs?: Accessor<SessionHeaderReviewDiff[]>
 }) {
   let touchGesture: number | undefined
 
@@ -1481,6 +1483,9 @@ export function MessageTimeline(props: {
                       placement="bottom"
                       buttonAppearance={settings.general.newLayoutDesigns() ? "v2" : "default"}
                     />
+                    <Show when={settings.general.newLayoutDesigns()}>
+                      <SessionHeaderQuickActions diffs={props.reviewDiffs} />
+                    </Show>
                     <Show when={!parentID()}>
                       <Show
                         when={settings.general.newLayoutDesigns()}
