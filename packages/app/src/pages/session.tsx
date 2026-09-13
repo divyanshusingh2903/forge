@@ -2248,7 +2248,7 @@ export default function Page() {
 
   return (
     <SessionRouteFrame>
-      <SessionHeader />
+      <SessionHeader diffs={reviewDiffs} />
       <div
         ref={panelRow}
         class="flex-1 min-h-0 flex flex-col md:flex-row"
