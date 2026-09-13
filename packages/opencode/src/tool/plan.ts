@@ -14,6 +14,7 @@ import ENTER_PLAN_DESCRIPTION from "./plan-enter.txt"
 export const Parameters = Schema.Struct({})
 
 type PresentMetadata = {
+  switched: boolean
   autoAccept: boolean
 }
 
@@ -66,7 +67,7 @@ export const PresentPlanTool = Tool.define(
               title: "Continuing to revise the plan",
               output:
                 "The user wants to keep revising the plan. Ask what they'd like changed and continue refining the plan file.",
-              metadata: { autoAccept: false },
+              metadata: { switched: false, autoAccept: false },
             }
           }
 
@@ -98,7 +99,7 @@ export const PresentPlanTool = Tool.define(
           return {
             title: "Switching to build agent",
             output: "User approved switching to build agent. Wait for further instructions.",
-            metadata: { autoAccept },
+            metadata: { switched: true, autoAccept },
           }
         }).pipe(Effect.orDie),
     }
