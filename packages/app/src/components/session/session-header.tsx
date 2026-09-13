@@ -4,7 +4,6 @@ import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Keybind } from "@opencode-ai/ui/keybind"
-import { Popover } from "@opencode-ai/ui/popover"
 import { Spinner } from "@opencode-ai/ui/spinner"
 import { showToast } from "@/utils/toast"
 import { Tooltip, TooltipKeybind } from "@opencode-ai/ui/tooltip"
@@ -29,12 +28,10 @@ import { fileManagerApp } from "@/utils/file-manager"
 import { Persist, persisted } from "@/utils/persist"
 import { StatusPopover, StatusPopoverV2 } from "../status-popover"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
-import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { DiffChanges } from "@opencode-ai/ui/v2/diff-changes-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
-import { reviewTooltipKeybind } from "../command-tooltip-keybind"
 import { useTitlebarRightMount } from "../titlebar"
 
 const OPEN_APPS = [
@@ -239,17 +236,6 @@ export function SessionHeader(props: { diffs?: Accessor<SessionHeaderReviewDiff[
   const tint = createMemo(() =>
     messageAgentColor(params.id ? sync().data.message[params.id] : undefined, sync().data.agent),
   )
-  const v2ActionsState = createMemo<SessionHeaderV2ActionsState>(() => ({
-    statusVisible: status(),
-    statusLabel: language.t("status.popover.trigger"),
-    reviewLabel: language.t("command.review.toggle"),
-    reviewKeybind: reviewTooltipKeybind(command),
-    reviewVisible: isDesktop(),
-    reviewOpened: view().reviewPanel.opened(),
-    onReviewToggle: () => view().reviewPanel.toggle(),
-    onReviewOpen: () => view().reviewPanel.open("other"),
-    reviewDiffs: props.diffs ?? (() => []),
-  }))
 
   const selectApp = (app: OpenApp) => {
     if (!options().some((item) => item.id === app)) return
@@ -514,7 +500,7 @@ export function SessionHeader(props: { diffs?: Accessor<SessionHeaderReviewDiff[
                 </div>
               }
             >
-              <SessionHeaderV2Actions state={v2ActionsState()} />
+              {null}
             </Show>
           </Portal>
         )}
@@ -523,120 +509,13 @@ export function SessionHeader(props: { diffs?: Accessor<SessionHeaderReviewDiff[
   )
 }
 
-type SessionHeaderV2ActionsState = {
-  statusVisible: boolean
-  statusLabel: string
-  reviewLabel: string
-  reviewKeybind: string[]
-  reviewVisible: boolean
-  reviewOpened: boolean
-  onReviewToggle: () => void
-  onReviewOpen: () => void
-  reviewDiffs: Accessor<SessionHeaderReviewDiff[]>
-}
-
-const REVIEW_POPOVER_MAX_FILES = 8
-
-function SessionHeaderReviewPopoverBody(props: { state: SessionHeaderV2ActionsState; onOpenFull: () => void }) {
-  const language = useLanguage()
-  const diffs = () => props.state.reviewDiffs()
-  const visible = () => diffs().slice(0, REVIEW_POPOVER_MAX_FILES)
-  const overflow = () => Math.max(0, diffs().length - REVIEW_POPOVER_MAX_FILES)
-
-  return (
-    <div class="flex w-72 max-w-[calc(100vw-40px)] flex-col rounded-xl bg-v2-background-bg-layer-01 p-1 shadow-[var(--v2-elevation-floating)]">
-      <div class="flex items-center justify-between px-2 py-1.5">
-        <span class="text-13-medium text-v2-text-text-base">{props.state.reviewLabel}</span>
-        <DiffChanges changes={diffs()} />
-      </div>
-      <Show
-        when={diffs().length > 0}
-        fallback={
-          <div class="px-2 py-3 text-13-regular text-v2-text-text-muted">{language.t("ui.sessionReviewV2.empty")}</div>
-        }
-      >
-        <div class="flex max-h-64 flex-col gap-0.5 overflow-y-auto px-1">
-          <For each={visible()}>
-            {(diff) => (
-              <div class="flex items-center justify-between gap-2 rounded-[6px] px-1.5 py-1">
-                <span class="min-w-0 truncate text-13-regular text-v2-text-text-base">
-                  {getFilename(diff.file ?? "")}
-                </span>
-                <DiffChanges changes={diff} />
-              </div>
-            )}
-          </For>
-          <Show when={overflow() > 0}>
-            <div class="px-1.5 py-1 text-12-regular text-v2-text-text-faint">
-              {language.t("ui.sessionTurn.diffs.more", { count: String(overflow()) })}
-            </div>
-          </Show>
-        </div>
-      </Show>
-      <div class="mt-1 border-t border-v2-border-border-muted pt-1">
-        <ButtonV2 variant="ghost" class="w-full justify-center" onClick={props.onOpenFull}>
-          {language.t("ui.sessionReviewV2.openFull")}
-        </ButtonV2>
-      </div>
-    </div>
-  )
-}
-
-function SessionHeaderV2Actions(props: { state: SessionHeaderV2ActionsState }) {
-  const language = useLanguage()
-  const [reviewPopoverOpen, setReviewPopoverOpen] = createSignal(false)
-
-  return (
-    <div class="flex items-center gap-2">
-      <Show when={props.state.statusVisible}>
-        <Tooltip placement="bottom" value={props.state.statusLabel}>
-          <StatusPopoverV2 />
-        </Tooltip>
-      </Show>
-      <Show when={props.state.reviewVisible}>
-        <Popover
-          open={reviewPopoverOpen()}
-          onOpenChange={setReviewPopoverOpen}
-          placement="bottom-end"
-          gutter={4}
-          class="border-0 bg-transparent p-0 shadow-none [&_[data-slot=popover-body]]:p-0"
-          triggerAs={IconButtonV2}
-          triggerProps={{
-            type: "button",
-            variant: "ghost-muted",
-            size: "large",
-            class: "!w-9 shrink-0",
-            state: props.state.reviewOpened || reviewPopoverOpen() ? "pressed" : undefined,
-            "aria-label": props.state.reviewLabel,
-            "aria-expanded": props.state.reviewOpened,
-            "aria-controls": "review-panel",
-          }}
-          trigger={<IconV2 name="sidebar-right" />}
-        >
-          <SessionHeaderReviewPopoverBody
-            state={props.state}
-            onOpenFull={() => {
-              setReviewPopoverOpen(false)
-              props.state.onReviewOpen()
-            }}
-          />
-        </Popover>
-      </Show>
-    </div>
-  )
-}
-
-// Self-contained status/review/terminal icon cluster -- same actions as
-// SessionHeaderV2Actions above, but usable anywhere (e.g. next to the
+// Self-contained status/review/terminal icon cluster, usable anywhere (e.g. next to the
 // context-usage circle) without needing the titlebar's precomputed state.
 export function SessionHeaderQuickActions(props: { diffs?: Accessor<SessionHeaderReviewDiff[]> }) {
   const language = useLanguage()
-  const command = useCommand()
-  const server = useServer()
   const settings = useSettings()
   const terminal = useTerminal()
   const { view } = useSessionLayout()
-  const [reviewPopoverOpen, setReviewPopoverOpen] = createSignal(false)
 
   const statusVisible = settings.visibility.status
   const reviewDiffs = props.diffs ?? (() => [])
@@ -651,17 +530,12 @@ export function SessionHeaderQuickActions(props: { diffs?: Accessor<SessionHeade
     if (id) focusTerminalById(id)
   }
 
-  const v2ActionsState = createMemo<SessionHeaderV2ActionsState>(() => ({
-    statusVisible: statusVisible(),
-    statusLabel: language.t("status.popover.trigger"),
-    reviewLabel: language.t("command.review.toggle"),
-    reviewKeybind: reviewTooltipKeybind(command),
-    reviewVisible: true,
-    reviewOpened: reviewOpened(),
-    onReviewToggle: () => view().reviewPanel.toggle(),
-    onReviewOpen: () => view().reviewPanel.open("other"),
-    reviewDiffs,
-  }))
+  const reviewTooltip = () => (
+    <div class="flex items-center gap-2">
+      <span>{language.t("command.review.toggle")}</span>
+      <DiffChanges changes={reviewDiffs()} />
+    </div>
+  )
 
   return (
     <div class="flex items-center gap-2">
@@ -684,33 +558,20 @@ export function SessionHeaderQuickActions(props: { diffs?: Accessor<SessionHeade
           icon={<IconV2 name={terminalOpened() ? "terminal-active" : "terminal"} />}
         />
       </TooltipV2>
-      <Popover
-        open={reviewPopoverOpen()}
-        onOpenChange={setReviewPopoverOpen}
-        placement="bottom-end"
-        gutter={4}
-        class="border-0 bg-transparent p-0 shadow-none [&_[data-slot=popover-body]]:p-0"
-        triggerAs={IconButtonV2}
-        triggerProps={{
-          type: "button",
-          variant: "ghost-muted",
-          size: "large",
-          class: "!w-9 shrink-0",
-          state: reviewOpened() || reviewPopoverOpen() ? "pressed" : undefined,
-          "aria-label": language.t("command.review.toggle"),
-          "aria-expanded": reviewOpened(),
-          "aria-controls": "review-panel",
-        }}
-        trigger={<IconV2 name="sidebar-right" />}
-      >
-        <SessionHeaderReviewPopoverBody
-          state={v2ActionsState()}
-          onOpenFull={() => {
-            setReviewPopoverOpen(false)
-            v2ActionsState().onReviewOpen()
-          }}
+      <TooltipV2 value={reviewTooltip()} placement="bottom">
+        <IconButtonV2
+          type="button"
+          variant="ghost-muted"
+          size="large"
+          class="!w-9 shrink-0"
+          state={reviewOpened() ? "pressed" : undefined}
+          aria-label={language.t("command.review.toggle")}
+          aria-expanded={reviewOpened()}
+          aria-controls="review-panel"
+          onClick={() => view().reviewPanel.toggle()}
+          icon={<IconV2 name="sidebar-right" />}
         />
-      </Popover>
+      </TooltipV2>
     </div>
   )
 }
