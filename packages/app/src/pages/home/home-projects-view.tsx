@@ -17,7 +17,7 @@ import { ServerConnection } from "@/context/server"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
-import { displayName, getProjectAvatarSource, sortedRootSessions } from "@/pages/layout/helpers"
+import { compareSessionTime, displayName, getProjectAvatarSource, sortedRootSessions } from "@/pages/layout/helpers"
 import { ServerRowMenuView, serverMenuLabels } from "@/components/server/server-row-menu"
 import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
@@ -90,6 +90,13 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
         props.onWheel(event)
       }}
     >
+      <HomeRecentSessions
+        servers={props.servers}
+        projectsForServer={props.projectsForServer}
+        currentSession={props.currentSession}
+        onOpenSession={props.onOpenSession}
+        language={props.language}
+      />
       <div class="flex h-7 min-w-0 shrink-0 items-center justify-between pl-1.5 pr-3">
         <div class="text-v2-text-text-muted [font-weight:530]">{props.language.t("home.projects")}</div>
         <Show
@@ -415,6 +422,58 @@ function HomeProjectSlot(
         />
       </Show>
     </div>
+  )
+}
+
+const HOME_RECENT_SESSIONS_LIMIT = 5
+
+function HomeRecentSessions(props: {
+  servers: Accessor<ServerConnection.Any[]>
+  projectsForServer: (server: ServerConnection.Any) => LocalProject[]
+  currentSession?: Accessor<{ server?: string; id?: string } | undefined>
+  onOpenSession: (server: ServerConnection.Any, session: Session) => void
+  language: ReturnType<typeof useLanguage>
+}) {
+  const global = useGlobal()
+  const entries = createMemo(() => {
+    const all: { server: ServerConnection.Any; project: LocalProject; session: Session }[] = []
+    for (const server of props.servers()) {
+      for (const project of props.projectsForServer(server)) {
+        const [store] = global.ensureServerCtx(server).sync.child(project.worktree, { bootstrap: true })
+        for (const session of sortedRootSessions(store, 0)) {
+          all.push({ server, project, session })
+        }
+      }
+    }
+    return all.sort((a, b) => compareSessionTime(a.session, b.session)).slice(0, HOME_RECENT_SESSIONS_LIMIT)
+  })
+
+  return (
+    <Show when={entries().length > 0}>
+      <div class="flex min-w-0 shrink-0 flex-col gap-1">
+        <div class="flex h-7 min-w-0 shrink-0 items-center pl-1.5 pr-3">
+          <div class="text-v2-text-text-muted [font-weight:530]">{props.language.t("home.recentSessions")}</div>
+        </div>
+        <For each={entries()}>
+          {(entry) => {
+            const current = createMemo(() => {
+              const value = props.currentSession?.()
+              return value?.server === ServerConnection.key(entry.server) && value?.id === entry.session.id
+            })
+            return (
+              <HomeProjectNavButton
+                type="button"
+                data-selected={current() ? "" : undefined}
+                onClick={() => props.onOpenSession(entry.server, entry.session)}
+              >
+                <HomeProjectAvatar project={entry.project} />
+                <span class={HOME_PROJECT_NAV_LABEL}>{sessionTitle(entry.session.title) || entry.session.id}</span>
+              </HomeProjectNavButton>
+            )
+          }}
+        </For>
+      </div>
+    </Show>
   )
 }
 
