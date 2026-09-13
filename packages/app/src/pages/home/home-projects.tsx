@@ -1,8 +1,16 @@
+import type { Accessor } from "solid-js"
+import type { ServerConnection } from "@/context/server"
+import type { Session } from "@opencode-ai/sdk/v2/client"
 import type { HomeProjectsController } from "./home-projects-controller"
 import { HomeProjectsView } from "./home-projects-view"
 import type { HomeScrollController } from "./home-scroll-controller"
 
-export function HomeProjects(props: { projects: HomeProjectsController; scroll: HomeScrollController }) {
+export function HomeProjects(props: {
+  projects: HomeProjectsController
+  scroll: HomeScrollController
+  onOpenSession: (server: ServerConnection.Any, session: Session) => void
+  currentSession?: Accessor<{ server?: string; id?: string } | undefined>
+}) {
   return (
     <HomeProjectsView
       language={props.projects.copy.language}
@@ -35,6 +43,8 @@ export function HomeProjects(props: { projects: HomeProjectsController; scroll: 
       onCloseProject={props.projects.project.close}
       onOpenSettings={props.projects.utility.settings}
       onOpenHelp={props.projects.utility.help}
+      onOpenSession={props.onOpenSession}
+      currentSession={props.currentSession}
     />
   )
 }
