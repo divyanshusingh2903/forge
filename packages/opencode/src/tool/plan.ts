@@ -9,11 +9,16 @@ import { Provider } from "@/provider/provider"
 import { InstanceState } from "@/effect/instance-state"
 import { MessageID, PartID } from "../session/schema"
 import PRESENT_PLAN_DESCRIPTION from "./present-plan.txt"
+import ENTER_PLAN_DESCRIPTION from "./plan-enter.txt"
 
 export const Parameters = Schema.Struct({})
 
-type Metadata = {
+type PresentMetadata = {
   autoAccept: boolean
+}
+
+type EnterMetadata = {
+  switched: boolean
 }
 
 const ACCEPT_MANUAL = "Accept (Manual)"
@@ -31,7 +36,7 @@ export const PresentPlanTool = Tool.define(
     return {
       description: PRESENT_PLAN_DESCRIPTION,
       parameters: Parameters,
-      execute: (_params: {}, ctx: Tool.Context<Metadata>) =>
+      execute: (_params: {}, ctx: Tool.Context<PresentMetadata>) =>
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
           const info = yield* session.get(ctx.sessionID)
@@ -94,6 +99,75 @@ export const PresentPlanTool = Tool.define(
             title: "Switching to build agent",
             output: "User approved switching to build agent. Wait for further instructions.",
             metadata: { autoAccept },
+          }
+        }).pipe(Effect.orDie),
+    }
+  }),
+)
+
+export const PlanEnterTool = Tool.define(
+  "plan_enter",
+  Effect.gen(function* () {
+    const session = yield* Session.Service
+    const question = yield* Question.Service
+    const provider = yield* Provider.Service
+
+    return {
+      description: ENTER_PLAN_DESCRIPTION,
+      parameters: Parameters,
+      execute: (_params: {}, ctx: Tool.Context<EnterMetadata>) =>
+        Effect.gen(function* () {
+          const answers = yield* question.ask({
+            sessionID: ctx.sessionID,
+            questions: [
+              {
+                question: "This looks like it needs planning before implementation. Switch to plan mode?",
+                header: "Plan Mode",
+                custom: false,
+                options: [
+                  { label: "Yes", description: "Switch to plan mode: research and design before making changes" },
+                  { label: "No", description: "Continue directly with the request" },
+                ],
+              },
+            ],
+            tool: ctx.callID ? { messageID: ctx.messageID, callID: ctx.callID } : undefined,
+          })
+
+          if (answers[0]?.[0] !== "Yes") {
+            return {
+              title: "Continuing without planning",
+              output: "The user chose to continue without switching to plan mode. Proceed with their request directly.",
+              metadata: { switched: false },
+            }
+          }
+
+          const messages = yield* session.messages({ sessionID: ctx.sessionID }).pipe(Effect.orDie)
+          const lastUser = messages.findLast((item) => item.info.role === "user" && item.info.model)
+          const model =
+            lastUser?.info.role === "user" && lastUser.info.model ? lastUser.info.model : yield* provider.defaultModel()
+
+          const msg: SessionV1.User = {
+            id: MessageID.ascending(),
+            sessionID: ctx.sessionID,
+            role: "user",
+            time: { created: Date.now() },
+            agent: "plan",
+            model,
+          }
+          yield* session.updateMessage(msg)
+          yield* session.updatePart({
+            id: PartID.ascending(),
+            messageID: msg.id,
+            sessionID: ctx.sessionID,
+            type: "text",
+            text: "Switched to plan mode. Research and design the approach before writing any code, then use present_plan once you've written the plan file.",
+            synthetic: true,
+          } satisfies SessionV1.TextPart)
+
+          return {
+            title: "Switching to plan agent",
+            output: "User approved switching to plan agent. Research and design before implementing.",
+            metadata: { switched: true },
           }
         }).pipe(Effect.orDie),
     }

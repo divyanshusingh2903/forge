@@ -24,7 +24,7 @@ import type { GlobTool } from "@/tool/glob"
 import type { GrepTool } from "@/tool/grep"
 import type { InvalidTool } from "@/tool/invalid"
 import type { LspTool } from "@/tool/lsp"
-import type { PresentPlanTool } from "@/tool/plan"
+import type { PresentPlanTool, PlanEnterTool } from "@/tool/plan"
 import type { QuestionTool } from "@/tool/question"
 import type { ReadTool } from "@/tool/read"
 import type { SkillTool } from "@/tool/skill"
@@ -110,6 +110,7 @@ type ToolDefs = {
   websearch: typeof WebSearchTool
   skill: typeof SkillTool
   present_plan: typeof PresentPlanTool
+  plan_enter: typeof PlanEnterTool
 }
 
 type ToolName = keyof ToolDefs
@@ -474,6 +475,15 @@ function runPresentPlan(p: ToolProps<typeof PresentPlanTool>): ToolInline {
   return {
     icon: "→",
     title: text(p.frame.state.title) || "Switching to build agent",
+    mode: "block",
+    body: p.frame.status === "completed" ? text(p.frame.state.output) : undefined,
+  }
+}
+
+function runPlanEnter(p: ToolProps<typeof PlanEnterTool>): ToolInline {
+  return {
+    icon: "→",
+    title: text(p.frame.state.title) || "Switching to plan agent",
     mode: "block",
     body: p.frame.status === "completed" ? text(p.frame.state.output) : undefined,
   }
@@ -1225,6 +1235,16 @@ const TOOL_RULES = {
       final: false,
     },
     run: runPresentPlan,
+    scroll: {
+      start: () => "",
+    },
+  },
+  plan_enter: {
+    view: {
+      output: true,
+      final: false,
+    },
+    run: runPlanEnter,
     scroll: {
       start: () => "",
     },
