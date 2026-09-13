@@ -1,9 +1,14 @@
 import { createEffect, Suspense, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
+import type { Session } from "@opencode-ai/sdk/v2/client"
 import { DebugBar } from "@/components/debug-bar"
 import { TabsInfoPopup } from "@/components/help-button"
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
 import { usePlatform } from "@/context/platform"
+import { useGlobal } from "@/context/global"
+import { useLayout } from "@/context/layout"
+import { ServerConnection } from "@/context/server"
+import { useTabs } from "@/context/tabs"
 import { setV2Toast, ToastRegion } from "@/utils/toast"
 import { createHomeController } from "@/pages/home/home-controller"
 import { createHomeProjectsController } from "@/pages/home/home-projects-controller"
@@ -13,9 +18,26 @@ import { createHomeScrollController } from "@/pages/home/home-scroll-controller"
 export default function NewLayout(props: ParentProps) {
   const platform = usePlatform()
   const [state, setState] = createStore({ debugTools: true })
+  const global = useGlobal()
+  const tabs = useTabs()
+  const layout = useLayout()
   const home = createHomeController()
   const projects = createHomeProjectsController(home)
   const scroll = createHomeScrollController(() => [])
+
+  const openSession = (server: ServerConnection.Any, session: Session) => {
+    const ctx = global.ensureServerCtx(server)
+    ctx.projects.open(session.directory)
+    ctx.projects.touch(session.directory)
+    const tab = tabs.addSessionTab({ server: ServerConnection.key(server), sessionId: session.id })
+    tabs.select(tab)
+  }
+
+  const currentSession = () => {
+    const route = layout.route()
+    if (route.type !== "session") return undefined
+    return { server: route.server, id: route.sessionId }
+  }
 
   createEffect(() => setV2Toast(true))
 
@@ -46,7 +68,7 @@ export default function NewLayout(props: ParentProps) {
         }
       />
       <div class="flex-1 min-h-0 min-w-0 flex flex-row">
-        <HomeProjects projects={projects} scroll={scroll} />
+        <HomeProjects projects={projects} scroll={scroll} onOpenSession={openSession} currentSession={currentSession} />
         <main class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-strict">
           <Suspense>{props.children}</Suspense>
         </main>

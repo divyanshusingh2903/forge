@@ -5,6 +5,7 @@ import { isSortable, useSortable } from "@dnd-kit/solid/sortable"
 import { AutoScroller, Feedback, PointerActivationConstraints } from "@dnd-kit/dom"
 import { RestrictToVerticalAxis } from "@dnd-kit/abstract/modifiers"
 import { RestrictToElement } from "@dnd-kit/dom/modifiers"
+import type { Session } from "@opencode-ai/sdk/v2/client"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { ProjectAvatar } from "@opencode-ai/ui/v2/project-avatar-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
@@ -13,13 +14,15 @@ import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { getProjectAvatarVariant, type HomeProjectSelection, type LocalProject } from "@/context/layout"
 import { ServerConnection } from "@/context/server"
+import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
-import { displayName, getProjectAvatarSource } from "@/pages/layout/helpers"
+import { displayName, getProjectAvatarSource, sortedRootSessions } from "@/pages/layout/helpers"
 import { ServerRowMenuView, serverMenuLabels } from "@/components/server/server-row-menu"
 import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
 import { fileManagerApp } from "@/utils/file-manager"
+import { sessionTitle } from "@/utils/session-title"
 
 const HOME_PROJECT_NAV_LABEL = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
 
@@ -58,6 +61,8 @@ export type HomeProjectsViewProps = {
   onCloseProject: (server: ServerConnection.Any, directory: string) => void
   onOpenSettings: () => void
   onOpenHelp: () => void
+  onOpenSession: (server: ServerConnection.Any, session: Session) => void
+  currentSession?: Accessor<{ server?: string; id?: string } | undefined>
 }
 
 export function HomeProjectsView(props: HomeProjectsViewProps) {
@@ -66,11 +71,18 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
     contextMenuOpen: (id: string) => contextMenu.open === id,
     onSetContextMenuOpen: (id: string, open: boolean) => setContextMenu("open", open ? id : undefined),
   }
+  const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
+  const expandedProps = {
+    sessionsExpanded: (worktree: string, selected: boolean) => expanded[worktree] ?? selected,
+    onToggleSessionsExpanded: (worktree: string, selected: boolean) =>
+      setExpanded(worktree, (value) => !(value ?? selected)),
+  }
   return (
     <aside
       class={`
         flex h-full w-[260px] shrink-0 min-h-0 min-w-0 flex-col gap-4 overflow-hidden
         bg-v2-background-bg-deep border-r border-v2-border-border-base py-3 pl-3 pr-2
+        rounded-tr-xl rounded-br-xl
       `}
       aria-label={props.language.t("home.projects")}
       onWheel={(event) => {
@@ -109,6 +121,7 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
                 <HomeProjectList
                   {...props}
                   {...contextMenuProps}
+                  {...expandedProps}
                   server={props.servers()[0]}
                   items={props.projects()}
                 />
@@ -135,7 +148,7 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
                     />
                     <Show when={healthy() && hasProjects() && !collapsed()}>
                       <div class="mx-3 h-px bg-v2-border-border-base" />
-                      <HomeProjectList {...props} {...contextMenuProps} server={item} items={projects()} />
+                      <HomeProjectList {...props} {...contextMenuProps} {...expandedProps} server={item} items={projects()} />
                     </Show>
                   </div>
                 )
@@ -305,8 +318,14 @@ type HomeProjectsContextMenuProps = {
   onSetContextMenuOpen: (id: string, open: boolean) => void
 }
 
+type HomeProjectsExpandedProps = {
+  sessionsExpanded: (worktree: string, selected: boolean) => boolean
+  onToggleSessionsExpanded: (worktree: string, selected: boolean) => void
+}
+
 type HomeProjectListProps = HomeProjectsViewProps &
-  HomeProjectsContextMenuProps & {
+  HomeProjectsContextMenuProps &
+  HomeProjectsExpandedProps & {
     server: ServerConnection.Any
     items: LocalProject[]
   }
@@ -366,20 +385,76 @@ function HomeProjectSlot(
     (previous) => props.items.find((item) => item.worktree === props.worktree) ?? previous,
     initial,
   )
+  const selected = createMemo(
+    () =>
+      props.selection().server === ServerConnection.key(props.server) &&
+      props.selection().directory === props.worktree,
+  )
+  const sessionsOpen = createMemo(() => props.sessionsExpanded(props.worktree, selected()))
 
   return (
-    <HomeProjectRow
-      {...props}
-      project={project()}
-      server={props.server}
-      index={props.index}
-      serverSelected={props.selection().server === ServerConnection.key(props.server)}
-      selected={
-        props.selection().server === ServerConnection.key(props.server) &&
-        props.selection().directory === props.worktree
-      }
-      unseen={props.unseenCount(props.server, project())}
-    />
+    <div class="flex min-w-0 flex-col gap-0.5">
+      <HomeProjectRow
+        {...props}
+        project={project()}
+        server={props.server}
+        index={props.index}
+        serverSelected={props.selection().server === ServerConnection.key(props.server)}
+        selected={selected()}
+        unseen={props.unseenCount(props.server, project())}
+        sessionsOpen={sessionsOpen()}
+        onToggleSessions={() => props.onToggleSessionsExpanded(props.worktree, selected())}
+      />
+      <Show when={sessionsOpen()}>
+        <HomeProjectSessions
+          server={props.server}
+          directory={props.worktree}
+          currentSession={props.currentSession}
+          onOpenSession={props.onOpenSession}
+          language={props.language}
+        />
+      </Show>
+    </div>
+  )
+}
+
+function HomeProjectSessions(props: {
+  server: ServerConnection.Any
+  directory: string
+  currentSession?: Accessor<{ server?: string; id?: string } | undefined>
+  onOpenSession: (server: ServerConnection.Any, session: Session) => void
+  language: ReturnType<typeof useLanguage>
+}) {
+  const global = useGlobal()
+  const [store] = global.ensureServerCtx(props.server).sync.child(props.directory, { bootstrap: true })
+  const sessions = createMemo(() => sortedRootSessions(store, 0))
+
+  return (
+    <div class="flex min-w-0 flex-col gap-0.5 pl-6">
+      <Show
+        when={sessions().length > 0}
+        fallback={<div class="px-1.5 py-1 text-v2-text-text-faint">{props.language.t("home.sessions.empty")}</div>}
+      >
+        <For each={sessions()}>
+          {(session) => {
+            const current = createMemo(() => {
+              const value = props.currentSession?.()
+              return value?.server === ServerConnection.key(props.server) && value?.id === session.id
+            })
+            return (
+              <HomeProjectNavButton
+                type="button"
+                class="h-6 disabled:opacity-60"
+                data-selected={current() ? "" : undefined}
+                onClick={() => props.onOpenSession(props.server, session)}
+              >
+                <span class={`${HOME_PROJECT_NAV_LABEL} text-[13px]`}>{sessionTitle(session.title) || session.id}</span>
+              </HomeProjectNavButton>
+            )
+          }}
+        </For>
+      </Show>
+    </div>
   )
 }
 
@@ -452,6 +527,8 @@ function HomeProjectRow(
       serverSelected: boolean
       selected: boolean
       unseen: number
+      sessionsOpen: boolean
+      onToggleSessions: () => void
     },
 ) {
   const platform = usePlatform()
@@ -518,6 +595,25 @@ function HomeProjectRow(
           pointerDownSelected = undefined
         }}
       >
+        <span
+          data-action="home-project-sessions-toggle"
+          class="-ml-0.5 -mr-1 inline-flex size-5 shrink-0 items-center justify-center rounded-[4px] text-v2-icon-icon-muted hover:bg-v2-overlay-simple-overlay-hover"
+          aria-label={props.sessionsOpen ? props.language.t("home.server.collapse") : props.language.t("home.server.expand")}
+          aria-expanded={props.sessionsOpen}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            props.onToggleSessions()
+          }}
+          onPointerDown={(event) => event.preventDefault()}
+        >
+          <IconV2
+            name="chevron-down"
+            size="small"
+            class="transition-transform duration-150 ease-in-out"
+            style={{ transform: `rotate(${props.sessionsOpen ? 0 : -90}deg)` }}
+          />
+        </span>
         <HomeProjectAvatar project={props.project} />
         <span class={HOME_PROJECT_NAV_LABEL}>{displayName(props.project)}</span>
       </HomeProjectNavButton>
