@@ -26,6 +26,7 @@ import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
 import { fileManagerApp } from "@/utils/file-manager"
 import { sessionTitle } from "@/utils/session-title"
+import { Persist, persisted } from "@/utils/persist"
 import type { PinnedSessions } from "./pinned-sessions"
 
 const HOME_PROJECT_NAV_LABEL = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
@@ -77,11 +78,14 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
     contextMenuOpen: (id: string) => contextMenu.open === id,
     onSetContextMenuOpen: (id: string, open: boolean) => setContextMenu("open", open ? id : undefined),
   }
-  const [expanded, setExpanded] = createStore<Record<string, boolean>>({})
+  const [expanded, setExpanded] = persisted(
+    Persist.global("home.sidebar.sessionsExpanded"),
+    createStore({ worktrees: {} as Record<string, boolean> }),
+  )
   const expandedProps = {
-    sessionsExpanded: (worktree: string, selected: boolean) => expanded[worktree] ?? selected,
+    sessionsExpanded: (worktree: string, selected: boolean) => expanded.worktrees[worktree] ?? selected,
     onToggleSessionsExpanded: (worktree: string, selected: boolean) =>
-      setExpanded(worktree, (value) => !(value ?? selected)),
+      setExpanded("worktrees", worktree, (value) => !(value ?? selected)),
   }
   return (
     <aside
