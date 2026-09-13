@@ -65,6 +65,8 @@ import { animate } from "motion"
 import { attached, inline, kind, typeLabel } from "./message-file"
 import { readPartText } from "./message-part-text"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
+import { highlightStreamingCode, disposeStreamingCode } from "./markdown-worker"
+import type { MarkdownToken } from "./markdown-worker-protocol"
 
 async function writeClipboard(text: string): Promise<boolean> {
   const body = typeof document === "undefined" ? undefined : document.body
@@ -120,6 +122,35 @@ function ShellSubmessage(props: { text: string; animate?: boolean }) {
         </span>
       </span>
     </span>
+  )
+}
+
+function BashCommandLine(props: { command: string }) {
+  const [tokens, setTokens] = createSignal<MarkdownToken[]>()
+
+  createEffect(() => {
+    const command = props.command
+    const key = `bash-command:${command}`
+    let cancelled = false
+    highlightStreamingCode(key, command, "bash", true)
+      .then((state) => {
+        if (cancelled) return
+        setTokens([...state.stable, ...state.unstable])
+      })
+      .catch(() => {
+        if (cancelled) return
+        setTokens(undefined)
+      })
+    onCleanup(() => {
+      cancelled = true
+      disposeStreamingCode(key)
+    })
+  })
+
+  return (
+    <Show when={tokens()} fallback={props.command} keyed>
+      {(list) => <For each={list}>{(token) => <span style={token[1]}>{token[0]}</span>}</For>}
+    </Show>
   )
 }
 
@@ -2137,7 +2168,9 @@ ToolRegistry.register({
           <Show when={props.input.command}>
             <div data-slot="bash-command">
               <span data-slot="bash-command-prompt">$</span>
-              <code>{props.input.command}</code>
+              <code>
+                <BashCommandLine command={props.input.command} />
+              </code>
             </div>
           </Show>
           <div
