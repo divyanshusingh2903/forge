@@ -17,6 +17,11 @@ type DiffOptions = {
 
 const emptyPatch = (file: string) => formatPatch(structuredPatch(file, file, "", "", "", "", { context: 0 }))
 
+// Plan files are the plan agent's own working notes, not application code --
+// exclude them from git status/diff so they don't clutter the review panel.
+// They still get written to the worktree and can be committed manually.
+const isPlanFile = (file: string) => file.startsWith(".opencode/plans/")
+
 const nums = (list: Git.Stat[]) =>
   new Map(list.map((item) => [item.file, { additions: item.additions, deletions: item.deletions }] as const))
 
@@ -177,6 +182,7 @@ const files = Effect.fnUntraced(function* (
   let capped = false
 
   for (const item of list.toSorted((a, b) => a.file.localeCompare(b.file))) {
+    if (isPlanFile(item.file)) continue
     const stat = map.get(item.file) ?? (item.status === "added" ? yield* git.statUntracked(cwd, item.file) : undefined)
     const patch = yield* patchForItem(git, cwd, ref, item, batch, capped, options)
     const result: { patch: string; capped: boolean } = capped
@@ -355,7 +361,7 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         )
         const map = nums(stats)
         return yield* Effect.forEach(
-          list.toSorted((a, b) => a.file.localeCompare(b.file)),
+          list.toSorted((a, b) => a.file.localeCompare(b.file)).filter((item) => !isPlanFile(item.file)),
           (item) =>
             Effect.gen(function* () {
               const stat =
