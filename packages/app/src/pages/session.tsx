@@ -2118,6 +2118,7 @@ export default function Page() {
                   setScrollToEnd={(fn) => {
                     scrollToEnd = fn
                   }}
+                  reviewDiffs={reviewDiffs}
                 />
               )}
             </Show>

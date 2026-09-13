@@ -625,3 +625,92 @@ function SessionHeaderV2Actions(props: { state: SessionHeaderV2ActionsState }) {
     </div>
   )
 }
+
+// Self-contained status/review/terminal icon cluster -- same actions as
+// SessionHeaderV2Actions above, but usable anywhere (e.g. next to the
+// context-usage circle) without needing the titlebar's precomputed state.
+export function SessionHeaderQuickActions(props: { diffs?: Accessor<SessionHeaderReviewDiff[]> }) {
+  const language = useLanguage()
+  const command = useCommand()
+  const server = useServer()
+  const settings = useSettings()
+  const terminal = useTerminal()
+  const { view } = useSessionLayout()
+  const [reviewPopoverOpen, setReviewPopoverOpen] = createSignal(false)
+
+  const statusVisible = settings.visibility.status
+  const reviewDiffs = props.diffs ?? (() => [])
+  const reviewOpened = createMemo(() => view().reviewPanel.opened())
+  const terminalOpened = createMemo(() => view().terminal.opened())
+
+  const toggleTerminal = () => {
+    const next = !terminalOpened()
+    view().terminal.toggle()
+    if (!next) return
+    const id = terminal.active()
+    if (id) focusTerminalById(id)
+  }
+
+  const v2ActionsState = createMemo<SessionHeaderV2ActionsState>(() => ({
+    statusVisible: statusVisible(),
+    statusLabel: language.t("status.popover.trigger"),
+    reviewLabel: language.t("command.review.toggle"),
+    reviewKeybind: reviewTooltipKeybind(command),
+    reviewVisible: true,
+    reviewOpened: reviewOpened(),
+    onReviewToggle: () => view().reviewPanel.toggle(),
+    onReviewOpen: () => view().reviewPanel.open("other"),
+    reviewDiffs,
+  }))
+
+  return (
+    <div class="flex items-center gap-2">
+      <Show when={statusVisible()}>
+        <Tooltip placement="bottom" value={language.t("status.popover.trigger")}>
+          <StatusPopoverV2 />
+        </Tooltip>
+      </Show>
+      <TooltipV2 value={language.t("command.terminal.toggle")} placement="bottom">
+        <IconButtonV2
+          type="button"
+          variant="ghost-muted"
+          size="large"
+          class="!w-9 shrink-0"
+          state={terminalOpened() ? "pressed" : undefined}
+          aria-label={language.t("command.terminal.toggle")}
+          aria-expanded={terminalOpened()}
+          aria-controls="terminal-panel"
+          onClick={toggleTerminal}
+          icon={<IconV2 name={terminalOpened() ? "terminal-active" : "terminal"} />}
+        />
+      </TooltipV2>
+      <Popover
+        open={reviewPopoverOpen()}
+        onOpenChange={setReviewPopoverOpen}
+        placement="bottom-end"
+        gutter={4}
+        class="border-0 bg-transparent p-0 shadow-none [&_[data-slot=popover-body]]:p-0"
+        triggerAs={IconButtonV2}
+        triggerProps={{
+          type: "button",
+          variant: "ghost-muted",
+          size: "large",
+          class: "!w-9 shrink-0",
+          state: reviewOpened() || reviewPopoverOpen() ? "pressed" : undefined,
+          "aria-label": language.t("command.review.toggle"),
+          "aria-expanded": reviewOpened(),
+          "aria-controls": "review-panel",
+        }}
+        trigger={<IconV2 name="sidebar-right" />}
+      >
+        <SessionHeaderReviewPopoverBody
+          state={v2ActionsState()}
+          onOpenFull={() => {
+            setReviewPopoverOpen(false)
+            v2ActionsState().onReviewOpen()
+          }}
+        />
+      </Popover>
+    </div>
+  )
+}
