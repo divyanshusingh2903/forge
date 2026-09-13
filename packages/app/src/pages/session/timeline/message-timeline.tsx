@@ -983,7 +983,10 @@ export function MessageTimeline(props: {
       })
       const contextOpenKey = () => `context:${row().group.key}`
       const open = createMemo(() => {
-        return toolOpen[contextOpenKey()] === true
+        // Default to expanded (verbose output by default) -- only an explicit
+        // user toggle to false should collapse a group; unset/undefined means
+        // "never touched", which should read as open.
+        return toolOpen[contextOpenKey()] !== false
       })
 
       return (
