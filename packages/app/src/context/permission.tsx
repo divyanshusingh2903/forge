@@ -20,6 +20,7 @@ import {
   isDirectoryAutoAccepting,
   autoRespondsPermission,
   sessionAutoAccept,
+  isEditPermission,
 } from "./permission-auto-respond"
 
 type PermissionRespondFn = (input: {
@@ -170,11 +171,38 @@ export const { use: usePermission, provider: PermissionProvider } = createSimple
       toggleAutoAcceptDirectory(directory: string) {
         selected().toggleAutoAcceptDirectory(directory)
       },
+      enableAutoAcceptDirectory(directory: string) {
+        selected().enableAutoAcceptDirectory(directory)
+      },
+      disableAutoAcceptDirectory(directory: string) {
+        selected().disableAutoAcceptDirectory(directory)
+      },
       enableAutoAccept(sessionID: string, directory: string) {
         selected().enableAutoAccept(sessionID, directory)
       },
       disableAutoAccept(sessionID: string, directory?: string) {
         selected().disableAutoAccept(sessionID, directory)
+      },
+      isEditsAccepting(sessionID: string, directory?: string) {
+        return selected().isEditsAccepting(sessionID, directory)
+      },
+      toggleEditsAccept(sessionID: string, directory?: string) {
+        selected().toggleEditsAccept(sessionID, directory)
+      },
+      enableEditsAccept(sessionID: string, directory?: string) {
+        selected().enableEditsAccept(sessionID, directory)
+      },
+      disableEditsAccept(sessionID: string, directory?: string) {
+        selected().disableEditsAccept(sessionID, directory)
+      },
+      isEditsAcceptingDirectory(directory: string) {
+        return selected().isEditsAcceptingDirectory(directory)
+      },
+      enableEditsAcceptDirectory(directory: string) {
+        selected().enableEditsAcceptDirectory(directory)
+      },
+      disableEditsAcceptDirectory(directory: string) {
+        selected().disableEditsAcceptDirectory(directory)
       },
       permissionsEnabled,
       isPermissionAllowAll(directory: string) {
@@ -208,6 +236,13 @@ function createServerPermissionState(input: { sdk: ServerSDK; sync: ServerSync }
     },
     createStore({
       autoAccept: {} as Record<string, boolean>,
+      // "Accept edits" mode: same session-lineage-aware override mechanism as
+      // autoAccept above (reuses acceptKey/autoRespondsPermission), but only
+      // ever consulted for edit-shaped permissions (see isEditPermission) --
+      // deliberately kept simpler than autoAccept (no directory-wide toggle,
+      // no retroactive resolve of already-pending requests on enable) since
+      // it's a narrower, lower-stakes mode.
+      editsAccept: {} as Record<string, boolean>,
     }),
   )
 
@@ -295,8 +330,14 @@ function createServerPermissionState(input: { sdk: ServerSDK; sync: ServerSync }
     return isDirectoryAutoAccepting(store.autoAccept, directory)
   }
 
+  function isEditsAccepting(sessionID: string, directory?: string) {
+    return autoRespondsPermission(store.editsAccept, sessions(directory), { sessionID }, directory)
+  }
+
   function shouldAutoRespond(permission: PermissionRequest, directory?: string) {
-    return autoRespondsPermission(store.autoAccept, sessions(directory), permission, directory)
+    if (autoRespondsPermission(store.autoAccept, sessions(directory), permission, directory)) return true
+    if (!isEditPermission(permission.permission)) return false
+    return autoRespondsPermission(store.editsAccept, sessions(directory), permission, directory)
   }
 
   function isPending(permission: PermissionRequest) {
@@ -305,8 +346,17 @@ function createServerPermissionState(input: { sdk: ServerSDK; sync: ServerSync }
   }
 
   async function shouldAutoRespondResolved(permission: PermissionRequest, directory?: string) {
-    const override = sessionAutoAccept(store.autoAccept, sessions(directory), permission, directory)
-    if (override !== undefined) return override
+    const autoOverride = sessionAutoAccept(store.autoAccept, sessions(directory), permission, directory)
+    if (autoOverride === true) return true
+    const editable = isEditPermission(permission.permission)
+    const editsOverride = editable
+      ? sessionAutoAccept(store.editsAccept, sessions(directory), permission, directory)
+      : false
+    if (editsOverride === true) return true
+    // Both toggles are decisively resolved (not just "unknown, check parent
+    // lineage") and neither says yes -- safe to answer without waiting on
+    // the async lineage resolve below.
+    if (autoOverride === false && (!editable || editsOverride === false)) return false
     if (input.sync.session.lineage.peek(permission.sessionID)) return shouldAutoRespond(permission, directory)
     const lineage = await input.sync.session.lineage.resolve(permission.sessionID).catch(() => undefined)
     if (meta.disposed || !lineage) return false
@@ -422,6 +472,55 @@ function createServerPermissionState(input: { sdk: ServerSDK; sync: ServerSync }
     )
   }
 
+  function enableEdits(sessionID: string, directory?: string) {
+    if (meta.disposed) return
+    const key = acceptKey(sessionID, directory)
+    setStore(
+      produce((draft) => {
+        draft.editsAccept[key] = true
+      }),
+    )
+  }
+
+  function disableEdits(sessionID: string, directory?: string) {
+    if (meta.disposed) return
+    const key = acceptKey(sessionID, directory)
+    setStore(
+      produce((draft) => {
+        draft.editsAccept[key] = false
+      }),
+    )
+  }
+
+  // Directory-wide variant (no session yet -- e.g. composing a brand-new
+  // draft's first message, before the server has assigned a session id).
+  // Mirrors enableDirectory/disableDirectory above; autoRespondsPermission
+  // already falls back to this when no session-level entry exists, since
+  // it's the same generic helper used for the autoAccept store.
+  function isEditsAcceptingDirectory(directory: string) {
+    return isDirectoryAutoAccepting(store.editsAccept, directory)
+  }
+
+  function enableEditsDirectory(directory: string) {
+    if (meta.disposed) return
+    const key = directoryAcceptKey(directory)
+    setStore(
+      produce((draft) => {
+        draft.editsAccept[key] = true
+      }),
+    )
+  }
+
+  function disableEditsDirectory(directory: string) {
+    if (meta.disposed) return
+    const key = directoryAcceptKey(directory)
+    setStore(
+      produce((draft) => {
+        draft.editsAccept[key] = false
+      }),
+    )
+  }
+
   const api = {
     ready: () => !meta.disposed && ready(),
     respond,
@@ -454,6 +553,15 @@ function createServerPermissionState(input: { sdk: ServerSDK; sync: ServerSync }
       }
       enableDirectory(directory)
     },
+    enableAutoAcceptDirectory(directory: string) {
+      if (meta.disposed) return
+      if (isAutoAcceptingDirectory(directory)) return
+      enableDirectory(directory)
+    },
+    disableAutoAcceptDirectory(directory: string) {
+      if (meta.disposed) return
+      disableDirectory(directory)
+    },
     enableAutoAccept(sessionID: string, directory: string) {
       if (meta.disposed) return
       if (isAutoAccepting(sessionID, directory)) return
@@ -462,6 +570,39 @@ function createServerPermissionState(input: { sdk: ServerSDK; sync: ServerSync }
     disableAutoAccept(sessionID: string, directory?: string) {
       if (meta.disposed) return
       disable(sessionID, directory)
+    },
+    isEditsAccepting(sessionID: string, directory?: string) {
+      if (meta.disposed) return false
+      return isEditsAccepting(sessionID, directory)
+    },
+    toggleEditsAccept(sessionID: string, directory?: string) {
+      if (meta.disposed) return
+      if (isEditsAccepting(sessionID, directory)) {
+        disableEdits(sessionID, directory)
+        return
+      }
+      enableEdits(sessionID, directory)
+    },
+    enableEditsAccept(sessionID: string, directory?: string) {
+      if (meta.disposed) return
+      if (isEditsAccepting(sessionID, directory)) return
+      enableEdits(sessionID, directory)
+    },
+    disableEditsAccept(sessionID: string, directory?: string) {
+      if (meta.disposed) return
+      disableEdits(sessionID, directory)
+    },
+    isEditsAcceptingDirectory(directory: string) {
+      if (meta.disposed) return false
+      return isEditsAcceptingDirectory(directory)
+    },
+    enableEditsAcceptDirectory(directory: string) {
+      if (meta.disposed) return
+      enableEditsDirectory(directory)
+    },
+    disableEditsAcceptDirectory(directory: string) {
+      if (meta.disposed) return
+      disableEditsDirectory(directory)
     },
     isPermissionAllowAll(directory: string) {
       if (meta.disposed) return false

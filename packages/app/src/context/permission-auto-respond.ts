@@ -1,5 +1,11 @@
 import { base64Encode } from "@opencode-ai/core/util/encode"
 
+const EDIT_PERMISSIONS = new Set(["edit", "write", "patch", "apply_patch"])
+
+export function isEditPermission(permission: string) {
+  return EDIT_PERMISSIONS.has(permission)
+}
+
 export function acceptKey(sessionID: string, directory?: string) {
   if (!directory) return sessionID
   return `${base64Encode(directory)}/${sessionID}`

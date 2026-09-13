@@ -32,6 +32,7 @@ export type PromptInputV2ViewConfig = {
     onAttach: () => void
   }
   agent?: PromptInputV2SelectControl
+  mode?: PromptInputV2SelectControl
   model?: PromptInputV2SelectControl
   variant?: PromptInputV2SelectControl
   submit: {
