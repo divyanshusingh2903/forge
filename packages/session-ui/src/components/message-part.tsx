@@ -49,7 +49,6 @@ import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import { getDirectory as _getDirectory, getFilename } from "@opencode-ai/core/util/path"
 import { AttachmentCardV2 } from "../v2/components/attachment-card-v2"
 import { CommentCardV2 } from "../v2/components/comment-card-v2"
-import { checksum } from "@opencode-ai/core/util/encode"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
@@ -2305,12 +2304,9 @@ ToolRegistry.register({
               <div data-component="write-content">
                 <Dynamic
                   component={fileComponent}
-                  mode="text"
-                  file={{
-                    name: props.input.filePath,
-                    contents: props.input.content,
-                    cacheKey: checksum(props.input.content),
-                  }}
+                  mode="diff"
+                  before={{ name: props.input.filePath, contents: "" }}
+                  after={{ name: props.input.filePath, contents: props.input.content }}
                   overflow="scroll"
                   onRendered={props.onContentRendered}
                 />
