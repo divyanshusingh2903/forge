@@ -49,6 +49,10 @@ const icons = {
     viewBox: "0 0 20 20",
     body: `<path d="M2 18H18V2H2V18Z" fill="currentColor" fill-opacity="0.1"/><path d="M6.5 8L8.64286 10L6.5 12M10.9286 12H13.5M2 18H18V2H2V18Z" stroke="currentColor" stroke-linecap="square"/>`,
   },
+  plan: {
+    viewBox: "0 0 20 20",
+    body: `<path d="M5 2H15V18H5V2Z" stroke="currentColor" stroke-miterlimit="10" stroke-linecap="square"/><path d="M7.5 6.5H12.5M7.5 10H12.5M7.5 13.5H10.5" stroke="currentColor" stroke-linecap="square"/>`,
+  },
   "magnifying-glass": {
     viewBox: "0 0 16 16",
     body: `<path d="M14 14L10.3454 10.3454M6.88889 11.7778C9.58889 11.7778 11.7778 9.58889 11.7778 6.88889C11.7778 4.18889 9.58889 2 6.88889 2C4.18889 2 2 4.18889 2 6.88889C2 9.58889 4.18889 11.7778 6.88889 11.7778Z" stroke="currentColor"/>`,

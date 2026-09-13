@@ -42,7 +42,7 @@ export function previewSessionTab(current: SessionTabState, tab: string): Sessio
 
 export function openSessionTab(current: SessionTabState, tab: string): SessionTabState {
   const preview = sessionTabPreview(current)
-  if (tab === "review") {
+  if (tab === "review" || tab === "plan") {
     return {
       tabs: { all: current.tabs.all.filter((item) => item !== tab), active: tab },
       preview,
@@ -80,7 +80,7 @@ export function openSessionTab(current: SessionTabState, tab: string): SessionTa
 }
 
 export function closeSessionTab(current: SessionTabState, tab: string): SessionTabState {
-  if (tab === "review") {
+  if (tab === "review" || tab === "plan") {
     if (current.tabs.active !== tab) return current
     return {
       tabs: { all: current.tabs.all, active: current.tabs.all[0] },

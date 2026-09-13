@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, createMemo, onCleanup, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createEffect, createMemo, createResource, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { DragDropProvider as DndKitProvider, PointerSensor } from "@dnd-kit/solid"
@@ -21,6 +21,7 @@ import { TooltipKeybind } from "@opencode-ai/ui/tooltip"
 import { ResizeHandle } from "@opencode-ai/ui/resize-handle"
 import { Mark } from "@opencode-ai/ui/logo"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
+import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import type { SnapshotFileDiff, VcsFileDiff } from "@opencode-ai/sdk/v2"
@@ -35,7 +36,7 @@ import { SessionContextUsage } from "@/components/session-context-usage"
 const reviewTabID = "session-side-panel-review-tab"
 const reviewTabPanelID = "session-side-panel-review-tabpanel"
 const fileBrowserTabPanelID = "session-side-panel-file-browser-tabpanel"
-import { SessionContextTab, SortableTab, SortableTabV2, FileVisual } from "@/components/session"
+import { SessionContextTab, SessionPlanTab, SortableTab, SortableTabV2, FileVisual } from "@/components/session"
 import { OpenInAppV2 } from "@/components/session/open-in-app-v2"
 import { useCommand } from "@/context/command"
 import { useFile, type SelectedLineRange } from "@/context/file"
@@ -43,6 +44,7 @@ import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
+import { useSync } from "@/context/sync"
 import { createFileTabListSync } from "@/pages/session/file-tab-scroll"
 import { FileTabContent } from "@/pages/session/file-tabs"
 import {
@@ -90,7 +92,25 @@ export function SessionSidePanel(props: {
   const dialog = useDialog()
   const sdk = useSDK()
   const { sessionKey, tabs, view, params } = useSessionLayout()
+  const sync = useSync()
   const projectDirectory = createMemo(() => sdk().directory)
+
+  const planKey = createMemo(() => {
+    const id = params.id
+    if (!id) return undefined
+    const count = sync().data.message[id]?.length ?? 0
+    return `${id}:${count}`
+  })
+  const [planInfo] = createResource(planKey, async (key) => {
+    const id = key.split(":")[0]
+    if (!id) return undefined
+    return sdk()
+      .client.session.plan({ sessionID: id })
+      .then((result) => result.data)
+      .catch(() => undefined)
+  })
+  const planExists = createMemo(() => planInfo()?.exists ?? false)
+  const planPath = createMemo(() => planInfo()?.path)
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const shown = settings.visibility.fileTree
@@ -180,6 +200,7 @@ export function SessionSidePanel(props: {
     review: reviewTab,
     hasReview: props.canReview,
     fileBrowser: () => !!props.fileBrowserState,
+    plan: planExists,
   })
   const contextOpen = tabState.contextOpen
   const openFileOpen = tabState.openFileOpen
@@ -238,7 +259,7 @@ export function SessionSidePanel(props: {
   })
   const fileBrowserVisible = createMemo(() => {
     const active = activeTab()
-    return active !== "review" && active !== "context" && active !== "empty"
+    return active !== "review" && active !== "context" && active !== "plan" && active !== "empty"
   })
   const openFileKeybind = createMemo(() => command.keybindParts("file.open"))
   const closeTabKeybind = createMemo(() => command.keybindParts("tab.close"))
@@ -605,6 +626,14 @@ export function SessionSidePanel(props: {
                                 </div>
                               </Tabs.Trigger>
                             </Show>
+                            <Show when={planExists()}>
+                              <Tabs.Trigger value="plan">
+                                <div class="flex items-center gap-2">
+                                  <IconV2 name="plan" />
+                                  <div>{language.t("session.tab.plan")}</div>
+                                </div>
+                              </Tabs.Trigger>
+                            </Show>
                             <For each={panelTabs()}>
                               {(tab) => (
                                 <Show
@@ -723,6 +752,12 @@ export function SessionSidePanel(props: {
                             <div class="relative pt-2 flex-1 min-h-0 overflow-hidden">
                               <SessionContextTab />
                             </div>
+                          </Tabs.Content>
+                        </Show>
+
+                        <Show when={activeTab() === "plan"}>
+                          <Tabs.Content value="plan" class="flex flex-col h-full overflow-hidden contain-strict">
+                            <SessionPlanTab path={planPath()} />
                           </Tabs.Content>
                         </Show>
 
