@@ -394,6 +394,53 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
             }
           : undefined
       },
+      get mode() {
+        if (!props.controls.agents.visible) return undefined
+        const buildAgent = () =>
+          props.controls.agents.available.find((item) => item.mode === "primary" && item.name !== "plan")?.name ??
+          "build"
+        const current = (): "manual" | "acceptEdits" | "auto" | "plan" => {
+          if (props.controls.agents.current === "plan") return "plan"
+          const id = props.controls.session.id
+          const directory = sdk().directory
+          if (accepting()) return "auto"
+          const editing = id ? permission.isEditsAccepting(id, directory) : permission.isEditsAcceptingDirectory(directory)
+          if (editing) return "acceptEdits"
+          return "manual"
+        }
+        return {
+          options: () =>
+            (["manual", "acceptEdits", "auto", "plan"] as const).map((id) => ({
+              id,
+              label: language.t(`ui.promptInput.mode.${id}`),
+            })),
+          current,
+          onSelect: (value: string) => {
+            const id = props.controls.session.id
+            const directory = sdk().directory
+            if (value === "plan") {
+              props.controls.agents.select("plan")
+              return
+            }
+            if (props.controls.agents.current === "plan") props.controls.agents.select(buildAgent())
+            if (id) {
+              permission.disableAutoAccept(id, directory)
+              permission.disableEditsAccept(id, directory)
+            } else {
+              permission.disableAutoAcceptDirectory(directory)
+              permission.disableEditsAcceptDirectory(directory)
+            }
+            if (value === "auto") {
+              if (id) permission.enableAutoAccept(id, directory)
+              else permission.enableAutoAcceptDirectory(directory)
+            } else if (value === "acceptEdits") {
+              if (id) permission.enableEditsAccept(id, directory)
+              else permission.enableEditsAcceptDirectory(directory)
+            }
+          },
+          keybind: () => command.keybindParts("mode.cycle"),
+        }
+      },
       variant: {
         options: () => variants().map((value) => ({ id: value, label: value })),
         current: () => props.controls.model.selection.variant.current() ?? "default",

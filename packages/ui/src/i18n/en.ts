@@ -136,6 +136,11 @@ export const dict: Record<string, string> = {
   "ui.promptInput.chooseAgent": "Choose agent",
   "ui.promptInput.chooseModel": "Choose model",
   "ui.promptInput.chooseVariant": "Choose model variant",
+  "ui.promptInput.chooseMode": "Choose mode",
+  "ui.promptInput.mode.manual": "Manual",
+  "ui.promptInput.mode.acceptEdits": "Accept Edits",
+  "ui.promptInput.mode.auto": "Auto",
+  "ui.promptInput.mode.plan": "Plan",
   "ui.promptInput.send": "Send",
   "ui.promptInput.stop": "Stop",
 

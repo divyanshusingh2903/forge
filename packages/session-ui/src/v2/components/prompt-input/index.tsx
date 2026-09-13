@@ -225,6 +225,11 @@ export function PromptInputV2(props: PromptInputV2Props) {
                 />
               )}
             </Show>
+            <Show when={view.mode} keyed>
+              {(control) => (
+                <PromptInputV2ConfiguredSelect title={i18n.t("ui.promptInput.chooseMode")} control={control} />
+              )}
+            </Show>
             <Show
               when={props.modelControl}
               fallback={
