@@ -23,7 +23,7 @@ const icons = {
   },
   home: {
     viewBox: "0 0 16 16",
-    body: `<path d="M2 7.11086L8 2.22197L14 7.11086M3.33333 5.99997V13.7777H12.6667V5.99997M6.22222 13.7777V9.33308H9.77778V13.7777" stroke="currentColor" stroke-linecap="square" stroke-linejoin="round"/>`,
+    body: `<path d="M2 7L8 2L14 7M3.5 6V14H12.5V6" stroke="currentColor" stroke-miterlimit="10" stroke-linecap="square"/><path d="M6.5 14V10H9.5V14" stroke="currentColor" stroke-miterlimit="10" stroke-linecap="square"/>`,
   },
   help: {
     viewBox: "0 0 16 16",
