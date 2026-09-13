@@ -37,6 +37,18 @@ export function createSessionComposerController(options?: { closeMs?: number | (
     return sessionQuestionRequest(sync().data.session, sync().data.question, params.id)
   })
 
+  // Which tool asked this question, if any (e.g. "present_plan", "plan_enter")
+  // -- lets the composer render a compact, permission-dock-style prompt for
+  // tools with a fixed, small set of options instead of the generic
+  // multi-step question wizard.
+  const questionToolName = createMemo((): string | undefined => {
+    const tool = questionRequest()?.tool
+    if (!tool) return undefined
+    const parts = sync().data.part[tool.messageID] ?? []
+    const match = parts.find((part) => part.type === "tool" && part.callID === tool.callID)
+    return match?.type === "tool" ? match.tool : undefined
+  })
+
   const permissionRequest = createMemo((): PermissionRequest | undefined => {
     return sessionPermissionRequest(sync().data.session, sync().data.permission, params.id, (item) => {
       return !permission.autoResponds(item, sdk().directory)
@@ -188,6 +200,7 @@ export function createSessionComposerController(options?: { closeMs?: number | (
   return {
     blocked,
     questionRequest,
+    questionToolName,
     permissionRequest,
     permissionResponding,
     decide,
