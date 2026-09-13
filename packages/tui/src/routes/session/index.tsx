@@ -331,7 +331,7 @@ export function Session() {
     if (part.state.status !== "completed") return
     if (part.id === lastSwitch) return
 
-    if (part.tool === "plan_exit") {
+    if (part.tool === "present_plan") {
       local.agent.set("build")
       lastSwitch = part.id
     } else if (part.tool === "plan_enter") {

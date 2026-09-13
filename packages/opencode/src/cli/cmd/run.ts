@@ -441,7 +441,7 @@ export const RunCommand = effectCmd({
               pattern: "*",
             },
             {
-              permission: "plan_exit",
+              permission: "present_plan",
               action: "deny",
               pattern: "*",
             },

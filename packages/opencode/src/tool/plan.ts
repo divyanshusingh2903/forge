@@ -8,7 +8,7 @@ import { MessageV2 } from "../session/message-v2"
 import { Provider } from "@/provider/provider"
 import { InstanceState } from "@/effect/instance-state"
 import { MessageID, PartID } from "../session/schema"
-import EXIT_DESCRIPTION from "./plan-exit.txt"
+import PRESENT_PLAN_DESCRIPTION from "./present-plan.txt"
 
 export const Parameters = Schema.Struct({})
 
@@ -21,15 +21,15 @@ const ACCEPT_AUTO = "Accept (Auto)"
 const REVISE = "Revise"
 const DENY = "Deny"
 
-export const PlanExitTool = Tool.define(
-  "plan_exit",
+export const PresentPlanTool = Tool.define(
+  "present_plan",
   Effect.gen(function* () {
     const session = yield* Session.Service
     const question = yield* Question.Service
     const provider = yield* Provider.Service
 
     return {
-      description: EXIT_DESCRIPTION,
+      description: PRESENT_PLAN_DESCRIPTION,
       parameters: Parameters,
       execute: (_params: {}, ctx: Tool.Context<Metadata>) =>
         Effect.gen(function* () {

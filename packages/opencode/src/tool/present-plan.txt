@@ -1,0 +1,15 @@
+Use this tool to show the plan file to the user and get their decision, any time you finish creating or editing it.
+
+This tool presents the current plan file to the user and asks them to choose: accept and start implementing (manually approving each edit, or auto-accepting them), revise the plan further, or deny it outright.
+
+Call this tool:
+- Immediately after you create the plan file for the first time
+- Immediately after any subsequent edit to the plan file, once you're ready for feedback again
+- After you have clarified any remaining questions with the user
+
+Do NOT call this tool:
+- Before you have written anything to the plan file
+- If you still have unanswered questions that would change the plan
+- Instead of the write/edit tool -- always use write/edit to create or modify the plan file itself, never a shell command; call this tool only after that edit is saved
+
+If the user chooses to revise, keep working on the plan file and call this tool again once you've made the requested changes.

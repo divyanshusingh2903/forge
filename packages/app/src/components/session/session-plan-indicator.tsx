@@ -16,14 +16,17 @@ export function SessionPlanIndicator() {
     tabs().setActive("plan")
   }
 
+  const tooltip = () => (plan.pending() ? language.t("session.plan.openTooltip") : language.t("session.plan.viewTooltip"))
+
   return (
-    <Show when={plan.exists()}>
-      <TooltipV2 value={language.t("session.plan.viewTooltip")} placement="bottom">
+    <Show when={plan.exists() || plan.pending()}>
+      <TooltipV2 value={tooltip()} placement="bottom">
         <IconButtonV2
           type="button"
           variant="ghost-muted"
           size="large"
           class="!w-9 shrink-0"
+          state={plan.pending() ? "pressed" : undefined}
           aria-label={language.t("session.tab.plan")}
           onClick={open}
           icon={<IconV2 name="plan" />}
