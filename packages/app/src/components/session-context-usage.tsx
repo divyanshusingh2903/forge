@@ -1,10 +1,14 @@
-import { Match, Show, Switch, createMemo, type ComponentProps, type JSX } from "solid-js"
+import { createSignal, For, Match, Show, Switch, createMemo, type ComponentProps, type JSX } from "solid-js"
 import { ProgressCircle } from "@opencode-ai/ui/progress-circle"
 import { ProgressCircleV2 } from "@opencode-ai/ui/v2/progress-circle-v2"
 import { Button } from "@opencode-ai/ui/button"
+import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
+import { Popover } from "@opencode-ai/ui/popover"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { createMediaQuery } from "@solid-primitives/media"
+import { findLast } from "@opencode-ai/core/util/array"
+import type { Part } from "@opencode-ai/sdk/v2/client"
 
 import { useFile } from "@/context/file"
 import { useLayout } from "@/context/layout"
@@ -13,9 +17,21 @@ import { useLanguage } from "@/context/language"
 import { useProviders } from "@/hooks/use-providers"
 import { useSDK } from "@/context/sdk"
 import { getSessionContext } from "@/components/session/session-context-metrics"
+import {
+  estimateSessionContextBreakdown,
+  type SessionContextBreakdownKey,
+} from "@/components/session/session-context-breakdown"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { createSessionTabs } from "@/pages/session/helpers"
 import { useSettings } from "@/context/settings"
+
+const BREAKDOWN_COLOR: Record<SessionContextBreakdownKey, string> = {
+  system: "var(--syntax-info)",
+  user: "var(--syntax-success)",
+  assistant: "var(--syntax-property)",
+  tool: "var(--syntax-warning)",
+  other: "var(--syntax-comment)",
+}
 
 interface SessionContextUsageProps {
   variant?: "button" | "indicator"
@@ -126,44 +142,139 @@ export function SessionContextUsage(props: SessionContextUsageProps) {
   )
 
   const tooltipValue = () => (
-    <div class="flex w-[120px] flex-col gap-2">
-      <ContextTooltipRow name={language.t("context.usage.cost")} value={cost()} />
-      <ContextTooltipRow name={language.t("context.usage.usage")} value={`${context()?.usage ?? 0}%`} />
+    <div class="flex w-[160px] flex-col gap-2">
       <ContextTooltipRow
         name={language.t("context.usage.tokens")}
-        value={context()?.total.toLocaleString(language.intl()) ?? "0"}
+        value={`${context()?.total.toLocaleString(language.intl()) ?? "0"} / ${context()?.limit?.toLocaleString(language.intl()) ?? "0"}`}
       />
+      <ContextTooltipRow name={language.t("context.usage.usage")} value={`${context()?.usage ?? 0}%`} />
+      <ContextTooltipRow name={language.t("context.usage.cost")} value={cost()} />
+    </div>
+  )
+
+  // Simplified relative to session-context-tab.tsx's systemPrompt(): that one
+  // stops at the most recent revert boundary, which matters for the full
+  // detailed view but is unnecessary precision for a quick hover-triggered
+  // preview -- this just wants the latest system prompt in the transcript.
+  const systemPrompt = createMemo(() => {
+    const msg = findLast(messages(), (m) => m.role === "user" && !!m.system)
+    const system = msg && "system" in msg ? msg.system : undefined
+    return system?.trim() || undefined
+  })
+
+  const breakdown = createMemo(() => {
+    const input = context()?.input
+    if (!input) return []
+    return estimateSessionContextBreakdown({
+      messages: messages(),
+      parts: sync().data.part as Record<string, Part[] | undefined>,
+      input,
+      systemPrompt: systemPrompt(),
+    })
+  })
+
+  const breakdownLabel = (key: SessionContextBreakdownKey) => language.t(`context.breakdown.${key}`)
+
+  const [popoverOpen, setPopoverOpen] = createSignal(false)
+
+  const popoverBody = () => (
+    <div class="flex w-[260px] flex-col gap-3 rounded-xl bg-v2-background-bg-layer-01 p-3 shadow-[var(--v2-elevation-floating)]">
+      <div class="flex items-center justify-between">
+        <span class="text-13-medium text-v2-text-text-base">{language.t("context.breakdown.title")}</span>
+        <span class="text-13-regular text-v2-text-text-muted">
+          {context()?.total.toLocaleString(language.intl()) ?? "0"} / {context()?.limit?.toLocaleString(language.intl()) ?? "0"}
+          {` (${context()?.usage ?? 0}%)`}
+        </span>
+      </div>
+      <Show when={breakdown().length > 0}>
+        <div class="flex flex-col gap-2">
+          <div class="h-2 w-full overflow-hidden rounded-full bg-v2-background-bg-layer-03 flex">
+            <For each={breakdown()}>
+              {(segment) => (
+                <div
+                  class="h-full"
+                  style={{ width: `${segment.width}%`, "background-color": BREAKDOWN_COLOR[segment.key] }}
+                />
+              )}
+            </For>
+          </div>
+          <div class="flex flex-wrap gap-x-3 gap-y-1">
+            <For each={breakdown()}>
+              {(segment) => (
+                <div class="flex items-center gap-1 text-12-regular text-v2-text-text-muted">
+                  <div class="size-2 rounded-sm" style={{ "background-color": BREAKDOWN_COLOR[segment.key] }} />
+                  <span>{breakdownLabel(segment.key)}</span>
+                  <span class="text-v2-text-text-faint">{segment.percent.toLocaleString(language.intl())}%</span>
+                </div>
+              )}
+            </For>
+          </div>
+        </div>
+      </Show>
+      <ButtonV2
+        variant="ghost"
+        class="w-full justify-center"
+        onClick={() => {
+          setPopoverOpen(false)
+          openContext()
+        }}
+      >
+        {language.t("context.usage.openDetails")}
+      </ButtonV2>
     </div>
   )
 
   return (
     <Show when={params.id}>
-      <TooltipV2 value={tooltipValue()} placement={props.placement ?? "top"} shift={-8}>
-        <Switch>
-          <Match when={variant() === "indicator"}>{circle()}</Match>
-          <Match when={buttonAppearance() === "v2"}>
-            <IconButtonV2
-              type="button"
-              variant="ghost-muted"
-              size="large"
-              icon={circleV2()}
-              onClick={openContext}
-              aria-label={language.t("context.usage.view")}
-            />
-          </Match>
-          <Match when={true}>
-            <Button
-              type="button"
-              variant="ghost"
-              class="size-6"
-              onClick={openContext}
-              aria-label={language.t("context.usage.view")}
+      <Switch>
+        <Match when={variant() === "indicator"}>
+          <TooltipV2 value={tooltipValue()} placement={props.placement ?? "top"} shift={-8}>
+            {circle()}
+          </TooltipV2>
+        </Match>
+        <Match when={buttonAppearance() === "v2"}>
+          <TooltipV2 value={tooltipValue()} placement={props.placement ?? "top"} shift={-8}>
+            <Popover
+              open={popoverOpen()}
+              onOpenChange={setPopoverOpen}
+              placement="bottom-end"
+              gutter={4}
+              class="border-0 bg-transparent p-0 shadow-none [&_[data-slot=popover-body]]:p-0"
+              triggerAs={IconButtonV2}
+              triggerProps={{
+                type: "button",
+                variant: "ghost-muted",
+                size: "large",
+                icon: circleV2(),
+                "aria-label": language.t("context.usage.view"),
+              }}
             >
-              {circle()}
-            </Button>
-          </Match>
-        </Switch>
-      </TooltipV2>
+              {popoverBody()}
+            </Popover>
+          </TooltipV2>
+        </Match>
+        <Match when={true}>
+          <TooltipV2 value={tooltipValue()} placement={props.placement ?? "top"} shift={-8}>
+            <Popover
+              open={popoverOpen()}
+              onOpenChange={setPopoverOpen}
+              placement="bottom-end"
+              gutter={4}
+              class="border-0 bg-transparent p-0 shadow-none [&_[data-slot=popover-body]]:p-0"
+              triggerAs={Button}
+              triggerProps={{
+                type: "button",
+                variant: "ghost",
+                class: "size-6",
+                "aria-label": language.t("context.usage.view"),
+              }}
+              trigger={circle()}
+            >
+              {popoverBody()}
+            </Popover>
+          </TooltipV2>
+        </Match>
+      </Switch>
     </Show>
   )
 }
