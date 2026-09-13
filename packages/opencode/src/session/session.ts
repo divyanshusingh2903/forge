@@ -335,6 +335,31 @@ export function plan(input: { slug: string; time: { created: number } }, instanc
   return path.join(base, [input.time.created, input.slug].join("-") + ".md")
 }
 
+// Finds the start of the *current* plan-mode stretch, so unrelated planning
+// requests in the same session each get their own file instead of all
+// colliding on one (plan() is keyed by slug+time, and a session's slug/
+// created time never change). A "stretch" is a run of user messages with
+// agent "plan" not preceded by an assistant reply that was also "plan" --
+// i.e. the message where the session most recently switched into plan mode.
+// Reuses the session's own slug (for a readable filename) with that
+// message's own timestamp standing in for the session's.
+export function planCycleAnchor(messages: SessionV1.WithParts[], session: { slug: string }) {
+  let anchor: { slug: string; time: { created: number } } | undefined
+  let lastAssistantAgent: string | undefined
+  for (const item of messages) {
+    if (item.info.role === "assistant") {
+      lastAssistantAgent = item.info.agent
+      continue
+    }
+    if (item.info.role !== "user") continue
+    if (item.info.agent !== "plan") continue
+    if (lastAssistantAgent !== "plan") {
+      anchor = { slug: session.slug, time: { created: item.info.time.created } }
+    }
+  }
+  return anchor
+}
+
 export const getUsage = (input: { model: Provider.Model; usage: Usage; metadata?: ProviderMetadata }) => {
   const finite = (value: number) => (Number.isFinite(value) ? value : 0)
   const safe = (value: number) => Math.max(0, finite(value))

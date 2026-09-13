@@ -108,7 +108,8 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const plan = Effect.fn("SessionHttpApi.plan")(function* (ctx: { params: { sessionID: SessionID } }) {
       const info = yield* requireSession(ctx.params.sessionID)
       const instance = yield* InstanceState.context
-      const path = Session.plan(info, instance)
+      const messages = yield* session.messages({ sessionID: ctx.params.sessionID }).pipe(Effect.orDie)
+      const path = Session.plan(Session.planCycleAnchor(messages, info) ?? info, instance)
       const exists = yield* fsSvc.existsSafe(path)
       return { path, exists }
     })
