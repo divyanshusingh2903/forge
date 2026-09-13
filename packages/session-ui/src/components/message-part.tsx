@@ -2305,6 +2305,7 @@ ToolRegistry.register({
     const path = createMemo(() => props.input.filePath || "")
     const filename = () => getFilename(props.input.filePath ?? "")
     const pending = () => props.status === "pending" || props.status === "running"
+    const contentOld = createMemo(() => (props.metadata.exists ? (props.metadata.contentOld ?? "") : ""))
     return (
       <div data-component="write-tool">
         <BasicTool
@@ -2338,7 +2339,7 @@ ToolRegistry.register({
                 <Dynamic
                   component={fileComponent}
                   mode="diff"
-                  before={{ name: props.input.filePath, contents: "" }}
+                  before={{ name: props.input.filePath, contents: contentOld() }}
                   after={{ name: props.input.filePath, contents: props.input.content }}
                   overflow="scroll"
                   onRendered={props.onContentRendered}
