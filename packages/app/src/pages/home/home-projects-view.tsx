@@ -69,9 +69,8 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
   return (
     <aside
       class={`
-        mt-6 flex min-h-0 min-w-0 flex-col gap-4 overflow-hidden
-        lg:sticky lg:top-14 lg:mt-14 lg:h-[calc(100cqh-56px)] lg:self-start lg:pt-[52px]
-        lg:-ml-6 lg:pl-6 lg:bg-v2-background-bg-deep lg:rounded-l-[10px] lg:border-r lg:border-v2-border-border-base
+        flex h-full w-[260px] shrink-0 min-h-0 min-w-0 flex-col gap-4 overflow-hidden
+        bg-v2-background-bg-deep border-r border-v2-border-border-base py-3 pl-3 pr-2
       `}
       aria-label={props.language.t("home.projects")}
       onWheel={(event) => {
