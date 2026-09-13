@@ -5,7 +5,6 @@
   --markdown-shell-code-background: var(--v2-background-bg-layer-02);
   --markdown-shell-code-border: var(--v2-border-border-muted);
   --markdown-shell-code-color: var(--v2-text-text-base);
-  --markdown-shell-code-token-color: currentColor;
 
   /* Reset & Base Typography */
   min-width: 0;
@@ -195,10 +194,6 @@
 
   [data-component="markdown-code"][data-code-kind="shell"] code {
     color: var(--markdown-shell-code-color);
-  }
-
-  [data-component="markdown-code"][data-code-kind="shell"] code span {
-    color: var(--markdown-shell-code-token-color) !important;
   }
 
   [data-slot="markdown-copy-button"] {
