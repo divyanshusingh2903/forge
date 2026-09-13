@@ -386,6 +386,7 @@ export default function Page() {
   // concept of, so the client watches for the completed call and flips it.
   const openedForPresentPlan = new Set<string>()
   const handledPresentPlanAutoAccept = new Set<string>()
+  const handledPlanEnter = new Set<string>()
   createEffect(() => {
     const id = params.id
     if (!id) return
@@ -393,17 +394,36 @@ export default function Page() {
     for (const message of messages) {
       const parts = (sync().data.part[message.id] ?? []) as Part[]
       for (const part of parts) {
-        if (part.type !== "tool" || part.tool !== "present_plan") continue
-        if (part.state.status === "running" && !openedForPresentPlan.has(part.callID)) {
-          openedForPresentPlan.add(part.callID)
-          if (!view().reviewPanel.opened()) view().reviewPanel.open()
-          tabs().setActive("plan")
+        if (part.type !== "tool") continue
+
+        if (part.tool === "present_plan") {
+          if (part.state.status === "running" && !openedForPresentPlan.has(part.callID)) {
+            openedForPresentPlan.add(part.callID)
+            if (!view().reviewPanel.opened()) view().reviewPanel.open()
+            tabs().setActive("plan")
+          }
+          if (
+            part.state.status === "completed" &&
+            part.state.metadata?.autoAccept === true &&
+            !handledPresentPlanAutoAccept.has(part.callID)
+          ) {
+            handledPresentPlanAutoAccept.add(part.callID)
+            permission.enableAutoAccept(id, sdk().directory)
+          }
         }
-        if (part.state.status !== "completed") continue
-        if (part.state.metadata?.autoAccept !== true) continue
-        if (handledPresentPlanAutoAccept.has(part.callID)) continue
-        handledPresentPlanAutoAccept.add(part.callID)
-        permission.enableAutoAccept(id, sdk().directory)
+
+        if (
+          part.tool === "plan_enter" &&
+          part.state.status === "completed" &&
+          part.state.metadata?.switched === true &&
+          !handledPlanEnter.has(part.callID)
+        ) {
+          handledPlanEnter.add(part.callID)
+          showToast({
+            variant: "default",
+            title: language.t("session.plan.enteredToast"),
+          })
+        }
       }
     }
   })
