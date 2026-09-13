@@ -31,6 +31,8 @@ export const dict: Record<string, string> = {
   "ui.sessionReviewV2.empty.noGit.actionLoading": "Creating Git repository...",
   "ui.sessionReviewV2.empty.changes.title": "No file changes yet",
   "ui.sessionReviewV2.empty.changes.description": "Project changes will appear here",
+  "ui.sessionReviewV2.empty": "No changes yet",
+  "ui.sessionReviewV2.openFull": "Open full review",
 
   "ui.sessionReview.openFile": "Open file",
   "ui.sessionReview.selection.line": "line {{line}}",
