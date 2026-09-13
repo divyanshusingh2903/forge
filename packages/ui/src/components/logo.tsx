@@ -1,17 +1,18 @@
 import { type ComponentProps } from "solid-js"
 
-// Minimalist anvil mark: the forge's namesake tool, reduced to three blocks.
+// Abstract mark: three flat bars, single tone, gaps only between rows.
 export const Mark = (props: { class?: string }) => {
   return (
     <svg
       data-component="logo-mark"
       classList={{ [props.class ?? ""]: !!props.class }}
-      viewBox="0 0 16 20"
+      viewBox="0 0 16 16"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path data-slot="logo-logo-mark-waist" d="M10 8H6V12H10V8Z" fill="var(--icon-weak-base)" />
-      <path data-slot="logo-logo-mark-body" d="M0 2H16V8H10V12H16V20H0V12H6V8H0V2Z" fill="var(--icon-strong-base)" />
+      <rect data-slot="logo-logo-mark-bar-top" x="0" y="0" width="16" height="4" fill="var(--icon-base)" />
+      <rect data-slot="logo-logo-mark-bar-mid" x="4" y="6" width="8" height="4" fill="var(--icon-base)" />
+      <rect data-slot="logo-logo-mark-bar-bottom" x="0" y="12" width="16" height="4" fill="var(--icon-base)" />
     </svg>
   )
 }
@@ -26,8 +27,9 @@ export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class">) => {
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      <path d="M50 40H30V60H50V40Z" fill="var(--icon-base)" />
-      <path d="M0 10H80V40H50V60H80V100H0V60H30V40H0V10Z" fill="var(--icon-strong-base)" />
+      <rect x="0" y="10" width="80" height="20" fill="var(--icon-strong-base)" />
+      <rect x="20" y="40" width="40" height="20" fill="var(--icon-strong-base)" />
+      <rect x="0" y="70" width="80" height="20" fill="var(--icon-strong-base)" />
     </svg>
   )
 }
