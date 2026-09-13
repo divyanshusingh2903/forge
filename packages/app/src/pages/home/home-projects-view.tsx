@@ -1,4 +1,4 @@
-import { type Accessor, createMemo, For, type JSX, onCleanup, Show, splitProps } from "solid-js"
+import { type Accessor, createMemo, createSignal, For, type JSX, onCleanup, Show, splitProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { DragDropProvider, PointerSensor } from "@dnd-kit/solid"
 import { isSortable, useSortable } from "@dnd-kit/solid/sortable"
@@ -10,8 +10,11 @@ import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { ProjectAvatar } from "@opencode-ai/ui/v2/project-avatar-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
+import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
+import { DialogFooter, DialogHeader, DialogTitleGroup, DialogV2 } from "@opencode-ai/ui/v2/dialog-v2"
 import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { getProjectAvatarVariant, type HomeProjectSelection, type LocalProject } from "@/context/layout"
 import { ServerConnection } from "@/context/server"
 import { useGlobal } from "@/context/global"
@@ -23,6 +26,7 @@ import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
 import { fileManagerApp } from "@/utils/file-manager"
 import { sessionTitle } from "@/utils/session-title"
+import type { PinnedSessions } from "./pinned-sessions"
 
 const HOME_PROJECT_NAV_LABEL = "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
 
@@ -62,7 +66,9 @@ export type HomeProjectsViewProps = {
   onOpenSettings: () => void
   onOpenHelp: () => void
   onOpenSession: (server: ServerConnection.Any, session: Session) => void
+  onDeleteSession: (server: ServerConnection.Any, session: Session) => void | Promise<void>
   currentSession?: Accessor<{ server?: string; id?: string } | undefined>
+  pinned: PinnedSessions
 }
 
 export function HomeProjectsView(props: HomeProjectsViewProps) {
@@ -90,11 +96,13 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
         props.onWheel(event)
       }}
     >
-      <HomeRecentSessions
+      <HomePinnedSessions
         servers={props.servers}
         projectsForServer={props.projectsForServer}
         currentSession={props.currentSession}
         onOpenSession={props.onOpenSession}
+        onDeleteSession={props.onDeleteSession}
+        pinned={props.pinned}
         language={props.language}
       />
       <div class="flex h-7 min-w-0 shrink-0 items-center justify-between pl-1.5 pr-3">
@@ -416,8 +424,11 @@ function HomeProjectSlot(
         <HomeProjectSessions
           server={props.server}
           directory={props.worktree}
+          project={project()}
           currentSession={props.currentSession}
           onOpenSession={props.onOpenSession}
+          onDeleteSession={props.onDeleteSession}
+          pinned={props.pinned}
           language={props.language}
         />
       </Show>
@@ -425,52 +436,51 @@ function HomeProjectSlot(
   )
 }
 
-const HOME_RECENT_SESSIONS_LIMIT = 5
-
-function HomeRecentSessions(props: {
+function HomePinnedSessions(props: {
   servers: Accessor<ServerConnection.Any[]>
   projectsForServer: (server: ServerConnection.Any) => LocalProject[]
   currentSession?: Accessor<{ server?: string; id?: string } | undefined>
   onOpenSession: (server: ServerConnection.Any, session: Session) => void
+  onDeleteSession: (server: ServerConnection.Any, session: Session) => void | Promise<void>
+  pinned: PinnedSessions
   language: ReturnType<typeof useLanguage>
 }) {
   const global = useGlobal()
   const entries = createMemo(() => {
+    const pins = new Set(props.pinned.entries().map((entry) => `${entry.server}\0${entry.id}`))
+    if (pins.size === 0) return []
     const all: { server: ServerConnection.Any; project: LocalProject; session: Session }[] = []
     for (const server of props.servers()) {
+      const serverKey = ServerConnection.key(server)
       for (const project of props.projectsForServer(server)) {
         const [store] = global.ensureServerCtx(server).sync.child(project.worktree, { bootstrap: true })
         for (const session of sortedRootSessions(store, 0)) {
-          all.push({ server, project, session })
+          if (pins.has(`${serverKey}\0${session.id}`)) all.push({ server, project, session })
         }
       }
     }
-    return all.sort((a, b) => compareSessionTime(a.session, b.session)).slice(0, HOME_RECENT_SESSIONS_LIMIT)
+    return all.sort((a, b) => compareSessionTime(a.session, b.session))
   })
 
   return (
     <Show when={entries().length > 0}>
-      <div class="flex min-w-0 shrink-0 flex-col gap-1">
+      <div class="flex min-w-0 shrink-0 flex-col gap-0.5">
         <div class="flex h-7 min-w-0 shrink-0 items-center pl-1.5 pr-3">
-          <div class="text-v2-text-text-muted [font-weight:530]">{props.language.t("home.recentSessions")}</div>
+          <div class="text-v2-text-text-muted [font-weight:530]">{props.language.t("home.pinnedSessions")}</div>
         </div>
         <For each={entries()}>
-          {(entry) => {
-            const current = createMemo(() => {
-              const value = props.currentSession?.()
-              return value?.server === ServerConnection.key(entry.server) && value?.id === entry.session.id
-            })
-            return (
-              <HomeProjectNavButton
-                type="button"
-                data-selected={current() ? "" : undefined}
-                onClick={() => props.onOpenSession(entry.server, entry.session)}
-              >
-                <HomeProjectAvatar project={entry.project} />
-                <span class={HOME_PROJECT_NAV_LABEL}>{sessionTitle(entry.session.title) || entry.session.id}</span>
-              </HomeProjectNavButton>
-            )
-          }}
+          {(entry) => (
+            <HomeSessionRow
+              server={entry.server}
+              session={entry.session}
+              project={entry.project}
+              currentSession={props.currentSession}
+              onOpenSession={props.onOpenSession}
+              onDeleteSession={props.onDeleteSession}
+              pinned={props.pinned}
+              language={props.language}
+            />
+          )}
         </For>
       </div>
     </Show>
@@ -480,8 +490,11 @@ function HomeRecentSessions(props: {
 function HomeProjectSessions(props: {
   server: ServerConnection.Any
   directory: string
+  project?: LocalProject
   currentSession?: Accessor<{ server?: string; id?: string } | undefined>
   onOpenSession: (server: ServerConnection.Any, session: Session) => void
+  onDeleteSession: (server: ServerConnection.Any, session: Session) => void | Promise<void>
+  pinned: PinnedSessions
   language: ReturnType<typeof useLanguage>
 }) {
   const global = useGlobal()
@@ -495,24 +508,128 @@ function HomeProjectSessions(props: {
         fallback={<div class="px-1.5 py-1 text-v2-text-text-faint">{props.language.t("home.sessions.empty")}</div>}
       >
         <For each={sessions()}>
-          {(session) => {
-            const current = createMemo(() => {
-              const value = props.currentSession?.()
-              return value?.server === ServerConnection.key(props.server) && value?.id === session.id
-            })
-            return (
-              <HomeProjectNavButton
-                type="button"
-                class="h-6 disabled:opacity-60"
-                data-selected={current() ? "" : undefined}
-                onClick={() => props.onOpenSession(props.server, session)}
-              >
-                <span class={`${HOME_PROJECT_NAV_LABEL} text-[13px]`}>{sessionTitle(session.title) || session.id}</span>
-              </HomeProjectNavButton>
-            )
-          }}
+          {(session) => (
+            <HomeSessionRow
+              server={props.server}
+              session={session}
+              currentSession={props.currentSession}
+              onOpenSession={props.onOpenSession}
+              onDeleteSession={props.onDeleteSession}
+              pinned={props.pinned}
+              language={props.language}
+              dense
+            />
+          )}
         </For>
       </Show>
+    </div>
+  )
+}
+
+function HomeSessionDeleteDialog(props: {
+  session: Session
+  onConfirm: () => void | Promise<void>
+  language: ReturnType<typeof useLanguage>
+}) {
+  const dialog = useDialog()
+  const name = createMemo(() => sessionTitle(props.session.title) || props.language.t("command.session.new"))
+  return (
+    <DialogV2 fit>
+      <DialogHeader hideClose>
+        <DialogTitleGroup
+          title={props.language.t("session.delete.title")}
+          description={props.language.t("session.delete.confirm", { name: name() })}
+        />
+      </DialogHeader>
+      <DialogFooter>
+        <ButtonV2 variant="ghost" onClick={() => dialog.close()}>
+          {props.language.t("common.cancel")}
+        </ButtonV2>
+        <ButtonV2
+          variant="danger"
+          onClick={async () => {
+            await props.onConfirm()
+            dialog.close()
+          }}
+        >
+          {props.language.t("session.delete.button")}
+        </ButtonV2>
+      </DialogFooter>
+    </DialogV2>
+  )
+}
+
+function HomeSessionRow(props: {
+  server: ServerConnection.Any
+  session: Session
+  project?: LocalProject
+  dense?: boolean
+  currentSession?: Accessor<{ server?: string; id?: string } | undefined>
+  onOpenSession: (server: ServerConnection.Any, session: Session) => void
+  onDeleteSession: (server: ServerConnection.Any, session: Session) => void | Promise<void>
+  pinned: PinnedSessions
+  language: ReturnType<typeof useLanguage>
+}) {
+  const dialog = useDialog()
+  const [menuOpen, setMenuOpen] = createSignal(false)
+  const serverKey = () => ServerConnection.key(props.server)
+  const current = createMemo(() => {
+    const value = props.currentSession?.()
+    return value?.server === serverKey() && value?.id === props.session.id
+  })
+  const isPinned = createMemo(() => props.pinned.isPinned(serverKey(), props.session.id))
+
+  return (
+    <div class="group/session relative flex min-w-0 items-center">
+      <HomeProjectNavButton
+        type="button"
+        class={`${props.dense ? "h-6" : ""} pr-7 disabled:opacity-60`}
+        data-selected={current() ? "" : undefined}
+        onClick={() => props.onOpenSession(props.server, props.session)}
+      >
+        <Show when={props.project}>{(project) => <HomeProjectAvatar project={project()} />}</Show>
+        <span class={`${HOME_PROJECT_NAV_LABEL} ${props.dense ? "text-[13px]" : ""}`}>
+          {sessionTitle(props.session.title) || props.session.id}
+        </span>
+      </HomeProjectNavButton>
+      <div
+        class={`
+          hover-reveal absolute right-1 top-1/2 flex -translate-y-1/2 items-center opacity-0
+          group-hover/session:opacity-100 focus-within:opacity-100 data-[menu=true]:opacity-100
+        `}
+        data-menu={menuOpen()}
+      >
+        <MenuV2 gutter={6} modal={false} placement="bottom-end" open={menuOpen()} onOpenChange={setMenuOpen}>
+          <MenuV2.Trigger
+            as={IconButtonV2}
+            variant="ghost-muted"
+            size="small"
+            icon={<IconV2 name="outline-dots" />}
+            aria-label={props.language.t("common.moreOptions")}
+          />
+          <MenuV2.Portal>
+            <MenuV2.Content>
+              <MenuV2.Item onSelect={() => props.pinned.toggle(serverKey(), props.session.id)}>
+                {isPinned() ? props.language.t("common.unpin") : props.language.t("common.pin")}
+              </MenuV2.Item>
+              <MenuV2.Separator />
+              <MenuV2.Item
+                onSelect={() =>
+                  dialog.show(() => (
+                    <HomeSessionDeleteDialog
+                      session={props.session}
+                      language={props.language}
+                      onConfirm={() => props.onDeleteSession(props.server, props.session)}
+                    />
+                  ))
+                }
+              >
+                {props.language.t("session.delete.button")}
+              </MenuV2.Item>
+            </MenuV2.Content>
+          </MenuV2.Portal>
+        </MenuV2>
+      </div>
     </div>
   )
 }
