@@ -2655,6 +2655,22 @@ ToolRegistry.register({
 })
 
 ToolRegistry.register({
+  name: "present_plan",
+  render(props) {
+    const i18n = useI18n()
+    return <BasicTool {...props} icon="bubble-5" hideDetails trigger={{ title: i18n.t("ui.tool.presentPlan") }} />
+  },
+})
+
+ToolRegistry.register({
+  name: "plan_enter",
+  render(props) {
+    const i18n = useI18n()
+    return <BasicTool {...props} icon="bubble-5" hideDetails trigger={{ title: i18n.t("ui.tool.planEnter") }} />
+  },
+})
+
+ToolRegistry.register({
   name: "skill",
   render(props) {
     const i18n = useI18n()

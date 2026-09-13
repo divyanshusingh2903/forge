@@ -110,16 +110,7 @@ export function SessionPlanQuestionDock(props: { request: QuestionRequest; onSub
         </>
       }
     >
-      <For each={options()}>
-        {(opt, i) => (
-          <div data-slot="permission-row">
-            <span data-slot="permission-spacer" aria-hidden="true" />
-            <div data-slot="permission-hint">
-              <Keybind>{i() + 1}</Keybind> {opt.label} — {opt.description}
-            </div>
-          </div>
-        )}
-      </For>
+      <></>
     </DockPrompt>
   )
 }
