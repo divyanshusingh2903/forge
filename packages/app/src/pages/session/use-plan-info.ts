@@ -1,11 +1,13 @@
-import { createMemo, createResource } from "solid-js"
+import { createEffect, createMemo, createResource } from "solid-js"
 import type { Part } from "@opencode-ai/sdk/v2"
+import { useFile } from "@/context/file"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
 
 export function usePlanInfo(sessionId: () => string | undefined) {
   const sdk = useSDK()
   const sync = useSync()
+  const file = useFile()
 
   const planKey = createMemo(() => {
     const id = sessionId()
@@ -21,6 +23,17 @@ export function usePlanInfo(sessionId: () => string | undefined) {
       .client.session.plan({ sessionID: id })
       .then((result) => result.data)
       .catch(() => undefined)
+  })
+
+  // The file watcher's invalidation isn't reliable enough on its own to keep
+  // the Plan tab fresh across edits (e.g. shell-appended writes), so force a
+  // reload whenever this resolves again -- planKey already changes on every
+  // new message, so this naturally re-checks each time the conversation
+  // progresses rather than only once when the path first appears.
+  createEffect(() => {
+    const info = planInfo()
+    if (!info?.exists) return
+    void file.load(info.path, { force: true })
   })
 
   const pending = createMemo(() => {
