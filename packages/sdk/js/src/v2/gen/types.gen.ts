@@ -9755,6 +9755,43 @@ export type SessionDiffResponses = {
 
 export type SessionDiffResponse = SessionDiffResponses[keyof SessionDiffResponses]
 
+export type SessionPlanData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/plan"
+}
+
+export type SessionPlanErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionPlanError = SessionPlanErrors[keyof SessionPlanErrors]
+
+export type SessionPlanResponses = {
+  /**
+   * Plan file info
+   */
+  200: {
+    path: string
+    exists: boolean
+  }
+}
+
+export type SessionPlanResponse = SessionPlanResponses[keyof SessionPlanResponses]
+
 export type SessionMessagesData = {
   body?: never
   path: {

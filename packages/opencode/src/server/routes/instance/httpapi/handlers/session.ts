@@ -16,6 +16,7 @@ import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { NamedError } from "@opencode-ai/core/util/error"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Cause, Effect, Option, Schema, Scope } from "effect"
 import * as Stream from "effect/Stream"
 import { InstanceState } from "@/effect/instance-state"
@@ -60,6 +61,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const summary = yield* SessionSummary.Service
     const events = yield* EventV2Bridge.Service
     const scope = yield* Scope.Scope
+    const fsSvc = yield* FSUtil.Service
 
     const list = Effect.fn("SessionHttpApi.list")(function* (ctx: { query: typeof ListQuery.Type }) {
       const directory = ctx.query.directory ? yield* InstanceState.directory : undefined
@@ -101,6 +103,14 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       query: typeof DiffQuery.Type
     }) {
       return yield* summary.diff({ sessionID: ctx.params.sessionID, messageID: ctx.query.messageID })
+    })
+
+    const plan = Effect.fn("SessionHttpApi.plan")(function* (ctx: { params: { sessionID: SessionID } }) {
+      const info = yield* requireSession(ctx.params.sessionID)
+      const instance = yield* InstanceState.context
+      const path = Session.plan(info, instance)
+      const exists = yield* fsSvc.existsSafe(path)
+      return { path, exists }
     })
 
     const messages = Effect.fn("SessionHttpApi.messages")(function* (ctx: {
@@ -417,6 +427,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("children", children)
       .handle("todo", todo)
       .handle("diff", diff)
+      .handle("plan", plan)
       .handle("messages", messages)
       .handle("message", message)
       .handleRaw("create", createRaw)

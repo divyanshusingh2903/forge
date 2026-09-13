@@ -46,6 +46,10 @@ export const MessagesQuery = Schema.Struct({
   before: Schema.optional(Schema.String),
 })
 export const StatusMap = Schema.Record(Schema.String, SessionStatus.Info)
+export const PlanInfo = Schema.Struct({
+  path: Schema.String,
+  exists: Schema.Boolean,
+})
 export const UpdatePayload = Schema.Struct({
   title: Schema.optional(Schema.String),
   metadata: Schema.optional(Session.Metadata),
@@ -82,6 +86,7 @@ export const SessionPaths = {
   children: `${root}/:sessionID/children`,
   todo: `${root}/:sessionID/todo`,
   diff: `${root}/:sessionID/diff`,
+  plan: `${root}/:sessionID/plan`,
   messages: `${root}/:sessionID/message`,
   message: `${root}/:sessionID/message/:messageID`,
   create: root,
@@ -174,6 +179,18 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.diff",
             summary: "Get message diff",
             description: "Get the file changes (diff) that resulted from a specific user message in the session.",
+          }),
+        ),
+        HttpApiEndpoint.get("plan", SessionPaths.plan, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(PlanInfo, "Plan file info"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.plan",
+            summary: "Get plan file info",
+            description: "Get the path to this session's plan file (written by the plan agent) and whether it exists.",
           }),
         ),
         HttpApiEndpoint.get("messages", SessionPaths.messages, {
