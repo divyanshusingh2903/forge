@@ -297,13 +297,14 @@
 
   [data-component="markdown"] {
     margin-top: 16px;
-    font-style: normal;
+    font-style: italic;
     font-size: 13px;
     color: var(--v2-text-text-muted);
 
     strong,
     b {
       color: var(--v2-text-text-muted);
+      font-style: italic;
     }
 
     p:has(strong) {
@@ -372,9 +373,13 @@
   direction: ltr;
   unicode-bidi: isolate;
   width: 100%;
-  border: 1px solid var(--v2-border-border-strong);
+  border: 1px solid var(--v2-grey-900);
   border-radius: 6px;
-  background: var(--v2-background-bg-layer-02);
+  /* Deliberately theme-invariant (raw palette, not a light/dark-aware
+     semantic token) -- a terminal block reads as a terminal because it's
+     dark regardless of whether the app itself is in light or dark mode,
+     matching the convention most coding-agent UIs use for shell output. */
+  background: var(--v2-grey-1100);
   position: relative;
   overflow: hidden;
 
@@ -385,6 +390,14 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
+
+    [data-slot="icon-svg"] {
+      color: var(--v2-grey-400);
+    }
+
+    &:hover [data-slot="icon-svg"] {
+      color: var(--v2-grey-100);
+    }
   }
 
   &:hover [data-slot="bash-copy"],
@@ -398,20 +411,21 @@
     align-items: flex-start;
     gap: 8px;
     padding: 10px 40px 10px 12px;
-    background: var(--v2-background-bg-layer-03);
-    border-bottom: 1px solid var(--v2-border-border-strong);
+    background: var(--v2-grey-1000);
+    border-bottom: 1px solid var(--v2-grey-900);
     font-family: var(--font-family-mono);
     font-feature-settings: var(--font-family-mono--font-feature-settings);
     font-size: 13px;
+    font-weight: 500;
     line-height: var(--line-height-large);
-    color: var(--v2-text-text-base);
+    color: var(--v2-grey-100);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
   }
 
   [data-slot="bash-command-prompt"] {
     flex-shrink: 0;
-    color: var(--v2-text-text-muted);
+    color: var(--v2-orange-500);
     user-select: none;
   }
 
@@ -439,6 +453,7 @@
     line-height: var(--line-height-large);
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+    color: var(--v2-grey-300);
   }
 }
 
