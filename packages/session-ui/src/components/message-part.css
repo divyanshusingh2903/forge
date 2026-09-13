@@ -374,7 +374,7 @@
   width: 100%;
   border: 0.5px solid var(--v2-border-border-base);
   border-radius: 6px;
-  background: transparent;
+  background: var(--v2-background-bg-deep);
   position: relative;
   overflow: hidden;
 
@@ -391,6 +391,27 @@
   &:focus-within [data-slot="bash-copy"] {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  [data-slot="bash-command"] {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 40px 10px 12px;
+    border-bottom: 0.5px solid var(--v2-border-border-base);
+    font-family: var(--font-family-mono);
+    font-feature-settings: var(--font-family-mono--font-feature-settings);
+    font-size: 13px;
+    line-height: var(--line-height-large);
+    color: var(--v2-text-text-base);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  [data-slot="bash-command-prompt"] {
+    flex-shrink: 0;
+    color: var(--v2-text-text-muted);
+    user-select: none;
   }
 
   [data-slot="bash-scroll"] {

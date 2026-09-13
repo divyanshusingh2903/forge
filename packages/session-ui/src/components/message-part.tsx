@@ -2135,6 +2135,12 @@ ToolRegistry.register({
               />
             </TooltipV2>
           </div>
+          <Show when={props.input.command}>
+            <div data-slot="bash-command">
+              <span data-slot="bash-command-prompt">$</span>
+              <code>{props.input.command}</code>
+            </div>
+          </Show>
           <div
             data-slot="bash-scroll"
             data-scrollable
