@@ -85,7 +85,7 @@ export function SessionPlanQuestionDock(props: { request: QuestionRequest; onSub
 
   return (
     <DockPrompt
-      kind="question"
+      kind="permission"
       header={
         <div data-slot="permission-row" data-variant="header">
           <span data-slot="permission-icon">
