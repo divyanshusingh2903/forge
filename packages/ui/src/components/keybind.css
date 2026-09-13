@@ -16,3 +16,13 @@
   line-height: 1;
   color: var(--text-weak);
 }
+
+/* On a dark/filled button (e.g. primary), the default light opaque badge
+   reads as a stray light patch rather than part of the button. Use a
+   translucent white treatment that sits on top of whatever the button's
+   own background is instead. */
+[data-component="button"][data-variant="primary"] [data-component="keybind"] {
+  background: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.7);
+  box-shadow: none;
+}
