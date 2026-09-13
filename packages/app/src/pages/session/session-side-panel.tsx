@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch, createEffect, createMemo, createResource, onCleanup, type JSX } from "solid-js"
+import { For, Match, Show, Switch, createEffect, createMemo, onCleanup, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { DragDropProvider as DndKitProvider, PointerSensor } from "@dnd-kit/solid"
@@ -44,7 +44,6 @@ import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
-import { useSync } from "@/context/sync"
 import { createFileTabListSync } from "@/pages/session/file-tab-scroll"
 import { FileTabContent } from "@/pages/session/file-tabs"
 import {
@@ -57,6 +56,7 @@ import {
 } from "@/pages/session/helpers"
 import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
+import { usePlanInfo } from "@/pages/session/use-plan-info"
 import { SessionFileBrowserTab, type SessionFileBrowserState } from "@/pages/session/v2/session-file-browser-tab"
 
 type ReviewDiff = FileDiffInfo | SnapshotFileDiff | VcsFileDiff
@@ -92,25 +92,11 @@ export function SessionSidePanel(props: {
   const dialog = useDialog()
   const sdk = useSDK()
   const { sessionKey, tabs, view, params } = useSessionLayout()
-  const sync = useSync()
   const projectDirectory = createMemo(() => sdk().directory)
 
-  const planKey = createMemo(() => {
-    const id = params.id
-    if (!id) return undefined
-    const count = sync().data.message[id]?.length ?? 0
-    return `${id}:${count}`
-  })
-  const [planInfo] = createResource(planKey, async (key) => {
-    const id = key.split(":")[0]
-    if (!id) return undefined
-    return sdk()
-      .client.session.plan({ sessionID: id })
-      .then((result) => result.data)
-      .catch(() => undefined)
-  })
-  const planExists = createMemo(() => planInfo()?.exists ?? false)
-  const planPath = createMemo(() => planInfo()?.path)
+  const plan = usePlanInfo(() => params.id)
+  const planExists = plan.exists
+  const planPath = plan.path
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const shown = settings.visibility.fileTree

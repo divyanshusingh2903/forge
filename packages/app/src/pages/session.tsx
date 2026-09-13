@@ -1,4 +1,4 @@
-import type { FilePart, Project, UserMessage, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { FilePart, Part, Project, UserMessage, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { getFilename } from "@opencode-ai/core/util/path"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createQuery, skipToken, useMutation, useQueryClient } from "@tanstack/solid-query"
@@ -56,6 +56,7 @@ import { useServerSDK } from "@/context/server-sdk"
 import { ServerConnection, serverName, useServer } from "@/context/server"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
+import { usePermission } from "@/context/permission"
 import { useTabs } from "@/context/tabs"
 import { TerminalProvider, useTerminal } from "@/context/terminal"
 import { PromptInput } from "@/components/prompt-input"
@@ -356,6 +357,7 @@ export default function Page() {
   const local = useLocal()
   const file = useFile()
   const sync = useSync()
+  const permission = usePermission()
   const queryClient = useQueryClient()
   const dialog = useDialog()
   const language = useLanguage()
@@ -375,6 +377,28 @@ export default function Page() {
   const reviewFile = () => view().review.file()
   const sessionOwnership = createSessionOwnership(sessionKey)
   const newSessionDesign = createMemo(() => settings.general.newLayoutDesigns())
+
+  // Reacts to plan_exit tool calls that resolved to "Accept (Auto)": the tool
+  // itself can only switch the session's agent, since auto-accept is a
+  // client-side permission setting the server has no concept of -- so the
+  // client watches for the completed call and flips it here.
+  const handledPlanExitAutoAccept = new Set<string>()
+  createEffect(() => {
+    const id = params.id
+    if (!id) return
+    const messages = sync().data.message[id] ?? []
+    for (const message of messages) {
+      const parts = (sync().data.part[message.id] ?? []) as Part[]
+      for (const part of parts) {
+        if (part.type !== "tool" || part.tool !== "plan_exit") continue
+        if (part.state.status !== "completed") continue
+        if (part.state.metadata?.autoAccept !== true) continue
+        if (handledPlanExitAutoAccept.has(part.callID)) continue
+        handledPlanExitAutoAccept.add(part.callID)
+        permission.enableAutoAccept(id, sdk().directory)
+      }
+    }
+  })
 
   createEffect(() => {
     if (!prompt.ready()) return

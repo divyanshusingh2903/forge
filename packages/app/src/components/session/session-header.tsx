@@ -33,6 +33,7 @@ import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { KeybindV2 } from "@opencode-ai/ui/v2/keybind-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { useTitlebarRightMount } from "../titlebar"
+import { SessionPlanIndicator } from "./session-plan-indicator"
 
 const OPEN_APPS = [
   "vscode",
@@ -544,6 +545,7 @@ export function SessionHeaderQuickActions(props: { diffs?: Accessor<SessionHeade
           <StatusPopoverV2 />
         </Tooltip>
       </Show>
+      <SessionPlanIndicator />
       <TooltipV2 value={language.t("command.terminal.toggle")} placement="bottom">
         <IconButtonV2
           type="button"

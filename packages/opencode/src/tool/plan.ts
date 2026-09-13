@@ -12,6 +12,15 @@ import EXIT_DESCRIPTION from "./plan-exit.txt"
 
 export const Parameters = Schema.Struct({})
 
+type Metadata = {
+  autoAccept: boolean
+}
+
+const ACCEPT_MANUAL = "Accept (Manual)"
+const ACCEPT_AUTO = "Accept (Auto)"
+const REVISE = "Revise"
+const DENY = "Deny"
+
 export const PlanExitTool = Tool.define(
   "plan_exit",
   Effect.gen(function* () {
@@ -22,7 +31,7 @@ export const PlanExitTool = Tool.define(
     return {
       description: EXIT_DESCRIPTION,
       parameters: Parameters,
-      execute: (_params: {}, ctx: Tool.Context) =>
+      execute: (_params: {}, ctx: Tool.Context<Metadata>) =>
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
           const info = yield* session.get(ctx.sessionID)
@@ -31,19 +40,32 @@ export const PlanExitTool = Tool.define(
             sessionID: ctx.sessionID,
             questions: [
               {
-                question: `Plan at ${plan} is complete. Would you like to switch to the build agent and start implementing?`,
-                header: "Build Agent",
+                question: `Plan at ${plan} is complete. How would you like to proceed?`,
+                header: "Plan Review",
                 custom: false,
                 options: [
-                  { label: "Yes", description: "Switch to build agent and start implementing the plan" },
-                  { label: "No", description: "Stay with plan agent to continue refining the plan" },
+                  { label: ACCEPT_MANUAL, description: "Switch to build agent; approve each edit yourself" },
+                  { label: ACCEPT_AUTO, description: "Switch to build agent; auto-accept edits" },
+                  { label: REVISE, description: "Keep refining the plan with the plan agent" },
+                  { label: DENY, description: "Stop here, don't implement this plan" },
                 ],
               },
             ],
             tool: ctx.callID ? { messageID: ctx.messageID, callID: ctx.callID } : undefined,
           })
 
-          if (answers[0]?.[0] === "No") yield* new Question.RejectedError()
+          const choice = answers[0]?.[0]
+          if (choice === DENY) yield* new Question.RejectedError()
+          if (choice === REVISE) {
+            return {
+              title: "Continuing to revise the plan",
+              output:
+                "The user wants to keep revising the plan. Ask what they'd like changed and continue refining the plan file.",
+              metadata: { autoAccept: false },
+            }
+          }
+
+          const autoAccept = choice === ACCEPT_AUTO
 
           const messages = yield* session.messages({ sessionID: ctx.sessionID }).pipe(Effect.orDie)
           const lastUser = messages.findLast((item) => item.info.role === "user" && item.info.model)
@@ -71,7 +93,7 @@ export const PlanExitTool = Tool.define(
           return {
             title: "Switching to build agent",
             output: "User approved switching to build agent. Wait for further instructions.",
-            metadata: {},
+            metadata: { autoAccept },
           }
         }).pipe(Effect.orDie),
     }
