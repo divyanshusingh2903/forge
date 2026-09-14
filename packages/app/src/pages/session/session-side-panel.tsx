@@ -95,7 +95,6 @@ export function SessionSidePanel(props: {
   const projectDirectory = createMemo(() => sdk().directory)
 
   const plan = usePlanInfo(() => params.id)
-  const planExists = plan.exists
   const planPath = plan.path
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
@@ -186,9 +185,9 @@ export function SessionSidePanel(props: {
     review: reviewTab,
     hasReview: props.canReview,
     fileBrowser: () => !!props.fileBrowserState,
-    plan: planExists,
   })
   const contextOpen = tabState.contextOpen
+  const planOpen = tabState.planOpen
   const openFileOpen = tabState.openFileOpen
   const panelTabs = tabState.panelTabs
   const openedTabs = tabState.openedTabs
@@ -612,8 +611,34 @@ export function SessionSidePanel(props: {
                                 </div>
                               </Tabs.Trigger>
                             </Show>
-                            <Show when={planExists()}>
-                              <Tabs.Trigger value="plan">
+                            <Show when={planOpen()}>
+                              <Tabs.Trigger
+                                value="plan"
+                                closeButton={
+                                  <TooltipV2
+                                    value={
+                                      <>
+                                        {language.t("common.closeTab")}
+                                        <Show when={closeTabKeybind().length > 0}>
+                                          <KeybindV2 keys={closeTabKeybind()} variant="neutral" />
+                                        </Show>
+                                      </>
+                                    }
+                                    placement="bottom"
+                                    gutter={10}
+                                  >
+                                    <IconButton
+                                      icon="close-small"
+                                      variant="ghost"
+                                      class="h-5 w-5"
+                                      onClick={() => tabs().close("plan")}
+                                      aria-label={language.t("common.closeTab")}
+                                    />
+                                  </TooltipV2>
+                                }
+                                hideCloseButton
+                                onMiddleClick={() => tabs().close("plan")}
+                              >
                                 <div class="flex items-center gap-2">
                                   <IconV2 name="plan" />
                                   <div>{language.t("session.tab.plan")}</div>
@@ -743,7 +768,7 @@ export function SessionSidePanel(props: {
 
                         <Show when={activeTab() === "plan"}>
                           <Tabs.Content value="plan" class="flex flex-col h-full overflow-hidden contain-strict">
-                            <SessionPlanTab path={planPath()} />
+                            <SessionPlanTab path={planPath()} pendingRequest={plan.pendingRequest} />
                           </Tabs.Content>
                         </Show>
 

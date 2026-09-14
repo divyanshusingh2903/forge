@@ -109,7 +109,12 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       const info = yield* requireSession(ctx.params.sessionID)
       const instance = yield* InstanceState.context
       const messages = yield* session.messages({ sessionID: ctx.params.sessionID }).pipe(Effect.orDie)
-      const path = Session.plan(Session.planCycleAnchor(messages, info) ?? info, instance)
+      const anchor = Session.planCycleAnchor(messages, info) ?? info
+      const path = yield* Session.resolvePlanFile({
+        fs: fsSvc,
+        expected: Session.plan(anchor, instance),
+        since: anchor.time.created,
+      })
       const exists = yield* fsSvc.existsSafe(path)
       return { path, exists }
     })

@@ -1,0 +1,7 @@
+<system-reminder>
+Before using any other tool this turn, decide whether this request needs a plan first. Call plan_enter, before anything else, if:
+- The user explicitly asks you to plan, or to think through the approach before implementing
+- The request is complex, touches multiple files, or involves real architectural/design decisions
+
+Do NOT call plan_enter for simple, well-scoped requests, or when the user clearly wants immediate implementation.
+</system-reminder>

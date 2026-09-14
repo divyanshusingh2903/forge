@@ -6,6 +6,7 @@ import { Question } from "../question"
 import { Session } from "@/session/session"
 import { MessageV2 } from "../session/message-v2"
 import { Provider } from "@/provider/provider"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { InstanceState } from "@/effect/instance-state"
 import { MessageID, PartID } from "../session/schema"
 import PRESENT_PLAN_DESCRIPTION from "./present-plan.txt"
@@ -33,6 +34,7 @@ export const PresentPlanTool = Tool.define(
     const session = yield* Session.Service
     const question = yield* Question.Service
     const provider = yield* Provider.Service
+    const fs = yield* FSUtil.Service
 
     return {
       description: PRESENT_PLAN_DESCRIPTION,
@@ -41,10 +43,13 @@ export const PresentPlanTool = Tool.define(
         Effect.gen(function* () {
           const instance = yield* InstanceState.context
           const info = yield* session.get(ctx.sessionID)
-          const plan = path.relative(
-            instance.worktree,
-            Session.plan(Session.planCycleAnchor(ctx.messages, info) ?? info, instance),
-          )
+          const anchor = Session.planCycleAnchor(ctx.messages, info) ?? info
+          const resolved = yield* Session.resolvePlanFile({
+            fs,
+            expected: Session.plan(anchor, instance),
+            since: anchor.time.created,
+          })
+          const plan = path.relative(instance.worktree, resolved)
           const answers = yield* question.ask({
             sessionID: ctx.sessionID,
             questions: [

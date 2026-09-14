@@ -1,4 +1,4 @@
-import { createEffect, createMemo, For } from "solid-js"
+import { createEffect, createMemo, For, Show } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { useMutation } from "@tanstack/solid-query"
 import type { QuestionRequest } from "@opencode-ai/sdk/v2"
@@ -9,6 +9,7 @@ import { Keybind } from "@opencode-ai/ui/keybind"
 import { showToast } from "@/utils/toast"
 import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
+import { useSessionLayout } from "@/pages/session/session-layout"
 
 // Same numeric-shortcut convention as SessionPermissionDock: deny/no is
 // always the most de-emphasized (ghost, lowest digit), the safest "go
@@ -29,9 +30,19 @@ function isEditableTarget(target: EventTarget | null) {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
 }
 
-export function SessionPlanQuestionDock(props: { request: QuestionRequest; onSubmit: () => void }) {
+export function SessionPlanQuestionDock(props: {
+  request: QuestionRequest
+  toolName?: string
+  onSubmit: () => void
+}) {
   const language = useLanguage()
   const sdk = useSDK()
+  const { view, tabs } = useSessionLayout()
+
+  const openPlan = () => {
+    if (!view().reviewPanel.opened()) view().reviewPanel.open()
+    void tabs().open("plan")
+  }
 
   const question = createMemo(() => props.request.questions[0])
   const options = createMemo(() =>
@@ -96,7 +107,13 @@ export function SessionPlanQuestionDock(props: { request: QuestionRequest; onSub
       }
       footer={
         <>
-          <div />
+          <div>
+            <Show when={props.toolName === "present_plan"}>
+              <Button variant="ghost" size="normal" onClick={openPlan}>
+                {language.t("session.plan.openButton")}
+              </Button>
+            </Show>
+          </div>
           <div data-slot="permission-footer-actions">
             <For each={options()}>
               {(opt, i) => (

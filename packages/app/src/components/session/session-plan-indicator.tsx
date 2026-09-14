@@ -13,7 +13,7 @@ export function SessionPlanIndicator() {
 
   const open = () => {
     if (!view().reviewPanel.opened()) view().reviewPanel.open()
-    tabs().setActive("plan")
+    void tabs().open("plan")
   }
 
   const tooltip = () => (plan.pending() ? language.t("session.plan.openTooltip") : language.t("session.plan.viewTooltip"))

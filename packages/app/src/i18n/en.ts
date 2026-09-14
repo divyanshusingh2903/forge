@@ -677,6 +677,7 @@ export const dict = {
   "session.plan.viewTooltip": "View plan",
   "session.plan.openTooltip": "Open plan — waiting for your decision",
   "session.plan.enteredToast": "Switched to Plan mode",
+  "session.plan.openButton": "Open Plan",
   "session.panel.reviewAndFiles": "Review and files",
   "session.error.notFound": "This session cannot be found",
   "session.error.notFound.description": "This tab points to a session that no longer exists on this server.",
