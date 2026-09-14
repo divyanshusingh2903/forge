@@ -27,6 +27,7 @@ import { initializationData } from "./initialization"
 import { DesktopFirstLaunchOnboarding } from "./onboarding"
 import { resetZoom, setPinchZoomEnabled, webviewZoom, zoomIn, zoomOut } from "./webview-zoom"
 import { windowFullscreen } from "./window-fullscreen"
+import { windowMaximized } from "./window-maximized"
 import { availableStartupServer, readyWslConnections } from "./wsl/connections"
 import "./styles.css"
 import { Splash } from "@opencode-ai/ui/logo"
@@ -295,6 +296,8 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
     webviewZoom,
 
     windowFullscreen,
+
+    windowMaximized,
 
     getPinchZoomEnabled: () => window.api.getPinchZoomEnabled(),
 

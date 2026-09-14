@@ -77,6 +77,10 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M8 1V6M11 3L8 6L5 3" stroke="currentColor"/><path d="M8 15V10M11 13L8 10L5 13" stroke="currentColor"/><path d="M4 8H6" stroke="currentColor"/><path d="M7 8H9" stroke="currentColor"/><path d="M10 8H12" stroke="currentColor"/>`,
   },
+  dash: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M3 8H13" stroke="currentColor" stroke-linejoin="round"/>`,
+  },
   check: {
     viewBox: "0 0 16 16",
     body: `<path d="M3.53613 8.17857L6.39328 11.75L12.4647 4.25" stroke="currentColor"/>`,

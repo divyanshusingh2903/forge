@@ -86,6 +86,11 @@ a {
   app-region: drag;
 }
 
+.linux-window-controls,
+.linux-window-controls * {
+  app-region: no-drag;
+}
+
 *[data-tauri-drag-region] button,
 *[data-tauri-drag-region] a,
 *[data-tauri-drag-region] input,

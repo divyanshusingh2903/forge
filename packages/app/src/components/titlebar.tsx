@@ -46,6 +46,34 @@ const minTitlebarZoom = 0.25
 const windowsControlsBaseWidth = 138 // 3 native Windows caption buttons at 46px each.
 const macTrafficLightsBaseWidth = 84
 
+function WindowControls(props: {
+  v2: boolean
+  maximized: boolean
+  language: ReturnType<typeof useLanguage>
+  platform: ReturnType<typeof usePlatform>
+}) {
+  const action = (name: "window.minimize" | "window.toggleMaximize" | "window.close") => {
+    void props.platform.runDesktopMenuAction?.(name)
+  }
+  const label = () => props.language.t("desktop.menu.maximize")
+  if (props.v2) {
+    return (
+      <div class="linux-window-controls flex items-center shrink-0">
+        <IconButtonV2 type="button" variant="ghost-muted" size="large" icon={<IconV2 name="dash" />} onClick={() => action("window.minimize")} aria-label={props.language.t("desktop.menu.minimize")} />
+        <IconButtonV2 type="button" variant="ghost-muted" size="large" icon={<IconV2 name={props.maximized ? "collapse" : "expand"} />} onClick={() => action("window.toggleMaximize")} aria-label={label()} />
+        <IconButtonV2 type="button" variant="ghost-muted" size="large" icon={<IconV2 name="close" />} onClick={() => action("window.close")} aria-label={props.language.t("desktop.menu.closeWindow")} />
+      </div>
+    )
+  }
+  return (
+    <div class="linux-window-controls flex items-center shrink-0">
+      <IconButton type="button" variant="ghost" size="normal" icon="dash" onClick={() => action("window.minimize")} aria-label={props.language.t("desktop.menu.minimize")} />
+      <IconButton type="button" variant="ghost" size="normal" icon={props.maximized ? "collapse" : "expand"} onClick={() => action("window.toggleMaximize")} aria-label={label()} />
+      <IconButton type="button" variant="ghost" size="normal" icon="close" onClick={() => action("window.close")} aria-label={props.language.t("desktop.menu.closeWindow")} />
+    </div>
+  )
+}
+
 export type TitlebarUpdate = {
   version: () => string | undefined
   installing: () => boolean
@@ -581,6 +609,14 @@ export function Titlebar(props: { update?: TitlebarUpdate; debugTools?: { visibl
               data-tauri-drag-region
             >
               <div id="opencode-titlebar-right" class="flex items-center gap-1 shrink-0 justify-end" />
+              <Show when={linux()}>
+                <WindowControls
+                  v2={useV2Titlebar()}
+                  maximized={platform.windowMaximized?.() ?? false}
+                  language={language}
+                  platform={platform}
+                />
+              </Show>
               <Show when={windows()}>
                 <div class="shrink-0" style={{ width: windowsControlsWidth() }} />
               </Show>
