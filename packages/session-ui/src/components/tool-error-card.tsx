@@ -10,6 +10,7 @@ import { useI18n } from "@opencode-ai/ui/context/i18n"
 export interface ToolErrorCardProps extends Omit<ComponentProps<typeof Card>, "children" | "variant"> {
   tool: string
   error: string
+  interrupted?: boolean
   title?: string
   defaultOpen?: boolean
   open?: boolean
@@ -30,6 +31,7 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
   const [split, rest] = splitProps(props, [
     "tool",
     "error",
+    "interrupted",
     "title",
     "defaultOpen",
     "open",
@@ -57,6 +59,8 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
       patch: "ui.tool.patch",
       apply_patch: "ui.tool.patch",
       question: "ui.tool.questions",
+      present_plan: "ui.tool.presentPlan",
+      plan_enter: "ui.tool.planEnter",
     }
     const key = map[split.tool]
     if (!key) return split.tool
@@ -73,6 +77,7 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
 
   const subtitle = createMemo(() => {
     if (split.subtitle) return split.subtitle
+    if (split.interrupted) return i18n.t("ui.message.interrupted")
     const parts = tail().split(": ")
     if (parts.length <= 1) return i18n.t("ui.toolErrorCard.failed")
     const head = (parts[0] ?? "").trim()
@@ -95,13 +100,23 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
   }
 
   return (
-    <Card {...rest} data-kind="tool-error-card" data-open={open() ? "true" : "false"} variant="error">
+    <Card
+      {...rest}
+      data-kind="tool-error-card"
+      data-open={open() ? "true" : "false"}
+      data-status={split.interrupted ? "interrupted" : "error"}
+      variant={split.interrupted ? "info" : "error"}
+    >
       <Collapsible class="tool-collapsible" data-open={open() ? "true" : "false"} open={open()} onOpenChange={setOpen}>
         <Collapsible.Trigger>
           <div data-component="tool-trigger">
             <div data-slot="basic-tool-tool-trigger-content">
               <span data-slot="basic-tool-tool-indicator" data-component="tool-error-card-icon">
-                <Icon name="circle-ban-sign" size="small" style={{ "stroke-width": 1.5 }} />
+                <Icon
+                  name={split.interrupted ? "help" : "circle-ban-sign"}
+                  size="small"
+                  style={{ "stroke-width": 1.5 }}
+                />
               </span>
               <div data-slot="basic-tool-tool-info">
                 <div data-slot="basic-tool-tool-info-structured">

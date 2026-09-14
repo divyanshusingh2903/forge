@@ -64,6 +64,12 @@
     background: var(--v2-state-bg-danger);
     color: var(--v2-text-text-base);
   }
+
+  &[data-status="interrupted"] [data-slot="tool-error-card-content"] :where(*)::selection,
+  &[data-status="interrupted"] [data-slot="tool-error-card-content"] :where(*)::-moz-selection {
+    background: var(--v2-state-bg-info);
+    color: var(--v2-text-text-base);
+  }
 }
 
 body:not([data-new-layout]) [data-component="card"][data-kind="tool-error-card"] {
@@ -87,5 +93,11 @@ body:not([data-new-layout]) [data-component="card"][data-kind="tool-error-card"]
   [data-slot="tool-error-card-content"] :where(*)::-moz-selection {
     background: var(--surface-critical-base);
     color: var(--text-on-critical-base);
+  }
+
+  &[data-status="interrupted"] [data-slot="tool-error-card-content"] :where(*)::selection,
+  &[data-status="interrupted"] [data-slot="tool-error-card-content"] :where(*)::-moz-selection {
+    background: var(--surface-info-base);
+    color: var(--text-strong);
   }
 }
