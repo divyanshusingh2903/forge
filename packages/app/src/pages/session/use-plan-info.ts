@@ -75,6 +75,22 @@ export function usePlanInfo(sessionId: () => string | undefined) {
     )
   })
 
+  // Orphaned present_plan: the tool part is still durable `running` (e.g. the
+  // app restarted and the in-memory question rendezvous was lost), but there is
+  // no matching live QuestionRequest to render Accept/Revise buttons for.
+  // Distinguished from the normal race where the tool just went running and the
+  // question event has not arrived yet by requiring the plan lookup to have
+  // settled.
+  const orphaned = createMemo(() => {
+    const tool = pendingTool()
+    if (!tool) return false
+    if (pendingRequest()) return false
+    if (planInfo.loading) return false
+    const key = planKey()
+    if (!key || !key.startsWith(`${sessionId()}:`)) return false
+    return true
+  })
+
   return {
     // planKey changes on every new message, so this resource refetches constantly
     // during normal chat activity. Reading it as `.latest` (rather than calling it
@@ -92,6 +108,8 @@ export function usePlanInfo(sessionId: () => string | undefined) {
       return planInfo.latest?.path
     }),
     pending,
+    pendingCallID: createMemo(() => pendingTool()?.callID),
     pendingRequest,
+    orphaned,
   }
 }

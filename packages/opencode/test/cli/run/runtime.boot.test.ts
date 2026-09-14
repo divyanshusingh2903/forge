@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import { OpencodeClient, type Provider } from "@opencode-ai/sdk/v2"
-import type { Resolved } from "@opencode-ai/tui/config"
-import { TuiConfig } from "@/config/tui"
+import type { Resolved } from "@/cli/mini/config"
+import { MiniConfig } from "@/cli/mini/config"
 import { resolveDiffStyle, resolveModelInfo, resolveRunTuiConfig } from "@/cli/cmd/run/runtime.boot"
-import { createTuiResolvedConfig } from "../../fixture/tui-runtime"
+import { createMiniResolvedConfig } from "../../fixture/mini-runtime"
 
 function model(id: string, providerID: string, context: number, variants?: Record<string, Record<string, never>>) {
   return {
@@ -72,7 +72,7 @@ function config(input?: {
   }>
 }): Resolved {
   const bind = input?.bindings
-  return createTuiResolvedConfig({
+  return createMiniResolvedConfig({
     diff_style: input?.diff_style,
     leader_timeout: input?.leaderTimeout,
     keybinds: {
@@ -95,7 +95,7 @@ describe("run runtime boot", () => {
   })
 
   test("reads footer keybinds from resolved keybind config", async () => {
-    spyOn(TuiConfig, "get").mockResolvedValue(
+    spyOn(MiniConfig, "get").mockResolvedValue(
       config({
         leader: "ctrl+g",
         bindings: {
@@ -126,7 +126,7 @@ describe("run runtime boot", () => {
   })
 
   test("falls back to default tui keymap config when config load fails", async () => {
-    spyOn(TuiConfig, "get").mockRejectedValue(new Error("boom"))
+    spyOn(MiniConfig, "get").mockRejectedValue(new Error("boom"))
 
     const result = await resolveRunTuiConfig()
 
@@ -144,7 +144,7 @@ describe("run runtime boot", () => {
   })
 
   test("preserves disabled leader from resolved tui config", async () => {
-    spyOn(TuiConfig, "get").mockResolvedValue(config({ leader: "none" }))
+    spyOn(MiniConfig, "get").mockResolvedValue(config({ leader: "none" }))
 
     const result = await resolveRunTuiConfig()
 
@@ -152,11 +152,11 @@ describe("run runtime boot", () => {
   })
 
   test("reads diff style and falls back to auto", async () => {
-    spyOn(TuiConfig, "get").mockResolvedValue(config({ diff_style: "stacked" }))
+    spyOn(MiniConfig, "get").mockResolvedValue(config({ diff_style: "stacked" }))
     await expect(resolveDiffStyle()).resolves.toBe("stacked")
 
     mock.restore()
-    spyOn(TuiConfig, "get").mockRejectedValue(new Error("boom"))
+    spyOn(MiniConfig, "get").mockRejectedValue(new Error("boom"))
     await expect(resolveDiffStyle()).resolves.toBe("auto")
   })
 

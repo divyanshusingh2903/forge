@@ -5,7 +5,6 @@ import config from "virtual:starlight/user-config";
 
 import CopyIcon from "../assets/lander/copy.svg";
 import CheckIcon from "../assets/lander/check.svg";
-import TuiScreenshot from "../assets/lander/screenshot-splash.png";
 import VscodeScreenshot from "../assets/lander/screenshot-vscode.png";
 import GithubScreenshot from "../assets/lander/screenshot-github.png";
 
@@ -24,7 +23,6 @@ const discord = (config.social || []).filter(s => s.icon === 'discord')[0];
 const locale = Astro.currentLocale || 'root';
 const t = Astro.locals.t as (key: string) => string;
 const docsHref = getRelativeLocaleUrl(locale, "")
-const docsCliHref = getRelativeLocaleUrl(locale, "cli")
 const docsIdeHref = getRelativeLocaleUrl(locale, "ide")
 const docsGithubHref = getRelativeLocaleUrl(locale, "github")
 
@@ -81,7 +79,6 @@ if (image) {
 
     <section class="content">
       <ul>
-        <li><b>{t('app.lander.features.native_tui.title')}</b>: {t('app.lander.features.native_tui.description')}</li>
         <li><b>{t('app.lander.features.lsp_enabled.title')}</b>: {t('app.lander.features.lsp_enabled.description')}</li>
         <li><b>{t('app.lander.features.multi_session.title')}</b>: {t('app.lander.features.multi_session.description')}</li>
         <li><b>{t('app.lander.features.shareable_links.title')}</b>: {t('app.lander.features.shareable_links.description')}</li>
@@ -155,14 +152,6 @@ if (image) {
     </section>
 
     <section class="images">
-      <div class="left">
-        <figure>
-          <figcaption>{t('app.lander.images.tui.caption')}</figcaption>
-          <a href={docsCliHref}>
-            <Image src={TuiScreenshot} alt={t('app.lander.images.tui.alt')} />
-          </a>
-        </figure>
-      </div>
       <div class="right">
         <div class="row1">
           <figure>
@@ -362,18 +351,11 @@ section.images {
   grid-template-rows: var(--images-height);
   border-top: 2px solid var(--sl-color-border);
 
-  & > div.left {
-    display: flex;
-    grid-row: 1;
-    grid-column: 1;
-  }
-
   & > div.right {
     display: grid;
     grid-template-rows: 1fr 1fr;
     grid-row: 1;
-    grid-column: 2;
-    border-left: 2px solid var(--sl-color-border);
+    grid-column: 1 / -1;
 
     & > div.row1 {
       display: flex;
@@ -436,21 +418,9 @@ section.images {
     }
   }
 
-  & > div.left figure {
-    height: var(--images-height);
-    box-sizing: border-box;
-  }
-
   & > div.right figure {
     height: calc(var(--images-height) / 2);
     box-sizing: border-box;
-  }
-
-  & > div.left img {
-    width: 100%;
-    height: 100%;
-    min-width: 0;
-    object-fit: contain;
   }
 
   & > div.right img {
@@ -467,16 +437,9 @@ section.images {
       grid-template-rows: auto auto;
     }
 
-    & > div.left {
+    & > div.right {
       grid-row: 1;
       grid-column: 1;
-    }
-
-    & > div.right {
-      grid-row: 2;
-      grid-column: 1;
-      border-left: none;
-      border-top: 2px solid var(--sl-color-border);
 
       & > div.row1,
       & > div.row2 {
@@ -484,12 +447,10 @@ section.images {
       }
     }
 
-    & > div.left figure,
     & > div.right figure {
       height: auto;
     }
 
-    & > div.left img,
     & > div.right img {
       width: 100%;
       height: auto;

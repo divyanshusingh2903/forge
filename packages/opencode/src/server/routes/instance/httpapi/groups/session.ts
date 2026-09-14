@@ -50,6 +50,12 @@ export const PlanInfo = Schema.Struct({
   path: Schema.String,
   exists: Schema.Boolean,
 })
+export const PlanRecoverPayload = Schema.Struct({})
+export const PlanRecoverResult = Schema.Struct({
+  path: Schema.String,
+  exists: Schema.Boolean,
+  recovered: Schema.Boolean,
+})
 export const UpdatePayload = Schema.Struct({
   title: Schema.optional(Schema.String),
   metadata: Schema.optional(Session.Metadata),
@@ -87,6 +93,7 @@ export const SessionPaths = {
   todo: `${root}/:sessionID/todo`,
   diff: `${root}/:sessionID/diff`,
   plan: `${root}/:sessionID/plan`,
+  planRecover: `${root}/:sessionID/plan/recover`,
   messages: `${root}/:sessionID/message`,
   message: `${root}/:sessionID/message/:messageID`,
   create: root,
@@ -191,6 +198,20 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.plan",
             summary: "Get plan file info",
             description: "Get the path to this session's plan file (written by the plan agent) and whether it exists.",
+          }),
+        ),
+        HttpApiEndpoint.post("planRecover", SessionPaths.planRecover, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: PlanRecoverPayload,
+          success: described(PlanRecoverResult, "Recovered interrupted plan"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError, SessionBusyError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.planRecover",
+            summary: "Recover interrupted plan",
+            description:
+              "Fail a stale running present_plan tool left behind by a restart so the session can continue. Never deletes the plan file.",
           }),
         ),
         HttpApiEndpoint.get("messages", SessionPaths.messages, {

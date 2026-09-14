@@ -9,6 +9,7 @@ import { Keybind } from "@opencode-ai/ui/keybind"
 import { showToast } from "@/utils/toast"
 import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
+import { ensurePlanActive } from "@/pages/session/plan-tab-activation"
 import { useSessionLayout } from "@/pages/session/session-layout"
 
 // Same numeric-shortcut convention as SessionPermissionDock: deny/no is
@@ -40,9 +41,7 @@ export function SessionPlanQuestionDock(props: {
   const { view, tabs } = useSessionLayout()
 
   const openPlan = () => {
-    if (!view().reviewPanel.opened()) view().reviewPanel.open()
-    void tabs().open("plan")
-    tabs().setActive("plan")
+    ensurePlanActive(view(), tabs())
   }
 
   const question = createMemo(() => props.request.questions[0])

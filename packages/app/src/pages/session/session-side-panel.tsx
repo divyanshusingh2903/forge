@@ -56,6 +56,7 @@ import {
 } from "@/pages/session/helpers"
 import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
+import { ensurePlanActive } from "@/pages/session/plan-tab-activation"
 import { usePlanInfo } from "@/pages/session/use-plan-info"
 import { SessionFileBrowserTab, type SessionFileBrowserState } from "@/pages/session/v2/session-file-browser-tab"
 
@@ -96,6 +97,19 @@ export function SessionSidePanel(props: {
 
   const plan = usePlanInfo(() => params.id)
   const planPath = plan.path
+
+  // Always-steal: when a new present_plan goes pending, activate the Plan tab
+  // even if the session.tsx scanner fired early or the user is on Files
+  // Changed. Guarded per callID so an explicit close isn't fought, and so
+  // refetches for the same plan don't re-steal.
+  const activatedPlanCallIDs = new Set<string>()
+  createEffect(() => {
+    const callID = plan.pendingCallID()
+    if (!callID || !plan.pending()) return
+    if (activatedPlanCallIDs.has(callID)) return
+    activatedPlanCallIDs.add(callID)
+    ensurePlanActive(view(), tabs())
+  })
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const shown = settings.visibility.fileTree

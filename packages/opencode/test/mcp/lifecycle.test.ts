@@ -461,7 +461,11 @@ it.instance("connect and disconnect fail for unknown servers", () =>
         expect(Cause.squash(exit.cause)).toMatchObject({ _tag: "MCP.NotFoundError", name: "missing" })
       }
     }
-    expect(yield* mcp.status()).toEqual({})
+    expect(yield* mcp.status()).toEqual({
+      linear: { status: "disabled" },
+      github: { status: "disabled" },
+      notion: { status: "disabled" },
+    })
     expect(yield* mcp.tools()).toEqual({})
   }),
 )

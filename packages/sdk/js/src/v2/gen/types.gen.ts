@@ -2550,6 +2550,12 @@ export type NotFoundError = {
   }
 }
 
+export type SessionBusyError = {
+  _tag: "SessionBusyError"
+  sessionID: string
+  message: string
+}
+
 export type TextPartInput = {
   id?: string
   type: "text"
@@ -2596,12 +2602,6 @@ export type SubtaskPartInput = {
     modelID: string
   }
   command?: string
-}
-
-export type SessionBusyError = {
-  _tag: "SessionBusyError"
-  sessionID: string
-  message: string
 }
 
 export type EventTuiPromptAppend = {
@@ -9791,6 +9791,50 @@ export type SessionPlanResponses = {
 }
 
 export type SessionPlanResponse = SessionPlanResponses[keyof SessionPlanResponses]
+
+export type SessionPlanRecoverData = {
+  body?: {
+    [key: string]: unknown
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/plan/recover"
+}
+
+export type SessionPlanRecoverErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+  /**
+   * SessionBusyError
+   */
+  409: SessionBusyError
+}
+
+export type SessionPlanRecoverError = SessionPlanRecoverErrors[keyof SessionPlanRecoverErrors]
+
+export type SessionPlanRecoverResponses = {
+  /**
+   * Recovered interrupted plan
+   */
+  200: {
+    path: string
+    exists: boolean
+    recovered: boolean
+  }
+}
+
+export type SessionPlanRecoverResponse = SessionPlanRecoverResponses[keyof SessionPlanRecoverResponses]
 
 export type SessionMessagesData = {
   body?: never

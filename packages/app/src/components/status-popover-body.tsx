@@ -434,7 +434,14 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
                           <span class="flex items-center gap-2 min-w-0">
                             <span class="text-14-regular text-text-base truncate">{name}</span>
                           </span>
-                          <Show when={status() === "needs_auth"}>
+                          <Show when={toggleMcp.isPending && toggleMcp.variables === name}>
+                            <span class="text-11-regular text-text-weaker truncate">
+                              {language.t("common.loading")}
+                            </span>
+                          </Show>
+                          <Show
+                            when={!(toggleMcp.isPending && toggleMcp.variables === name) && status() === "needs_auth"}
+                          >
                             <span class="text-11-regular text-text-weaker truncate">
                               {language.t("mcp.auth.clickToAuthenticate")}
                             </span>

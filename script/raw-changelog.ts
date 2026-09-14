@@ -31,10 +31,9 @@ const team = [
     .then((x) => x.filter((x) => x && !x.startsWith("#")))),
   ...bot,
 ]
-const order = ["Core", "TUI", "Desktop", "SDK", "Extensions"] as const
+const order = ["Core", "Desktop", "SDK", "Extensions"] as const
 const sections = {
   core: "Core",
-  tui: "TUI",
   app: "Desktop",
   tauri: "Desktop",
   sdk: "SDK",
@@ -74,7 +73,7 @@ async function diff(base: string, head: string) {
 }
 
 function section(areas: Set<string>) {
-  const priority = ["core", "tui", "app", "tauri", "sdk", "plugin", "extensions/vscode", "github"]
+  const priority = ["core", "app", "tauri", "sdk", "plugin", "extensions/vscode", "github"]
   for (const area of priority) {
     if (areas.has(area)) return sections[area as keyof typeof sections]
   }
@@ -132,8 +131,7 @@ async function commits(from: string, to: string) {
     const areas = new Set<string>()
 
     for (const file of diff.split("\n").filter(Boolean)) {
-      if (file.startsWith("packages/opencode/src/cli/cmd/")) areas.add("tui")
-      else if (file.startsWith("packages/opencode/")) areas.add("core")
+      if (file.startsWith("packages/opencode/")) areas.add("core")
       else if (file.startsWith("packages/desktop/src-tauri/")) areas.add("tauri")
       else if (file.startsWith("packages/desktop/") || file.startsWith("packages/app/")) areas.add("app")
       else if (file.startsWith("packages/sdk/") || file.startsWith("packages/plugin/")) areas.add("sdk")

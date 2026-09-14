@@ -1,9 +1,12 @@
 import { Show, type JSX } from "solid-js"
+import { useParams } from "@solidjs/router"
 import { useLanguage } from "@/context/language"
 import { useSettings } from "@/context/settings"
 import { SessionPermissionDock } from "@/pages/session/composer/session-permission-dock"
 import { SessionQuestionDock } from "@/pages/session/composer/session-question-dock"
 import { SessionPlanQuestionDock } from "@/pages/session/composer/session-plan-question-dock"
+import { SessionInterruptedDock } from "@/pages/session/composer/session-interrupted-dock"
+import { usePlanInfo } from "@/pages/session/use-plan-info"
 import { SessionFollowupDock } from "@/pages/session/composer/session-followup-dock"
 import { SessionRevertDock } from "@/pages/session/composer/session-revert-dock"
 import { SessionTodoDock } from "@/pages/session/composer/session-todo-dock"
@@ -16,6 +19,8 @@ export function SessionComposerRegion(props: {
   const language = useLanguage()
   const controller = props.controller
   const settings = useSettings()
+  const params = useParams()
+  const plan = usePlanInfo(() => params.id)
   const rolled = () => {
     const revert = controller.revert()
     return revert?.items.length ? revert : undefined
@@ -53,6 +58,18 @@ export function SessionComposerRegion(props: {
                   onSubmit={controller.onResponseSubmit}
                 />
               </Show>
+            </div>
+          )}
+        </Show>
+
+        <Show when={!controller.state.questionRequest() && plan.orphaned() && params.id} keyed>
+          {(sessionID) => (
+            <div>
+              <SessionInterruptedDock
+                sessionID={sessionID}
+                exists={plan.exists()}
+                onRecovered={controller.onResponseSubmit}
+              />
             </div>
           )}
         </Show>
