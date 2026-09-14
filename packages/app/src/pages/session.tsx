@@ -73,6 +73,7 @@ import {
   SessionComposerRegion,
 } from "@/pages/session/composer"
 import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree } from "@/pages/session/helpers"
+import { ensurePlanActive } from "@/pages/session/plan-tab-activation"
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
 import { createTimelineModel } from "@/pages/session/timeline/model"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
@@ -401,21 +402,27 @@ export default function Page() {
   const handledPresentPlanAutoAccept = new Set<string>()
   const handledPresentPlanAgentSync = new Set<string>()
   const handledPlanEnter = new Set<string>()
-  // Tracks which sessions this component has already scanned once. The first
-  // scan for a given session (initial load, or switching tabs into a session
-  // this instance hasn't seen before) processes that session's entire history
-  // in one pass, so a plan_enter completed long ago -- possibly since
-  // superseded by switching back to build -- would otherwise look "new" and
-  // fire a stale "Switched to Plan mode" toast for a transition that isn't
-  // actually happening right now.
-  const seededPlanEnterSessions = new Set<string>()
+  // Baseline message id per session, captured the first time this component
+  // scans that session's history (initial load, or switching tabs into a
+  // session this instance hasn't seen before): anything at or before it is
+  // "already known" history, not a live transition. A plan_enter completed
+  // long ago -- possibly since superseded by switching back to build --
+  // would otherwise look "new" and fire a stale "Switched to Plan mode"
+  // toast. Using a message-id cutoff (rather than a one-shot "have we
+  // scanned this session before" flag) also covers scrolling up to load
+  // older history well after that first scan: pagination only ever prepends
+  // messages older than the baseline, so they stay classified as history
+  // instead of re-triggering the toast; a genuinely new plan_enter always
+  // arrives in a message newer than the baseline.
+  const planEnterBaseline = new Map<string, string>()
   createEffect(() => {
     const id = params.id
     if (!id) return
-    const seeding = !seededPlanEnterSessions.has(id)
-    seededPlanEnterSessions.add(id)
     const messages = sync().data.message[id] ?? []
+    if (!planEnterBaseline.has(id)) planEnterBaseline.set(id, messages.at(-1)?.id ?? "")
+    const baseline = planEnterBaseline.get(id) ?? ""
     for (const message of messages) {
+      const isHistorical = message.id <= baseline
       const parts = (sync().data.part[message.id] ?? []) as Part[]
       for (const part of parts) {
         if (part.type !== "tool") continue
@@ -423,9 +430,7 @@ export default function Page() {
         if (part.tool === "present_plan") {
           if (part.state.status === "running" && !openedForPresentPlan.has(part.callID)) {
             openedForPresentPlan.add(part.callID)
-            if (!view().reviewPanel.opened()) view().reviewPanel.open()
-            void tabs().open("plan")
-            tabs().setActive("plan")
+            ensurePlanActive(view(), tabs())
           }
           if (
             part.state.status === "completed" &&
@@ -453,7 +458,7 @@ export default function Page() {
         ) {
           local.agent.set("plan")
           handledPlanEnter.add(part.callID)
-          if (!seeding) {
+          if (!isHistorical) {
             showToast({
               variant: "default",
               title: language.t("session.plan.enteredToast"),

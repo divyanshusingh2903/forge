@@ -1,8 +1,5 @@
 import { cmd } from "./cmd"
 import { UI } from "@/cli/ui"
-import { errorMessage } from "@opencode-ai/tui/util/error"
-import { validateSession } from "../tui/validate-session"
-import { ServerAuth } from "@/server/auth"
 
 export const AttachCommand = cmd({
   command: "attach <url>",
@@ -104,45 +101,7 @@ export const AttachCommand = cmd({
       return
     }
 
-    const { TuiConfig } = await import("@/config/tui")
-    if (args.fork && !args.continue && !args.session) {
-      UI.error("--fork requires --continue or --session")
-      process.exitCode = 1
-      return
-    }
-
-    const headers = ServerAuth.headers({ password: args.password, username: args.username })
-    const config = await TuiConfig.get()
-
-    try {
-      await validateSession({
-        url: args.url,
-        sessionID: args.session,
-        directory,
-        headers,
-      })
-    } catch (error) {
-      UI.error(errorMessage(error))
-      process.exitCode = 1
-      return
-    }
-
-    const { Effect } = await import("effect")
-    const { run } = await import("../tui/layer")
-    const { createLegacyTuiPluginHost } = await import("@/plugin/tui/runtime")
-    await Effect.runPromise(
-      run({
-        url: args.url,
-        config,
-        pluginHost: createLegacyTuiPluginHost(),
-        args: {
-          continue: args.continue,
-          sessionID: args.session,
-          fork: args.fork,
-        },
-        directory,
-        headers,
-      }),
-    )
+    UI.error("The terminal UI has been removed. Use `opencode attach <url> --mini`, `opencode web`, or the desktop app.")
+    process.exitCode = 1
   },
 })

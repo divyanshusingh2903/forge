@@ -1664,6 +1664,50 @@ it.instance("local .opencode config can override MCP from project config", () =>
   }),
 )
 
+it.instance("inbuilt Linear, GitHub and Notion MCPs ship disabled by default", () =>
+  Effect.gen(function* () {
+    const config = yield* Config.use.get()
+    expect(config.mcp?.linear).toMatchObject({
+      type: "remote",
+      url: "https://mcp.linear.app/mcp",
+      enabled: false,
+    })
+    expect(config.mcp?.github).toMatchObject({
+      type: "remote",
+      url: "https://api.githubcopilot.com/mcp/",
+      enabled: false,
+    })
+    expect(config.mcp?.notion).toMatchObject({
+      type: "remote",
+      url: "https://mcp.notion.com/mcp",
+      enabled: false,
+    })
+  }),
+)
+
+it.instance("project config cannot wipe inbuilt MCPs and can opt into them", () =>
+  Effect.gen(function* () {
+    const test = yield* TestInstance
+    yield* writeConfigEffect(test.directory, {
+      $schema: "https://opencode.ai/config.json",
+      mcp: {
+        github: {
+          enabled: true,
+        },
+      },
+    })
+
+    const config = yield* Config.use.get()
+    expect(config.mcp?.github).toMatchObject({
+      type: "remote",
+      url: "https://api.githubcopilot.com/mcp/",
+      enabled: true,
+    })
+    expect(config.mcp?.linear).toMatchObject({ enabled: false })
+    expect(config.mcp?.notion).toMatchObject({ enabled: false })
+  }),
+)
+
 const remoteProjectOverride = wellKnown({
   config: {
     mcp: { jira: { type: "remote", url: "https://jira.example.com/mcp", enabled: false } },

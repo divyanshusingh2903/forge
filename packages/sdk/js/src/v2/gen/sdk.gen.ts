@@ -202,6 +202,8 @@ import type {
   SessionMessagesErrors,
   SessionMessagesResponses,
   SessionPlanErrors,
+  SessionPlanRecoverErrors,
+  SessionPlanRecoverResponses,
   SessionPlanResponses,
   SessionPromptAsyncErrors,
   SessionPromptAsyncResponses,
@@ -3729,6 +3731,47 @@ export class Session2 extends HeyApiClient {
       url: "/session/{sessionID}/plan",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Recover interrupted plan
+   *
+   * Fail a stale running present_plan tool left behind by a restart so the session can continue. Never deletes the plan file.
+   */
+  public planRecover<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      body?: {
+        [key: string]: unknown
+      }
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "body", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<SessionPlanRecoverResponses, SessionPlanRecoverErrors, ThrowOnError>({
+      url: "/session/{sessionID}/plan/recover",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

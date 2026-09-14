@@ -4,6 +4,7 @@ import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { useLanguage } from "@/context/language"
 import { useSessionLayout } from "@/pages/session/session-layout"
+import { ensurePlanActive } from "@/pages/session/plan-tab-activation"
 import { usePlanInfo } from "@/pages/session/use-plan-info"
 
 export function SessionPlanIndicator() {
@@ -12,8 +13,7 @@ export function SessionPlanIndicator() {
   const plan = usePlanInfo(() => params.id)
 
   const open = () => {
-    if (!view().reviewPanel.opened()) view().reviewPanel.open()
-    void tabs().open("plan")
+    ensurePlanActive(view(), tabs())
   }
 
   const tooltip = () => (plan.pending() ? language.t("session.plan.openTooltip") : language.t("session.plan.viewTooltip"))

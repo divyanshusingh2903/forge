@@ -12,7 +12,7 @@
 //       → footer.ts queues commits and patches the footer view
 //         → OpenTUI split-footer renderer writes to terminal
 import type { OpencodeClient, PermissionRequest, QuestionRequest, ToolPart } from "@opencode-ai/sdk/v2"
-import type { TuiConfig } from "@opencode-ai/tui/config"
+import type { MiniConfig } from "../../mini/config"
 
 export type RunFilePart = {
   type: "file"
@@ -286,7 +286,7 @@ export type QuestionReply = Parameters<OpencodeClient["question"]["reply"]>[0]
 
 export type QuestionReject = Parameters<OpencodeClient["question"]["reject"]>[0]
 
-export type RunTuiConfig = Pick<TuiConfig.Resolved, "keybinds" | "leader_timeout" | "diff_style">
+export type RunTuiConfig = Pick<MiniConfig.Resolved, "keybinds" | "leader_timeout" | "diff_style">
 
 // Lifecycle phase of a scrollback entry. "start" opens the entry, "progress"
 // appends content (coalesced in the footer queue), "final" closes it.

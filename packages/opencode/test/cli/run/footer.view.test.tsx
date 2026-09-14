@@ -5,7 +5,7 @@ import { testRender, useRenderer } from "@opentui/solid"
 import { createSignal } from "solid-js"
 import { createDefaultOpenTuiKeymap } from "@opentui/keymap/opentui"
 import type { QuestionRequest } from "@opencode-ai/sdk/v2"
-import { OpencodeKeymapProvider, registerOpencodeKeymap } from "@opencode-ai/tui/keymap"
+import { OpencodeKeymapProvider, registerOpencodeKeymap } from "../../../src/cli/mini/keymap"
 import {
   RUN_COMMAND_PANEL_ROWS,
   RUN_SUBAGENT_PANEL_ROWS,
@@ -33,9 +33,9 @@ import type {
 } from "@/cli/cmd/run/types"
 import { RunQuestionBody } from "@/cli/cmd/run/footer.question"
 import { RejectField } from "@/cli/cmd/run/footer.permission"
-import { createTuiResolvedConfig } from "../../fixture/tui-runtime"
+import { createMiniResolvedConfig } from "../../fixture/mini-runtime"
 
-const tuiConfig = createTuiResolvedConfig()
+const tuiConfig = createMiniResolvedConfig()
 
 function command(input: { name: string; description: string; source?: "command" | "mcp" | "skill" }) {
   return {
@@ -743,7 +743,7 @@ test.skip("direct footer recreates the frame across command panel transitions", 
 test.skip("direct footer dispatches leader variant binding only when leader is registered", async () => {
   const calls: string[] = []
   const app = await renderFooter({
-    tuiConfig: createTuiResolvedConfig({ keybinds: { leader: "ctrl+x", variant_cycle: "<leader>t" } }),
+    tuiConfig: createMiniResolvedConfig({ keybinds: { leader: "ctrl+x", variant_cycle: "<leader>t" } }),
     onCycle: () => calls.push("cycle"),
   })
 
@@ -763,7 +763,7 @@ test.skip("direct footer dispatches leader variant binding only when leader is r
 test("direct footer keeps leader variant binding inactive when leader is disabled", async () => {
   const calls: string[] = []
   const app = await renderFooter({
-    tuiConfig: createTuiResolvedConfig({ keybinds: { leader: "none", variant_cycle: "<leader>t" } }),
+    tuiConfig: createMiniResolvedConfig({ keybinds: { leader: "none", variant_cycle: "<leader>t" } }),
     onCycle: () => calls.push("cycle"),
   })
 
@@ -1117,7 +1117,7 @@ test("direct footer hides the subagent hint when only completed subagents remain
 
 test("direct footer omits interrupt key hint when interrupt is unbound", async () => {
   const app = await renderFooter({
-    tuiConfig: createTuiResolvedConfig({ keybinds: { session_interrupt: "none", input_clear: "ctrl+l" } }),
+    tuiConfig: createMiniResolvedConfig({ keybinds: { session_interrupt: "none", input_clear: "ctrl+l" } }),
     state: { phase: "running" },
   })
 

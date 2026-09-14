@@ -31,6 +31,7 @@ import {
   ListQuery,
   MessagesQuery,
   PermissionResponsePayload,
+  PlanRecoverPayload,
   PromptPayload,
   RevertPayload,
   ShellPayload,
@@ -119,6 +120,56 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       })
       const exists = yield* fsSvc.existsSafe(path)
       return { path, exists }
+    })
+
+    const planRecover = Effect.fn("SessionHttpApi.planRecover")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: typeof PlanRecoverPayload.Type
+    }) {
+      const info = yield* requireSession(ctx.params.sessionID)
+      yield* SessionError.mapBusy(runState.assertNotBusy(ctx.params.sessionID))
+      const instance = yield* InstanceState.context
+      const messages = yield* session.messages({ sessionID: ctx.params.sessionID }).pipe(Effect.orDie)
+      let stale: Extract<SessionV1.Part, { type: "tool" }> | undefined
+      for (const msg of messages) {
+        for (const part of msg.parts) {
+          if (part.type === "tool" && part.tool === "present_plan" && part.state.status === "running") stale = part
+        }
+      }
+      let recovered = false
+      if (stale) {
+        const metadata =
+          "metadata" in stale.state &&
+          typeof stale.state.metadata === "object" &&
+          stale.state.metadata !== null
+            ? (stale.state.metadata as Record<string, unknown>)
+            : {}
+        const start =
+          "time" in stale.state && typeof stale.state.time?.start === "number"
+            ? stale.state.time.start
+            : Date.now()
+        yield* session.updatePart({
+          ...stale,
+          state: {
+            ...stale.state,
+            status: "error",
+            error: "Tool execution interrupted",
+            metadata: { ...metadata, interrupted: true },
+            time: { start, end: Date.now() },
+          },
+        })
+        recovered = true
+      }
+      const anchor = Session.planCycleAnchor(messages, info)
+      if (!anchor) return { path: Session.plan(info, instance), exists: false as const, recovered }
+      const path = yield* Session.resolvePlanFile({
+        fs: fsSvc,
+        expected: Session.plan(anchor, instance),
+        since: anchor.time.created,
+        slug: anchor.slug,
+      })
+      const exists = yield* fsSvc.existsSafe(path)
+      return { path, exists, recovered }
     })
 
     const messages = Effect.fn("SessionHttpApi.messages")(function* (ctx: {
@@ -436,6 +487,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("todo", todo)
       .handle("diff", diff)
       .handle("plan", plan)
+      .handle("planRecover", planRecover)
       .handle("messages", messages)
       .handle("message", message)
       .handleRaw("create", createRaw)

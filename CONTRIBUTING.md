@@ -71,7 +71,7 @@ Replace `<platform>` with your platform (e.g., `darwin-arm64`, `linux-x64`).
 
 - Core pieces:
   - `packages/opencode`: OpenCode core business logic & server.
-  - `packages/opencode/src/cli/cmd/tui/`: The TUI code, written in SolidJS with [opentui](https://github.com/sst/opentui)
+  - `packages/opencode/src/cli/cmd/run/`: The minimal terminal interface (`--mini`), written in SolidJS with [opentui](https://github.com/sst/opentui)
   - `packages/app`: The shared web UI components, written in SolidJS
   - `packages/desktop`: The native desktop app, built with Electron (wraps `packages/app`)
   - `packages/plugin`: Source for `@opencode-ai/plugin`
@@ -85,13 +85,13 @@ During development, `bun dev` is the local equivalent of the built `opencode` co
 bun dev --help           # Show all available commands
 bun dev serve            # Start headless API server
 bun dev web              # Start server + open web interface
-bun dev <directory>      # Start TUI in specific directory
+bun dev --mini <directory> # Start minimal terminal interface in specific directory
 
 # Production
 opencode --help          # Show all available commands
 opencode serve           # Start headless API server
 opencode web             # Start server + open web interface
-opencode <directory>     # Start TUI in specific directory
+opencode --mini <directory> # Start minimal terminal interface in specific directory
 ```
 
 ### Running the API Server
@@ -152,12 +152,11 @@ your debugger via that URL. Other methods can result in breakpoints being mapped
 
 Caveats:
 
-- If you want to run the OpenCode TUI and have breakpoints triggered in the server code, you might need to run `bun dev spawn` instead of
-  the usual `bun dev`. This is because `bun dev` runs the server in a worker thread and breakpoints might not work there.
+- If you want to run the OpenCode server and have breakpoints triggered in the server code, you might need to run `bun dev spawn` instead of
+  the usual `bun dev`.
 - If `spawn` does not work for you, you can debug the server separately:
   - Debug server: `bun run --inspect=ws://localhost:6499/ --cwd packages/opencode ./src/index.ts serve --port 4096`,
-    then attach TUI with `opencode attach http://localhost:4096`
-  - Debug TUI: `bun run --inspect=ws://localhost:6499/ --cwd packages/opencode ./src/index.ts`
+    then attach with `opencode attach http://localhost:4096 --mini`
 
 Other tips and tricks:
 

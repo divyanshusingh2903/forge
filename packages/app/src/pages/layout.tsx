@@ -403,6 +403,30 @@ export default function LegacyLayout(props: ParentProps) {
           return
         }
 
+        if (e.details?.type === "mcp.browser.open.failed") {
+          // Backend couldn't open the browser for MCP OAuth. The pending
+          // authenticate call still waits for the callback, so hand the user
+          // the URL with a one-click retry instead of hanging silently.
+          const props = e.details.properties as { mcpName?: string; url?: string }
+          const url = props.url ?? ""
+          showToast({
+            persistent: true,
+            title: language.t("common.requestFailed"),
+            description: url,
+            actions: [
+              {
+                label: language.t("common.open"),
+                onClick: () => platform.openExternal(url),
+              },
+              {
+                label: language.t("common.dismiss"),
+                onClick: "dismiss",
+              },
+            ],
+          })
+          return
+        }
+
         if (
           e.details?.type === "question.replied" ||
           e.details?.type === "question.rejected" ||

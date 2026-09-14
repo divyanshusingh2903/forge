@@ -6,8 +6,7 @@
 // history ring. All are async because they read config or hit the SDK, but
 // none block each other.
 import { Context, Effect, Layer } from "effect"
-import { resolve } from "@opencode-ai/tui/config"
-import { TuiConfig } from "@/config/tui"
+import { MiniConfig, resolve } from "../../mini/config"
 import { makeRuntime } from "@/effect/run-service"
 import { reusePendingTask } from "./runtime.shared"
 import { resolveSession, sessionHistory } from "./session.shared"
@@ -26,7 +25,7 @@ export type SessionInfo = {
   variant: string | undefined
 }
 
-type Config = Awaited<ReturnType<typeof TuiConfig.get>>
+type Config = Awaited<ReturnType<typeof MiniConfig.get>>
 type BootService = {
   readonly resolveModelInfo: (
     sdk: RunInput["sdk"],
@@ -47,7 +46,7 @@ const configTask: { current?: Promise<Config> } = {}
 class Service extends Context.Service<Service, BootService>()("@opencode/RunBoot") {}
 
 function loadConfig() {
-  return reusePendingTask(configTask, () => TuiConfig.get())
+  return reusePendingTask(configTask, () => MiniConfig.get())
 }
 
 function emptyModelInfo(): ModelInfo {
@@ -67,22 +66,14 @@ function emptySessionInfo(): SessionInfo {
 }
 
 function defaultRunTuiConfig(): RunTuiConfig {
-  return {
-    ...resolve({}, { terminalSuspend: process.platform !== "win32" }),
-    diff_style: "auto",
-  }
+  return resolve({})
 }
 
 function runTuiConfig(config: Config | undefined): RunTuiConfig {
   if (!config) {
     return defaultRunTuiConfig()
   }
-
-  return {
-    keybinds: config.keybinds,
-    leader_timeout: config.leader_timeout,
-    diff_style: config.diff_style ?? "auto",
-  }
+  return config
 }
 
 const layer = Layer.effect(
@@ -192,7 +183,7 @@ export async function resolveSessionInfo(
   return runtime.runPromise((svc) => svc.resolveSessionInfo(sdk, sessionID, model)).catch(() => emptySessionInfo())
 }
 
-// Reads TUI config once for direct mode keymap setup and display preferences.
+// Reads mini config once for direct mode keymap setup and display preferences.
 export async function resolveRunTuiConfig(): Promise<RunTuiConfig> {
   return runtime.runPromise((svc) => svc.resolveRunTuiConfig()).catch(() => defaultRunTuiConfig())
 }

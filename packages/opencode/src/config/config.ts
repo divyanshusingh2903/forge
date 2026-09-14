@@ -43,6 +43,31 @@ function mergeConfig(target: Info, source: Info): Info {
   return mergeDeep(target, source) as Info
 }
 
+// Inbuilt remote MCP servers shipped with the platform. Merged first so any
+// user, project, remote, or managed config can override them. Disabled by
+// default so startup performs no network I/O; opt in per server with
+// `enabled: true`, then auth via `opencode mcp auth <name>`.
+const builtinMcp: NonNullable<Info["mcp"]> = {
+  linear: {
+    type: "remote",
+    url: "https://mcp.linear.app/mcp",
+    enabled: false,
+    oauth: {},
+  },
+  github: {
+    type: "remote",
+    url: "https://api.githubcopilot.com/mcp/",
+    enabled: false,
+    oauth: {},
+  },
+  notion: {
+    type: "remote",
+    url: "https://mcp.notion.com/mcp",
+    enabled: false,
+    oauth: {},
+  },
+}
+
 function mergeConfigConcatArrays(target: Info, source: Info): Info {
   const merged = mergeConfig(target, source)
   if (target.instructions && source.instructions) {
@@ -329,7 +354,7 @@ const layer = Layer.effect(
       function* (ctx: InstanceContext) {
         const auth = yield* authSvc.all().pipe(Effect.orDie)
 
-        let result: Info = {}
+        let result: Info = { mcp: builtinMcp }
         const authEnv: Record<string, string> = {}
         const consoleManagedProviders = new Set<string>()
         let activeOrgName: string | undefined
@@ -545,6 +570,14 @@ const layer = Layer.effect(
               source: managed.source,
             }),
           )
+        }
+
+        // Re-assert inbuilt MCP servers. Layered configs override their fields
+        // but must not delete the keys, otherwise the status UIs report
+        // "No MCPs configured" for a fresh install.
+        if (!result.mcp) result.mcp = {}
+        for (const [name, entry] of Object.entries(builtinMcp)) {
+          if (result.mcp[name] === undefined || result.mcp[name] === null) result.mcp[name] = entry
         }
 
         for (const [name, mode] of Object.entries(result.mode ?? {})) {

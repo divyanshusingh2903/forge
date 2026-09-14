@@ -2,7 +2,7 @@
 
 import { Config } from "@/config/config"
 import { ConfigV1 } from "@opencode-ai/core/v1/config/config"
-import { TuiConfig } from "@opencode-ai/tui/config"
+import { MiniConfig } from "../src/cli/mini/config"
 import { Schema } from "effect"
 
 type JsonSchema = Record<string, unknown>
@@ -73,5 +73,5 @@ await Bun.write(configFile, JSON.stringify(generateEffect(ConfigV1.Info), null, 
 
 if (tuiFile) {
   console.log(tuiFile)
-  await Bun.write(tuiFile, JSON.stringify(generateEffect(TuiConfig.Info), null, 2))
+  await Bun.write(tuiFile, JSON.stringify(generateEffect(MiniConfig.Info), null, 2))
 }
