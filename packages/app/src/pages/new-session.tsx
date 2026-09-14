@@ -1,16 +1,13 @@
 import { createPromptProjectController } from "@/components/prompt-project-selector"
-import { useTitlebarRightMount } from "@/components/titlebar"
-import { useSettings } from "@/context/settings"
+import { SessionHeaderQuickActions } from "@/components/session/session-header"
 import { createEffect, createResource } from "solid-js"
 import { createNewSessionDraftController } from "./new-session/new-session-draft-controller"
-import { NewSessionStatus, NewSessionView } from "./new-session/new-session-view"
+import { NewSessionView } from "./new-session/new-session-view"
 import { createNewSessionWorkspaceController } from "./new-session/new-session-workspace-controller"
 import { useNewSessionCommands } from "./new-session/use-new-session-commands"
 
 /** The draft-only V2 session page. Submitting promotes the draft into a real session. */
 export default function NewSessionPage() {
-  const settings = useSettings()
-  const rightMount = useTitlebarRightMount()
   const workspace = createNewSessionWorkspaceController()
   const draft = createNewSessionDraftController({
     worktree: workspace.selection.value,
@@ -38,11 +35,15 @@ export default function NewSessionPage() {
   )
 
   return (
-    <div class="relative size-full overflow-hidden flex flex-col">
+    <div class="relative size-full overflow-hidden flex flex-col p-2">
       {suspendUntilPromptReady()}
-      <NewSessionStatus mount={rightMount} visible={settings.visibility.status} />
-      <div class="flex-1 min-h-0 flex flex-col gap-2 p-2">
-        <NewSessionView input={draft.input} project={project} workspace={workspace} />
+      <div class="relative flex-1 min-h-0 flex flex-col bg-v2-background-bg-base rounded-[10px] overflow-hidden shadow-[var(--v2-elevation-raised)]">
+        <div class="h-12 w-full shrink-0 flex items-center justify-end gap-2 px-3">
+          <SessionHeaderQuickActions plan={false} review={false} terminal={false} />
+        </div>
+        <div class="flex-1 min-h-0 flex flex-col">
+          <NewSessionView input={draft.input} project={project} workspace={workspace} />
+        </div>
       </div>
     </div>
   )

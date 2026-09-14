@@ -58,15 +58,15 @@ function WindowControls(props: {
   const label = () => props.language.t("desktop.menu.maximize")
   if (props.v2) {
     return (
-      <div class="linux-window-controls flex items-center shrink-0">
+      <div class="linux-window-controls ml-1 flex items-center shrink-0 z-10">
         <IconButtonV2 type="button" variant="ghost-muted" size="large" icon={<IconV2 name="dash" />} onClick={() => action("window.minimize")} aria-label={props.language.t("desktop.menu.minimize")} />
-        <IconButtonV2 type="button" variant="ghost-muted" size="large" icon={<IconV2 name={props.maximized ? "collapse" : "expand"} />} onClick={() => action("window.toggleMaximize")} aria-label={label()} />
+        <IconButtonV2 type="button" variant="ghost-muted" size="large" icon={<IconV2 name={props.maximized ? "restore" : "maximize"} />} onClick={() => action("window.toggleMaximize")} aria-label={label()} />
         <IconButtonV2 type="button" variant="ghost-muted" size="large" icon={<IconV2 name="close" />} onClick={() => action("window.close")} aria-label={props.language.t("desktop.menu.closeWindow")} />
       </div>
     )
   }
   return (
-    <div class="linux-window-controls flex items-center shrink-0">
+    <div class="linux-window-controls ml-1 flex items-center shrink-0 z-10">
       <IconButton type="button" variant="ghost" size="normal" icon="dash" onClick={() => action("window.minimize")} aria-label={props.language.t("desktop.menu.minimize")} />
       <IconButton type="button" variant="ghost" size="normal" icon={props.maximized ? "collapse" : "expand"} onClick={() => action("window.toggleMaximize")} aria-label={label()} />
       <IconButton type="button" variant="ghost" size="normal" icon="close" onClick={() => action("window.close")} aria-label={props.language.t("desktop.menu.closeWindow")} />
@@ -459,6 +459,14 @@ export function Titlebar(props: { update?: TitlebarUpdate; debugTools?: { visibl
                 </TooltipV2>
                 <div class="flex-1" />
                 <TitlebarV2Right state={v2RightState()} />
+                <Show when={linux()}>
+                  <WindowControls
+                    v2={true}
+                    maximized={platform.windowMaximized?.() ?? false}
+                    language={language}
+                    platform={platform}
+                  />
+                </Show>
               </div>
             )
           }}

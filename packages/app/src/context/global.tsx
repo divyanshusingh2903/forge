@@ -74,6 +74,7 @@ export const { use: useGlobal, provider: GlobalProvider } = createSimpleContext(
       servers: {
         list: () => server.list,
         health: serverHealth,
+        ready: server.ready,
       },
       settings: {
         server: {

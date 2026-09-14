@@ -397,6 +397,34 @@ export function SessionSidePanel(props: {
                                   </div>
                                 </Tabs.Trigger>
                               </Show>
+                              <Show when={planOpen()}>
+                                <Tabs.Trigger
+                                  value="plan"
+                                  closeButton={
+                                    <TooltipKeybind
+                                      title={language.t("common.closeTab")}
+                                      keybind={command.keybind("tab.close")}
+                                      placement="bottom"
+                                      gutter={10}
+                                    >
+                                      <IconButton
+                                        icon="close-small"
+                                        variant="ghost"
+                                        class="h-5 w-5"
+                                        onClick={() => tabs().close("plan")}
+                                        aria-label={language.t("common.closeTab")}
+                                      />
+                                    </TooltipKeybind>
+                                  }
+                                  hideCloseButton
+                                  onMiddleClick={() => tabs().close("plan")}
+                                >
+                                  <div class="flex items-center gap-2">
+                                    <IconV2 name="plan" />
+                                    <div>{language.t("session.tab.plan")}</div>
+                                  </div>
+                                </Tabs.Trigger>
+                              </Show>
                               <SortableProvider ids={openedTabs()}>
                                 <For each={panelTabs()}>
                                   {(tab) => (
@@ -501,6 +529,12 @@ export function SessionSidePanel(props: {
                               <div class="relative pt-2 flex-1 min-h-0 overflow-hidden">
                                 <SessionContextTab />
                               </div>
+                            </Tabs.Content>
+                          </Show>
+
+                          <Show when={activeTab() === "plan"}>
+                            <Tabs.Content value="plan" class="flex flex-col h-full overflow-hidden contain-strict">
+                              <SessionPlanTab path={planPath()} pendingRequest={plan.pendingRequest} />
                             </Tabs.Content>
                           </Show>
 

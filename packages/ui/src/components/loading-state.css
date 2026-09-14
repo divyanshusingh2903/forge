@@ -1,0 +1,32 @@
+[data-component="forge-loading"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+[data-component="forge-loading"] [data-slot="forge-loading-mark"] {
+  position: relative;
+  display: inline-flex;
+}
+
+[data-component="forge-loading"] [data-slot="forge-loading-mark"] svg {
+  animation: forge-loading-pulse 1600ms ease-in-out infinite;
+}
+
+@keyframes forge-loading-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-component="forge-loading"] [data-slot="forge-loading-mark"] svg {
+    animation: none;
+    opacity: 1;
+  }
+}

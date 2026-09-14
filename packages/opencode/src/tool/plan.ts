@@ -48,6 +48,7 @@ export const PresentPlanTool = Tool.define(
             fs,
             expected: Session.plan(anchor, instance),
             since: anchor.time.created,
+            slug: anchor.slug,
           })
           const plan = path.relative(instance.worktree, resolved)
           const answers = yield* question.ask({

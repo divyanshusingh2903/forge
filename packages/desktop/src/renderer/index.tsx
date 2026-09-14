@@ -114,7 +114,7 @@ function DesktopMemoryRouter(props: BaseRouterProps & { windowID: string }) {
 const createPlatform = (windowState: DesktopWindowState): Platform => {
   const attachmentPaths = new WeakMap<File, string>()
   const os = (() => {
-    const ua = navigator.userAgent
+    const ua = `${navigator.userAgent} ${navigator.platform}`
     if (ua.includes("Mac")) return "macos"
     if (ua.includes("Windows")) return "windows"
     if (ua.includes("Linux")) return "linux"

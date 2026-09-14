@@ -17,6 +17,7 @@ export function HomeProjects(props: {
   return (
     <HomeProjectsView
       language={props.projects.copy.language}
+      loading={() => !props.projects.server.ready()}
       servers={props.projects.server.list}
       projects={props.projects.project.list}
       recentlyClosed={props.projects.project.recentlyClosed}

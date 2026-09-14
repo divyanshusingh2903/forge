@@ -81,8 +81,16 @@ export function usePlanInfo(sessionId: () => string | undefined) {
     // directly) keeps those refetches from re-tripping the app's top-level Suspense
     // boundary -- which has no fallback, so every refetch would otherwise blank the
     // whole session view for a frame.
-    exists: createMemo(() => planInfo.latest?.exists ?? false),
-    path: createMemo(() => planInfo.latest?.path),
+    exists: createMemo(() => {
+      const key = planKey()
+      if (!key || !key.startsWith(`${sessionId()}:`)) return false
+      return planInfo.latest?.exists ?? false
+    }),
+    path: createMemo(() => {
+      const key = planKey()
+      if (!key || !key.startsWith(`${sessionId()}:`)) return undefined
+      return planInfo.latest?.path
+    }),
     pending,
     pendingRequest,
   }

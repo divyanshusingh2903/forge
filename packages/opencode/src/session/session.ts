@@ -373,6 +373,7 @@ export const resolvePlanFile = Effect.fn("Session.resolvePlanFile")(function* (i
   fs: FSUtil.Interface
   expected: string
   since: number
+  slug: string
 }) {
   const fs = input.fs
   if (yield* fs.existsSafe(input.expected)) return input.expected
@@ -382,9 +383,13 @@ export const resolvePlanFile = Effect.fn("Session.resolvePlanFile")(function* (i
 
   const entries = yield* fs.readDirectoryEntries(dir).pipe(Effect.catch(() => Effect.succeed([] as FSUtil.DirEntry[])))
 
+  // Plans share one directory per worktree (or one global directory when the
+  // project has no VCS), so only consider files for this session's slug.
+  // Otherwise a session with no plan would resolve to another session's plan.
+  const suffix = `-${input.slug}.md`
   let newest: { path: string; mtime: number } | undefined
   for (const entry of entries) {
-    if (entry.type !== "file" || !entry.name.endsWith(".md")) continue
+    if (entry.type !== "file" || !entry.name.endsWith(suffix)) continue
     const full = path.join(dir, entry.name)
     const stat = yield* fs.stat(full).pipe(Effect.catch(() => Effect.succeed(undefined)))
     const mtimeDate = stat ? Option.getOrUndefined(stat.mtime) : undefined

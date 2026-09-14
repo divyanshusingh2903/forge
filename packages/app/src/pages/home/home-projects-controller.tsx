@@ -50,6 +50,7 @@ export function createHomeProjectsController(home: HomeController) {
     server: {
       list: home.server.list,
       health: home.server.health,
+      ready: home.server.ready,
       projects: home.project.forServer,
       collapsed: (conn: ServerConnection.Any) => state().collapsed[ServerConnection.key(conn)] ?? false,
       toggleCollapsed: (conn: ServerConnection.Any) => {

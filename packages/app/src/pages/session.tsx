@@ -1,6 +1,7 @@
 import type { FilePart, Part, Project, UserMessage, VcsFileDiff } from "@opencode-ai/sdk/v2"
 import { getFilename } from "@opencode-ai/core/util/path"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
+import { DelayedLoadingState } from "@opencode-ai/ui/loading-state"
 import { createQuery, skipToken, useMutation, useQueryClient } from "@tanstack/solid-query"
 import {
   batch,
@@ -248,6 +249,7 @@ function ResolvedTargetSessionRoute() {
   const params = useParams<{ serverKey: string; id: string }>()
   const tabs = useTabs()
   const sync = useServerSync()
+  const language = useLanguage()
   const serverKey = createMemo(() => requireServerKey(params.serverKey))
   const current = createSessionLineage(
     () => params.id,
@@ -270,7 +272,14 @@ function ResolvedTargetSessionRoute() {
     // lineage mid-resolution), which tears down the workspace subtree including
     // the terminal. Same-workspace tab switches keep it open because warm
     // targets resolve synchronously from the sync cache.
-    <Show when={directory()}>
+    <Show
+      when={directory()}
+      fallback={
+        <div class="flex-1 min-h-0 w-full">
+          <DelayedLoadingState label={language.t("common.loading")} class="h-full justify-center" />
+        </div>
+      }
+    >
       <SDKProvider directory={targetDirectory}>
         <DirectoryDataProvider directory={targetDirectory} server={serverKey}>
           <TargetSessionPage />
@@ -392,9 +401,19 @@ export default function Page() {
   const handledPresentPlanAutoAccept = new Set<string>()
   const handledPresentPlanAgentSync = new Set<string>()
   const handledPlanEnter = new Set<string>()
+  // Tracks which sessions this component has already scanned once. The first
+  // scan for a given session (initial load, or switching tabs into a session
+  // this instance hasn't seen before) processes that session's entire history
+  // in one pass, so a plan_enter completed long ago -- possibly since
+  // superseded by switching back to build -- would otherwise look "new" and
+  // fire a stale "Switched to Plan mode" toast for a transition that isn't
+  // actually happening right now.
+  const seededPlanEnterSessions = new Set<string>()
   createEffect(() => {
     const id = params.id
     if (!id) return
+    const seeding = !seededPlanEnterSessions.has(id)
+    seededPlanEnterSessions.add(id)
     const messages = sync().data.message[id] ?? []
     for (const message of messages) {
       const parts = (sync().data.part[message.id] ?? []) as Part[]
@@ -406,6 +425,7 @@ export default function Page() {
             openedForPresentPlan.add(part.callID)
             if (!view().reviewPanel.opened()) view().reviewPanel.open()
             void tabs().open("plan")
+            tabs().setActive("plan")
           }
           if (
             part.state.status === "completed" &&
@@ -433,10 +453,12 @@ export default function Page() {
         ) {
           local.agent.set("plan")
           handledPlanEnter.add(part.callID)
-          showToast({
-            variant: "default",
-            title: language.t("session.plan.enteredToast"),
-          })
+          if (!seeding) {
+            showToast({
+              variant: "default",
+              title: language.t("session.plan.enteredToast"),
+            })
+          }
         }
       }
     }
@@ -2147,7 +2169,15 @@ export default function Page() {
             </div>
           </Match>
           <Match when={params.id}>
-            <Show when={messagesReady() ? params.id : undefined} keyed>
+            <Show
+              when={messagesReady() ? params.id : undefined}
+              keyed
+              fallback={
+                <div class="flex-1 min-h-0 w-full">
+                  <DelayedLoadingState label={language.t("common.loading")} class="h-full justify-center" />
+                </div>
+              }
+            >
               {(_id) => (
                 <MessageTimeline
                   actions={actions}

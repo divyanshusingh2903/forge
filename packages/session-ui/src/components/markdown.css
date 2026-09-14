@@ -302,6 +302,20 @@
 }
 
 body[data-new-layout] [data-component="markdown"] {
+  font-size: 13px;
+  line-height: 20px;
+
+  table {
+    font-size: 13px;
+  }
+
+  h1 {
+    font-size: 16px;
+  }
+
+  h2 {
+    font-size: 14px;
+  }
   [data-slot="markdown-copy-button"]::after {
     box-sizing: border-box;
     display: inline-flex;

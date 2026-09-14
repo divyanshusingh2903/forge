@@ -552,7 +552,15 @@ function PromptInputV2ModelControl(props: {
     </>
   )
   return (
-    <Show when={!props.loading}>
+    <Show
+      when={!props.loading}
+      fallback={
+        <div
+          aria-hidden="true"
+          class="h-7 w-[120px] shrink-0 rounded-[6px] bg-v2-background-bg-layer-02 opacity-70 animate-pulse"
+        />
+      }
+    >
       <TooltipV2
         placement="top"
         gutter={4}
