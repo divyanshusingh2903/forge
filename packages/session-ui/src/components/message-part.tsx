@@ -1613,10 +1613,18 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
                   </div>
                 )
               }
+              const interruptedTool = part().tool === "question" || part().tool === "present_plan" || part().tool === "plan_enter"
+              const interrupted =
+                interruptedTool &&
+                (partMetadata().interrupted === true ||
+                  cleaned === "Tool execution aborted" ||
+                  cleaned === "Tool execution interrupted" ||
+                  cleaned === "[Tool execution was interrupted]")
               return (
                 <ToolErrorCard
                   tool={part().tool}
                   error={error()}
+                  interrupted={interrupted}
                   title={
                     part().tool === "websearch" ? webSearchProviderLabel(partMetadata().provider, i18n) : undefined
                   }

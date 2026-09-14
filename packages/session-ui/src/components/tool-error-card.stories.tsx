@@ -47,6 +47,11 @@ const samples = [
     tool: "question",
     error: "question Dismissed: user dismissed this question",
   },
+  {
+    tool: "present_plan",
+    error: "Tool execution aborted",
+    interrupted: true,
+  },
 ]
 
 export default {
@@ -74,8 +79,8 @@ export default {
       control: "text",
     },
   },
-  render: (props: { tool: string; error: string }) => {
-    return <ToolErrorCard tool={props.tool} error={props.error} />
+  render: (props: { tool: string; error: string; interrupted?: boolean }) => {
+    return <ToolErrorCard tool={props.tool} error={props.error} interrupted={props.interrupted} />
   },
 }
 
@@ -84,7 +89,7 @@ export const All = {
     return (
       <div style="display: flex; flex-direction: column; gap: 12px; max-width: 720px;">
         {samples.map((item) => (
-          <ToolErrorCard tool={item.tool} error={item.error} />
+          <ToolErrorCard tool={item.tool} error={item.error} interrupted={item.interrupted} />
         ))}
       </div>
     )
