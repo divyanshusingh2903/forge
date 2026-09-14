@@ -1,5 +1,6 @@
 import type { Session } from "@opencode-ai/sdk/v2/client"
 import { type Accessor, createMemo, For, Show, Suspense } from "solid-js"
+import { ForgeMarkLoader } from "@opencode-ai/ui/loading-state"
 import { Spinner } from "@opencode-ai/ui/spinner"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
@@ -39,6 +40,7 @@ function isBackgroundOpen(event: MouseEvent) {
 export type HomeSessionsViewProps = {
   language: ReturnType<typeof useLanguage>
   groups: Accessor<HomeSessionGroup[]>
+  loading: Accessor<boolean>
   showProjectName: Accessor<boolean>
   server: Accessor<ServerConnection.Key>
   canCreateSession: Accessor<boolean>
@@ -104,7 +106,7 @@ export function HomeSessionsView(props: HomeSessionsViewProps) {
           class="relative ml-auto h-[calc(100cqh-84px)] w-3 lg:h-[calc(100cqh-108px)]"
         />
       </div>
-      <div class="-mr-3 min-h-[calc(100cqh-72px)] lg:min-h-[calc(100cqh-96px)]">
+      <div class="-mr-3 min-h-[calc(100cqh-72px)] lg:min-h-[calc(100cqh-96px)]" aria-busy={props.loading()}>
         <Suspense
           fallback={
             <div class="pt-3">
@@ -113,33 +115,42 @@ export function HomeSessionsView(props: HomeSessionsViewProps) {
           }
         >
           <Show
-            when={props.groups().length > 0}
+            when={!props.loading()}
             fallback={
-              <HomeSessionsEmpty
-                onNewSession={props.canCreateSession() ? props.onCreateSession : undefined}
-                language={props.language}
-              />
+              <div class="pt-3">
+                <HomeSessionSkeleton label={props.language.t("common.loading")} />
+              </div>
             }
           >
-            <div ref={props.onSetContent} class="flex flex-col pt-3 pr-3 pb-16">
-              <For each={props.groups()}>
-                {(group, index) => (
-                  <>
-                    <HomeSessionGroupHeader
-                      title={group.title}
-                      titleOpacity={props.titleOpacity(group.id)}
-                      onSetRef={(element) => props.onSetHeader(group.id, element)}
-                      elevated={index() === 0}
-                    />
-                    <div
-                      class={`flex min-w-0 flex-col gap-px pt-4 ${index() === props.groups().length - 1 ? "" : "mb-6"}`}
-                    >
-                      <For each={group.sessions}>{(record) => <HomeSessionRow {...props} record={record} />}</For>
-                    </div>
-                  </>
-                )}
-              </For>
-            </div>
+            <Show
+              when={props.groups().length > 0}
+              fallback={
+                <HomeSessionsEmpty
+                  onNewSession={props.canCreateSession() ? props.onCreateSession : undefined}
+                  language={props.language}
+                />
+              }
+            >
+              <div ref={props.onSetContent} class="flex flex-col pt-3 pr-3 pb-16">
+                <For each={props.groups()}>
+                  {(group, index) => (
+                    <>
+                      <HomeSessionGroupHeader
+                        title={group.title}
+                        titleOpacity={props.titleOpacity(group.id)}
+                        onSetRef={(element) => props.onSetHeader(group.id, element)}
+                        elevated={index() === 0}
+                      />
+                      <div
+                        class={`flex min-w-0 flex-col gap-px pt-4 ${index() === props.groups().length - 1 ? "" : "mb-6"}`}
+                      >
+                        <For each={group.sessions}>{(record) => <HomeSessionRow {...props} record={record} />}</For>
+                      </div>
+                    </>
+                  )}
+                </For>
+              </div>
+            </Show>
           </Show>
         </Suspense>
       </div>
@@ -538,12 +549,22 @@ function HomeSessionsEmpty(props: { onNewSession?: () => void; language: ReturnT
 
 function HomeSessionSkeleton(props: { label: string }) {
   return (
-    <div class="flex min-w-0 flex-col gap-4">
-      <div class="flex h-7 min-w-0 items-center justify-between px-4">
-        <div class={HOME_SECTION_LABEL}>{props.label}</div>
-      </div>
-      <div class="flex min-w-0 flex-col gap-px" aria-hidden="true">
-        <For each={[0, 1, 2, 3]}>{() => <div class="h-10 rounded-[6px] bg-v2-background-bg-deep opacity-70" />}</For>
+    <div
+      class="flex min-w-0 flex-col items-center gap-6 px-4 pt-6"
+      role="status"
+      aria-live="polite"
+      aria-label={props.label}
+    >
+      <ForgeMarkLoader class="h-10 w-8" />
+      <div class="flex w-full min-w-0 flex-col gap-4">
+        <div class="flex h-7 min-w-0 items-center justify-between px-4">
+          <div class={HOME_SECTION_LABEL}>{props.label}</div>
+        </div>
+        <div class="flex min-w-0 flex-col gap-px" aria-hidden="true">
+          <For each={[0, 1, 2, 3]}>
+            {() => <div class="h-10 rounded-[6px] bg-v2-background-bg-deep opacity-70 animate-pulse" />}
+          </For>
+        </div>
       </div>
     </div>
   )

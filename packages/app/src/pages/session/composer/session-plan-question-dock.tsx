@@ -42,6 +42,7 @@ export function SessionPlanQuestionDock(props: {
   const openPlan = () => {
     if (!view().reviewPanel.opened()) view().reviewPanel.open()
     void tabs().open("plan")
+    tabs().setActive("plan")
   }
 
   const question = createMemo(() => props.request.questions[0])

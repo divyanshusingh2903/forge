@@ -1,11 +1,13 @@
 import { createEffect, Suspense, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { Session } from "@opencode-ai/sdk/v2/client"
+import { DelayedLoadingState } from "@opencode-ai/ui/loading-state"
 import { DebugBar } from "@/components/debug-bar"
 import { TabsInfoPopup } from "@/components/help-button"
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
 import { usePlatform } from "@/context/platform"
 import { useGlobal } from "@/context/global"
+import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { ServerConnection } from "@/context/server"
 import { useTabs } from "@/context/tabs"
@@ -18,6 +20,7 @@ import { createPinnedSessions } from "@/pages/home/pinned-sessions"
 
 export default function NewLayout(props: ParentProps) {
   const platform = usePlatform()
+  const language = useLanguage()
   const [state, setState] = createStore({ debugTools: true })
   const global = useGlobal()
   const tabs = useTabs()
@@ -85,7 +88,9 @@ export default function NewLayout(props: ParentProps) {
           pinned={pinned}
         />
         <main class="flex-1 min-h-0 min-w-0 overflow-x-hidden flex flex-col items-start contain-strict">
-          <Suspense>{props.children}</Suspense>
+          <Suspense fallback={<DelayedLoadingState label={language.t("common.loading")} class="w-full" />}>
+            {props.children}
+          </Suspense>
         </main>
       </div>
       {import.meta.env.DEV && state.debugTools && <DebugBar inline />}

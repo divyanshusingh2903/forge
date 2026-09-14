@@ -1,11 +1,9 @@
 import { useDialog } from "@opencode-ai/ui/context/dialog"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { WordmarkV2 } from "@opencode-ai/ui/v2/wordmark-v2"
-import { Show, createMemo, createSignal, type Accessor } from "solid-js"
+import { Show, createMemo, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
-import { Portal } from "solid-js/web"
 import createPresence from "solid-presence"
 import { PromptInputV2Composer } from "@/components/prompt-input-v2"
 import { PromptGitStatus, PromptWorkspaceSelector } from "@/components/prompt-workspace-selector"
@@ -14,7 +12,6 @@ import {
   PromptProjectSelector,
   type PromptProjectController,
 } from "@/components/prompt-project-selector"
-import { StatusPopoverV2 } from "@/components/status-popover"
 import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
 import { useServerSync } from "@/context/server-sync"
@@ -33,10 +30,7 @@ export function NewSessionView(props: {
 }) {
   return (
     <div class="@container relative flex flex-col min-h-0 h-full flex-1">
-      <div
-        data-component="session-new-design"
-        class="relative flex-1 min-h-0 overflow-hidden rounded-[10px] bg-v2-background-bg-deep"
-      >
+      <div data-component="session-new-design" class="relative flex-1 min-h-0 overflow-hidden">
         <div class="absolute inset-x-0 top-[25.375%] flex justify-center px-6">
           <div class={NEW_SESSION_CONTENT_WIDTH}>
             <WordmarkV2 class="h-auto w-full text-v2-background-bg-inverse" />
@@ -71,24 +65,6 @@ export function NewSessionView(props: {
         <ProviderTip />
       </div>
     </div>
-  )
-}
-
-export function NewSessionStatus(props: { mount: Accessor<HTMLElement | null>; visible: Accessor<boolean> }) {
-  const language = useLanguage()
-
-  return (
-    <Show when={props.mount()} keyed>
-      {(mount) => (
-        <Portal mount={mount}>
-          <Show when={props.visible()}>
-            <Tooltip placement="bottom" value={language.t("status.popover.trigger")}>
-              <StatusPopoverV2 />
-            </Tooltip>
-          </Show>
-        </Portal>
-      )}
-    </Show>
   )
 }
 

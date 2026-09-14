@@ -6,6 +6,7 @@ import { AutoScroller, Feedback, PointerActivationConstraints } from "@dnd-kit/d
 import { RestrictToVerticalAxis } from "@dnd-kit/abstract/modifiers"
 import { RestrictToElement } from "@dnd-kit/dom/modifiers"
 import type { Session } from "@opencode-ai/sdk/v2/client"
+import { SessionLoadingState } from "@opencode-ai/ui/loading-state"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { ProjectAvatar } from "@opencode-ai/ui/v2/project-avatar-v2"
 import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
@@ -37,6 +38,7 @@ const projectContextMenuID = (server: ServerConnection.Any, directory: string) =
 
 export type HomeProjectsViewProps = {
   language: ReturnType<typeof useLanguage>
+  loading: Accessor<boolean>
   servers: Accessor<ServerConnection.Any[]>
   projects: Accessor<LocalProject[]>
   recentlyClosed: Accessor<LocalProject[]>
@@ -128,52 +130,64 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
           </TooltipV2>
         </Show>
       </div>
-      <ScrollView data-slot="home-projects-scroll" class="min-h-0 min-w-0 shrink">
+      <ScrollView data-slot="home-projects-scroll" class="min-h-0 min-w-0 shrink" aria-busy={props.loading()}>
         <Show
-          when={props.servers().length > 1}
+          when={!props.loading()}
           fallback={
-            <div class="pr-3">
-              <Show
-                when={props.projects().length > 0}
-                fallback={<HomeProjectEmpty {...props} server={props.servers()[0]} items={props.recentlyClosed()} />}
-              >
-                <HomeProjectList
-                  {...props}
-                  {...contextMenuProps}
-                  {...expandedProps}
-                  server={props.servers()[0]}
-                  items={props.projects()}
-                />
-              </Show>
-            </div>
+            <SessionLoadingState
+              label={props.language.t("common.loading")}
+              rows={5}
+              rowClass="h-8 w-full rounded-[6px] bg-v2-background-bg-base opacity-70 animate-pulse"
+              class="px-1 py-10 pr-4"
+            />
           }
         >
-          <div class="flex min-w-0 flex-col gap-4 pr-3">
-            <For each={props.servers()}>
-              {(item) => {
-                const projects = () => props.projectsForServer(item)
-                const healthy = () => !!props.serverHealth(item)?.healthy
-                const hasProjects = () => projects().length > 0
-                const collapsed = () => props.collapsed(item)
-                return (
-                  <div class="flex min-w-0 flex-col gap-1">
-                    <HomeServerRow
-                      server={item}
-                      {...props}
-                      {...contextMenuProps}
-                      selected={props.selection().server === ServerConnection.key(item) && !props.selection().directory}
-                      collapsed={collapsed()}
-                      health={props.serverHealth(item)}
-                    />
-                    <Show when={healthy() && hasProjects() && !collapsed()}>
-                      <div class="mx-3 h-px bg-v2-border-border-base" />
-                      <HomeProjectList {...props} {...contextMenuProps} {...expandedProps} server={item} items={projects()} />
-                    </Show>
-                  </div>
-                )
-              }}
-            </For>
-          </div>
+          <Show
+            when={props.servers().length > 1}
+            fallback={
+              <div class="pr-3">
+                <Show
+                  when={props.projects().length > 0}
+                  fallback={<HomeProjectEmpty {...props} server={props.servers()[0]} items={props.recentlyClosed()} />}
+                >
+                  <HomeProjectList
+                    {...props}
+                    {...contextMenuProps}
+                    {...expandedProps}
+                    server={props.servers()[0]}
+                    items={props.projects()}
+                  />
+                </Show>
+              </div>
+            }
+          >
+            <div class="flex min-w-0 flex-col gap-4 pr-3">
+              <For each={props.servers()}>
+                {(item) => {
+                  const projects = () => props.projectsForServer(item)
+                  const healthy = () => !!props.serverHealth(item)?.healthy
+                  const hasProjects = () => projects().length > 0
+                  const collapsed = () => props.collapsed(item)
+                  return (
+                    <div class="flex min-w-0 flex-col gap-1">
+                      <HomeServerRow
+                        server={item}
+                        {...props}
+                        {...contextMenuProps}
+                        selected={props.selection().server === ServerConnection.key(item) && !props.selection().directory}
+                        collapsed={collapsed()}
+                        health={props.serverHealth(item)}
+                      />
+                      <Show when={healthy() && hasProjects() && !collapsed()}>
+                        <div class="mx-3 h-px bg-v2-border-border-base" />
+                        <HomeProjectList {...props} {...contextMenuProps} {...expandedProps} server={item} items={projects()} />
+                      </Show>
+                    </div>
+                  )
+                }}
+              </For>
+            </div>
+          </Show>
         </Show>
       </ScrollView>
       <HomeUtilityNav
@@ -504,27 +518,43 @@ function HomeProjectSessions(props: {
   const global = useGlobal()
   const [store] = global.ensureServerCtx(props.server).sync.child(props.directory, { bootstrap: true })
   const sessions = createMemo(() => sortedRootSessions(store, 0))
+  // status goes "loading" -> "partial" -> "complete"; sessions are fetched as
+  // one of several "slow" bootstrap tasks awaited before the "complete" flip,
+  // so the actual loading window is spent in "partial", not "loading" --
+  // checking only for "loading" would miss almost the whole fetch.
+  const loading = createMemo(() => store.status !== "complete")
 
   return (
     <div class="flex min-w-0 flex-col gap-0.5 pl-6">
       <Show
-        when={sessions().length > 0}
-        fallback={<div class="px-1.5 py-1 text-v2-text-text-faint">{props.language.t("home.sessions.empty")}</div>}
+        when={!loading()}
+        fallback={
+          <div aria-hidden="true" class="flex min-w-0 flex-col gap-1">
+            <For each={[0, 1]}>
+              {() => <div class="h-6 w-full rounded-[6px] bg-v2-background-bg-layer-02 opacity-70 animate-pulse" />}
+            </For>
+          </div>
+        }
       >
-        <For each={sessions()}>
-          {(session) => (
-            <HomeSessionRow
-              server={props.server}
-              session={session}
-              currentSession={props.currentSession}
-              onOpenSession={props.onOpenSession}
-              onDeleteSession={props.onDeleteSession}
-              pinned={props.pinned}
-              language={props.language}
-              dense
-            />
-          )}
-        </For>
+        <Show
+          when={sessions().length > 0}
+          fallback={<div class="px-1.5 py-1 text-v2-text-text-faint">{props.language.t("home.sessions.empty")}</div>}
+        >
+          <For each={sessions()}>
+            {(session) => (
+              <HomeSessionRow
+                server={props.server}
+                session={session}
+                currentSession={props.currentSession}
+                onOpenSession={props.onOpenSession}
+                onDeleteSession={props.onDeleteSession}
+                pinned={props.pinned}
+                language={props.language}
+                dense
+              />
+            )}
+          </For>
+        </Show>
       </Show>
     </div>
   )

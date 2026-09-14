@@ -228,6 +228,15 @@
   }
 }
 
+body[data-new-layout] [data-component="session-turn"] {
+  [data-slot="session-turn-thinking"],
+  [data-slot="session-turn-diffs-label"],
+  [data-slot="session-turn-diffs-toggle"] {
+    font-size: 13px;
+    line-height: 20px;
+  }
+}
+
 body:not([data-new-layout]) [data-component="session-turn"] {
   .error-card {
     color: var(--text-on-critical-base);

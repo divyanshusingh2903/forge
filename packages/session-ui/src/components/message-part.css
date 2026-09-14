@@ -1365,6 +1365,8 @@
 
 body[data-new-layout] [data-component="user-message"] {
   font-weight: 440;
+  font-size: 13px;
+  line-height: 20px;
 
   [data-slot="user-message-text"] {
     background: var(--v2-background-bg-layer-01);

@@ -125,6 +125,14 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M8.25 6.17773V1.17773M11.25 4.17773L8.25 1.17773L5.25 4.17773" stroke="currentColor"/><path d="M8.25 9.17773V14.1777M11.25 11.1777L8.25 14.1777L5.25 11.1777" stroke="currentColor"/><path d="M4.25 7.67773H12.25" stroke="currentColor"/>`,
   },
+  maximize: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M3.5 3.5H12.5V12.5H3.5V3.5Z" stroke="currentColor"/>`,
+  },
+  restore: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M5.5 5.5V2.5H13.5V10.5H10.5M10.5 5.5V13.5H2.5V5.5H10.5Z" stroke="currentColor"/>`,
+  },
   filetree: {
     viewBox: "0 0 16 16",
     body: `<path d="M2.5 1.5V12.2484H6.75M2.5 4.74838H6.75" stroke="currentColor"/><rect x="8.5" y="3.2168" width="6" height="3" fill="none" stroke="currentColor"/><rect x="8.5" y="10.75" width="6" height="3" fill="none" stroke="currentColor"/>`,

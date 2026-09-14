@@ -511,11 +511,22 @@ export function SessionHeader(props: { diffs?: Accessor<SessionHeaderReviewDiff[
 }
 
 // Self-contained status/review/terminal icon cluster, usable anywhere (e.g. next to the
-// context-usage circle) without needing the titlebar's precomputed state.
-export function SessionHeaderQuickActions(props: { diffs?: Accessor<SessionHeaderReviewDiff[]> }) {
+// context-usage circle) without needing the titlebar's precomputed state. `plan`/`review`/
+// `terminal` default to shown but can be turned off where they don't apply yet (e.g. a draft
+// session with no plan file, diffs to review, or -- since the draft route drops
+// TerminalProvider entirely (see app.tsx's DraftProviders) -- no terminal to attach to).
+export function SessionHeaderQuickActions(props: {
+  diffs?: Accessor<SessionHeaderReviewDiff[]>
+  plan?: boolean
+  review?: boolean
+  terminal?: boolean
+}) {
   const language = useLanguage()
   const settings = useSettings()
-  const terminal = useTerminal()
+  const showTerminal = props.terminal ?? true
+  // Only call useTerminal() when this instance actually renders the terminal button --
+  // routes without TerminalProvider (the draft/new-session page) would otherwise throw.
+  const terminal = showTerminal ? useTerminal() : undefined
   const { view } = useSessionLayout()
 
   const statusVisible = settings.visibility.status
@@ -527,7 +538,7 @@ export function SessionHeaderQuickActions(props: { diffs?: Accessor<SessionHeade
     const next = !terminalOpened()
     view().terminal.toggle()
     if (!next) return
-    const id = terminal.active()
+    const id = terminal?.active()
     if (id) focusTerminalById(id)
   }
 
@@ -545,35 +556,41 @@ export function SessionHeaderQuickActions(props: { diffs?: Accessor<SessionHeade
           <StatusPopoverV2 />
         </Tooltip>
       </Show>
-      <SessionPlanIndicator />
-      <TooltipV2 value={language.t("command.terminal.toggle")} placement="bottom">
-        <IconButtonV2
-          type="button"
-          variant="ghost-muted"
-          size="large"
-          class="!w-9 shrink-0"
-          state={terminalOpened() ? "pressed" : undefined}
-          aria-label={language.t("command.terminal.toggle")}
-          aria-expanded={terminalOpened()}
-          aria-controls="terminal-panel"
-          onClick={toggleTerminal}
-          icon={<IconV2 name={terminalOpened() ? "terminal-active" : "terminal"} />}
-        />
-      </TooltipV2>
-      <TooltipV2 value={reviewTooltip()} placement="bottom">
-        <IconButtonV2
-          type="button"
-          variant="ghost-muted"
-          size="large"
-          class="!w-9 shrink-0"
-          state={reviewOpened() ? "pressed" : undefined}
-          aria-label={language.t("command.review.toggle")}
-          aria-expanded={reviewOpened()}
-          aria-controls="review-panel"
-          onClick={() => view().reviewPanel.toggle()}
-          icon={<IconV2 name="sidebar-right" />}
-        />
-      </TooltipV2>
+      <Show when={props.plan ?? true}>
+        <SessionPlanIndicator />
+      </Show>
+      <Show when={showTerminal}>
+        <TooltipV2 value={language.t("command.terminal.toggle")} placement="bottom">
+          <IconButtonV2
+            type="button"
+            variant="ghost-muted"
+            size="large"
+            class="!w-9 shrink-0"
+            state={terminalOpened() ? "pressed" : undefined}
+            aria-label={language.t("command.terminal.toggle")}
+            aria-expanded={terminalOpened()}
+            aria-controls="terminal-panel"
+            onClick={toggleTerminal}
+            icon={<IconV2 name={terminalOpened() ? "terminal-active" : "terminal"} />}
+          />
+        </TooltipV2>
+      </Show>
+      <Show when={props.review ?? true}>
+        <TooltipV2 value={reviewTooltip()} placement="bottom">
+          <IconButtonV2
+            type="button"
+            variant="ghost-muted"
+            size="large"
+            class="!w-9 shrink-0"
+            state={reviewOpened() ? "pressed" : undefined}
+            aria-label={language.t("command.review.toggle")}
+            aria-expanded={reviewOpened()}
+            aria-controls="review-panel"
+            onClick={() => view().reviewPanel.toggle()}
+            icon={<IconV2 name="sidebar-right" />}
+          />
+        </TooltipV2>
+      </Show>
     </div>
   )
 }

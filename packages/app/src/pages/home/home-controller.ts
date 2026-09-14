@@ -62,6 +62,7 @@ export function createHomeController() {
     server: {
       list: global.servers.list,
       health: (conn: ServerConnection.Any) => global.servers.health[ServerConnection.key(conn)],
+      ready: global.servers.ready,
       context: (conn: ServerConnection.Any) => global.ensureServerCtx(conn),
       focused: focusedServer,
       focusedContext: focusedServerCtx,
