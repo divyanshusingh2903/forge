@@ -109,6 +109,12 @@ const api: ElectronAPI = {
     ipcRenderer.on("window-fullscreen-changed", handler)
     return () => ipcRenderer.removeListener("window-fullscreen-changed", handler)
   },
+  getWindowMaximized: () => ipcRenderer.invoke("get-window-maximized"),
+  onWindowMaximizedChanged: (cb) => {
+    const handler = (_: unknown, maximized: boolean) => cb(maximized)
+    ipcRenderer.on("window-maximized-changed", handler)
+    return () => ipcRenderer.removeListener("window-maximized-changed", handler)
+  },
   setWindowFocus: () => ipcRenderer.invoke("set-window-focus"),
   showWindow: () => ipcRenderer.invoke("show-window"),
   relaunch: () => ipcRenderer.send("relaunch"),

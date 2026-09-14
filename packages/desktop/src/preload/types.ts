@@ -97,6 +97,8 @@ export type ElectronAPI = {
   getWindowFocused: () => Promise<boolean>
   getWindowFullscreen: () => Promise<boolean>
   onWindowFullscreenChanged: (cb: (fullscreen: boolean) => void) => () => void
+  getWindowMaximized: () => Promise<boolean>
+  onWindowMaximizedChanged: (cb: (maximized: boolean) => void) => () => void
   setWindowFocus: () => Promise<void>
   showWindow: () => Promise<void>
   relaunch: () => void

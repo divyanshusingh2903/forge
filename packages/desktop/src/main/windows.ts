@@ -196,6 +196,7 @@ export function createMainWindow(id: string = randomUUID()) {
           titleBarOverlay: overlay({ mode }),
         }
       : {}),
+    ...(process.platform === "linux" ? { frame: false } : {}),
     webPreferences: {
       preload: join(root, "../preload/index.js"),
       contextIsolation: true,
@@ -223,6 +224,7 @@ export function createMainWindow(id: string = randomUUID()) {
   state.manage(win)
   registerWindow(win, id)
   wireFullscreen(win)
+  wireMaximized(win)
   loadWindow(win, "index.html")
   wireZoom(win)
 
@@ -538,6 +540,16 @@ function wireFullscreen(win: BrowserWindow) {
 
   win.on("enter-full-screen", () => send(true))
   win.on("leave-full-screen", () => send(false))
+}
+
+function wireMaximized(win: BrowserWindow) {
+  const send = () => {
+    if (win.isDestroyed() || win.webContents.isDestroyed()) return
+    win.webContents.send("window-maximized-changed", win.isMaximized())
+  }
+
+  win.on("maximize", send)
+  win.on("unmaximize", send)
 }
 
 function clampZoom(value: number) {
