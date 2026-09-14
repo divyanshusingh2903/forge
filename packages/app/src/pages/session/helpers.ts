@@ -20,7 +20,6 @@ type TabsInput = {
   review?: Accessor<boolean>
   hasReview?: Accessor<boolean>
   fileBrowser?: Accessor<boolean>
-  plan?: Accessor<boolean>
 }
 
 export const getSessionKey = (dir: string | undefined, id: string | undefined) => `${dir ?? ""}${id ? `/${id}` : ""}`
@@ -33,8 +32,11 @@ export const createSessionTabs = (input: TabsInput) => {
   const review = input.review ?? (() => false)
   const hasReview = input.hasReview ?? (() => false)
   const fileBrowser = input.fileBrowser ?? (() => false)
-  const plan = input.plan ?? (() => false)
   const contextOpen = createMemo(() => input.tabs().active() === "context" || input.tabs().all().includes("context"))
+  // Plan is opened/closed the same way as context (added to/removed from the
+  // tab list), rather than "review"'s always-there-when-data-exists treatment --
+  // so closing it actually hides it until something reopens it.
+  const planOpen = createMemo(() => input.tabs().active() === "plan" || input.tabs().all().includes("plan"))
   const openFileOpen = createMemo(
     () =>
       fileBrowser() &&
@@ -66,7 +68,7 @@ export const createSessionTabs = (input: TabsInput) => {
     if (active === "context") return active
     if (active === SESSION_OPEN_FILE_TAB && openFileOpen()) return active
     if (active === "review" && review()) return active
-    if (active === "plan" && plan()) return active
+    if (active === "plan" && planOpen()) return active
     if (active && input.pathFromTab(active)) return input.normalizeTab(active)
 
     const first = openedTabs()[0]
@@ -83,6 +85,7 @@ export const createSessionTabs = (input: TabsInput) => {
   const closableTab = createMemo(() => {
     const active = activeTab()
     if (active === "context") return active
+    if (active === "plan") return active
     if (active === SESSION_OPEN_FILE_TAB && openFileOpen()) return active
     if (!openedTabs().includes(active)) return
     return active
@@ -90,6 +93,7 @@ export const createSessionTabs = (input: TabsInput) => {
 
   return {
     contextOpen,
+    planOpen,
     openFileOpen,
     panelTabs,
     openedTabs,

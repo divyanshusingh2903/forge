@@ -9,6 +9,7 @@ import { Decimal } from "decimal.js"
 import type { ProviderMetadata, Usage } from "@opencode-ai/llm"
 import { InstallationVersion } from "@opencode-ai/core/installation/version"
 import { Database } from "@opencode-ai/core/database/database"
+import { FSUtil } from "@opencode-ai/core/fs-util"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { SessionV2 } from "@opencode-ai/core/session"
 import * as SessionExecutionLocal from "@opencode-ai/core/session/execution/local"
@@ -359,6 +360,41 @@ export function planCycleAnchor(messages: SessionV1.WithParts[], session: { slug
   }
   return anchor
 }
+
+// present_plan and the client's plan-info fetch both re-derive the same
+// deterministic path from message history via plan()/planCycleAnchor(). If the
+// model wrote its plan to a different, hand-constructed path instead of the
+// exact one it was given (its own guess at a timestamp, a shell-command typo,
+// etc.), that expected path won't exist even though a plan file genuinely does
+// -- fall back to the most recently modified .md file in the plans directory
+// written since this plan cycle started, rather than reporting "no plan" for
+// one that's actually there.
+export const resolvePlanFile = Effect.fn("Session.resolvePlanFile")(function* (input: {
+  fs: FSUtil.Interface
+  expected: string
+  since: number
+}) {
+  const fs = input.fs
+  if (yield* fs.existsSafe(input.expected)) return input.expected
+
+  const dir = path.dirname(input.expected)
+  if (!(yield* fs.existsSafe(dir))) return input.expected
+
+  const entries = yield* fs.readDirectoryEntries(dir).pipe(Effect.catch(() => Effect.succeed([] as FSUtil.DirEntry[])))
+
+  let newest: { path: string; mtime: number } | undefined
+  for (const entry of entries) {
+    if (entry.type !== "file" || !entry.name.endsWith(".md")) continue
+    const full = path.join(dir, entry.name)
+    const stat = yield* fs.stat(full).pipe(Effect.catch(() => Effect.succeed(undefined)))
+    const mtimeDate = stat ? Option.getOrUndefined(stat.mtime) : undefined
+    const mtime = mtimeDate?.getTime()
+    if (mtime === undefined || mtime < input.since) continue
+    if (!newest || mtime > newest.mtime) newest = { path: full, mtime }
+  }
+
+  return newest?.path ?? input.expected
+})
 
 export const getUsage = (input: { model: Provider.Model; usage: Usage; metadata?: ProviderMetadata }) => {
   const finite = (value: number) => (Number.isFinite(value) ? value : 0)

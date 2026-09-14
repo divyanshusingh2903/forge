@@ -405,7 +405,7 @@ export default function Page() {
           if (part.state.status === "running" && !openedForPresentPlan.has(part.callID)) {
             openedForPresentPlan.add(part.callID)
             if (!view().reviewPanel.opened()) view().reviewPanel.open()
-            tabs().setActive("plan")
+            void tabs().open("plan")
           }
           if (
             part.state.status === "completed" &&

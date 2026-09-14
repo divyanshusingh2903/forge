@@ -42,14 +42,16 @@ export function previewSessionTab(current: SessionTabState, tab: string): Sessio
 
 export function openSessionTab(current: SessionTabState, tab: string): SessionTabState {
   const preview = sessionTabPreview(current)
-  if (tab === "review" || tab === "plan") {
+  if (tab === "review") {
     return {
       tabs: { all: current.tabs.all.filter((item) => item !== tab), active: tab },
       preview,
     }
   }
 
-  if (tab === "context") {
+  // Plan behaves like context: it's added to (and closable from) the tab list,
+  // rather than "review"'s always-available-but-never-closable treatment.
+  if (tab === "context" || tab === "plan") {
     return {
       tabs: { all: [tab, ...current.tabs.all.filter((item) => item !== tab)], active: tab },
       preview,
@@ -80,7 +82,7 @@ export function openSessionTab(current: SessionTabState, tab: string): SessionTa
 }
 
 export function closeSessionTab(current: SessionTabState, tab: string): SessionTabState {
-  if (tab === "review" || tab === "plan") {
+  if (tab === "review") {
     if (current.tabs.active !== tab) return current
     return {
       tabs: { all: current.tabs.all, active: current.tabs.all[0] },

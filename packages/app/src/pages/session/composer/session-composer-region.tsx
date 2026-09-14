@@ -47,7 +47,11 @@ export function SessionComposerRegion(props: {
                 }
                 fallback={<SessionQuestionDock request={request} onSubmit={controller.onResponseSubmit} />}
               >
-                <SessionPlanQuestionDock request={request} onSubmit={controller.onResponseSubmit} />
+                <SessionPlanQuestionDock
+                  request={request}
+                  toolName={controller.state.questionToolName()}
+                  onSubmit={controller.onResponseSubmit}
+                />
               </Show>
             </div>
           )}
