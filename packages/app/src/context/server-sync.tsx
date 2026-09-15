@@ -46,6 +46,7 @@ import { ServerConnection, useServer } from "./server"
 import { retry } from "@opencode-ai/core/util/retry"
 import type { ServerScope } from "@/utils/server-scope"
 import { createHomeSessionIndexCache } from "./global-sync/home-session-index"
+import { usePlatform } from "./platform"
 import { persisted } from "@/utils/persist"
 import type { ServerApi } from "@/utils/server"
 import type {
@@ -204,6 +205,7 @@ export type QueryOptionsApi = ReturnType<typeof makeQueryOptionsApi>
 
 export function createServerSyncContextInner(serverSDK: ServerSDK) {
   const language = useLanguage()
+  const platform = usePlatform()
   const owner = getOwner()
   if (!owner) throw new Error("ServerSync must be created within owner")
 
@@ -570,6 +572,24 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
         }
       }
       return
+    }
+
+    if (event.type === "session.deleted") {
+      const properties = event.properties as { sessionID?: string; info?: { id?: string } }
+      const sessionID = properties.info?.id ?? properties.sessionID
+      // Covers a session deleted from another connected client/window: that
+      // client already ran its own destroySessionTerminals with a live sdk
+      // (pty.remove included) before this broadcast landed, so here it's only
+      // about not leaving this client's own cache/persisted terminal entry
+      // for a session that no longer exists anywhere. Dynamic import: a
+      // static one from ./terminal closes a real cycle (this module ->
+      // terminal.tsx -> server-sdk.tsx -> global.tsx -> back to this module),
+      // which left destroySessionTerminals undefined at evaluation time.
+      if (sessionID) {
+        void import("./terminal").then(({ destroySessionTerminals }) =>
+          destroySessionTerminals({ dir: directory, sessionID, scope: serverSDK.scope, platform, sdk: serverSDK }),
+        )
+      }
     }
 
     if (event.current?.type === "session.moved") {

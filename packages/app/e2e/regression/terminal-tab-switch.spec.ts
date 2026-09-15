@@ -9,17 +9,19 @@ const sessionA = "ses_terminal_tab_a"
 const sessionB = "ses_terminal_tab_b"
 const titleA = "Alpha session"
 const titleB = "Beta session"
-const ptyID = "pty_tab_switch"
+const ptyA = "pty_tab_switch_a"
+const ptyB = "pty_tab_switch_b"
 const server = `http://${process.env.PLAYWRIGHT_SERVER_HOST ?? "127.0.0.1"}:${process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"}`
 // Marks the terminal DOM node so a remount (fresh node) is detectable.
 const PROBE = "original"
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
-// Terminals are workspace-scoped: switching between session tabs in the same
-// workspace must keep the terminal mounted and its PTY connection open instead
-// of tearing it down and reconnecting.
-test("keeps the terminal session alive when switching session tabs in a workspace", async ({ page }) => {
+// Terminals are session-scoped: each session gets its own terminal set, and
+// switching to a different session must not show the previous session's
+// terminal(s). Switching back to a session must reconnect to that same
+// session's own pty, not a fresh one and not the other session's.
+test("keeps terminal sets independent when switching session tabs in the same workspace", async ({ page }) => {
   const connections = await setup(page)
 
   await page.goto(sessionHref(sessionA))
@@ -29,23 +31,27 @@ test("keeps the terminal session alive when switching session tabs in a workspac
   const terminal = page.locator('[data-component="terminal"]')
   await expect(terminal).toBeVisible()
   await expect.poll(() => connections.length).toBe(1)
-  const connection = new URL(connections[0]!)
-  expect(connection.pathname).toBe(`/api/pty/${ptyID}/connect`)
-  expect(connection.searchParams.get("location[directory]")).toBe(directory)
-  expect(connection.searchParams.get("ticket")).toBeNull()
+  expect(connectionPtyID(connections[0]!)).toBe(ptyA)
   await writeProbe(page)
 
   await switchTab(page, titleB)
   await expectSessionTitle(page, titleB)
+  // Session B has never had a terminal of its own -- a brand new one gets
+  // auto-created for it, distinct from session A's.
   await expect(terminal).toBeVisible()
-  expect(await readProbe(page)).toBe(PROBE)
-  expect(connections.length).toBe(1)
+  await expect.poll(() => connections.length).toBe(2)
+  expect(connectionPtyID(connections[1]!)).toBe(ptyB)
+  expect(await readProbe(page)).toBeUndefined()
 
   await switchTab(page, titleA)
   await expectSessionTitle(page, titleA)
   await expect(terminal).toBeVisible()
-  expect(await readProbe(page)).toBe(PROBE)
-  expect(connections.length).toBe(1)
+  // Reconnecting to A's own terminal set -- same pty as before, not a new one
+  // and not B's. The DOM node itself is a fresh mount (session B's terminal
+  // occupied that slot in between), so the probe does not survive; what
+  // matters is that it's still ptyA being reconnected to, not a clone.
+  await expect.poll(() => connections.length).toBe(3)
+  expect(connectionPtyID(connections[2]!)).toBe(ptyA)
 })
 
 type Probed = HTMLElement & { __e2eProbe?: string }
@@ -62,6 +68,11 @@ async function writeProbe(page: Page) {
 
 async function readProbe(page: Page) {
   return page.locator('[data-component="terminal"]').evaluate((el) => (el as Probed).__e2eProbe)
+}
+
+function connectionPtyID(url: string) {
+  const match = /\/api\/pty\/([^/]+)\/connect/.exec(new URL(url).pathname)
+  return match?.[1]
 }
 
 async function setup(page: Page) {
@@ -90,21 +101,31 @@ async function setup(page: Page) {
     sessions: [session(sessionA, titleA, 1700000000000), session(sessionB, titleB, 1700000001000)],
     pageMessages: () => ({ items: [] }),
   })
-  await page.route("**/api/pty*", (route) =>
+  const created = { count: 0 }
+  await page.route("**/api/pty*", (route) => {
+    created.count += 1
+    const info = created.count === 1 ? ptyInfo(ptyA) : ptyInfo(ptyB)
+    return route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ location: ptyLocation(), data: info }),
+    })
+  })
+  await page.route(`**/api/pty/${ptyA}*`, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ location: ptyLocation(), data: ptyInfo() }),
+      body: JSON.stringify({ location: ptyLocation(), data: ptyInfo(ptyA) }),
     }),
   )
-  await page.route(`**/api/pty/${ptyID}*`, (route) =>
+  await page.route(`**/api/pty/${ptyB}*`, (route) =>
     route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ location: ptyLocation(), data: ptyInfo() }),
+      body: JSON.stringify({ location: ptyLocation(), data: ptyInfo(ptyB) }),
     }),
   )
-  await page.route(`**/api/pty/${ptyID}/connect-token*`, (route) => {
+  await page.route(/\/api\/pty\/[^/]+\/connect-token/, (route) => {
     expect(route.request().headers()["x-opencode-ticket"]).toBe("1")
     const url = new URL(route.request().url())
     expect(url.searchParams.get("location[directory]")).toBe(directory)
@@ -116,7 +137,7 @@ async function setup(page: Page) {
     })
   })
   const connections: string[] = []
-  await page.routeWebSocket(new RegExp(`/api/pty/${ptyID}/connect`), (ws) => {
+  await page.routeWebSocket(/\/api\/pty\/[^/]+\/connect/, (ws) => {
     connections.push(ws.url())
   })
 
@@ -160,6 +181,6 @@ function ptyLocation() {
   return { directory, project: { id: projectID, directory } }
 }
 
-function ptyInfo() {
-  return { id: ptyID, title: "Terminal 1", command: "cmd.exe", args: [], cwd: directory, status: "running", pid: 1 }
+function ptyInfo(id: string) {
+  return { id, title: "Terminal 1", command: "cmd.exe", args: [], cwd: directory, status: "running", pid: 1 }
 }

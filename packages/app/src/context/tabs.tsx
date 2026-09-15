@@ -13,6 +13,7 @@ import { createTabMemory } from "./tab-memory"
 import { nextTabAfterClose, pushClosedTab, removeClosedTabs, takeClosedTab, type ClosedTab } from "./closed-tabs"
 import { createDraftPromptSession, type PromptModel } from "./prompt-state"
 import { migrateTabs } from "./tab-migration"
+import { destroySessionTerminals } from "./terminal"
 
 export type SessionTab = {
   type: "session"
@@ -278,6 +279,10 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
         })
       },
       removeSessionTab(input: Omit<SessionTab, "type">) {
+        // Only ever called from the "session not found" close button, i.e. a
+        // directory that never resolved -- so there's no directory to key a
+        // terminal cache/persist entry by, and nothing this client could have
+        // created one under. Nothing to destroy here.
         updateClosed((stack) => removeClosedTabs(stack, input.server, [input.sessionId]))
         const index = store.findIndex(
           (tab) => tab.type === "session" && tab.server === input.server && tab.sessionId === input.sessionId,
@@ -298,6 +303,10 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
       removeSessions: (input: SessionTabsRemovedDetail) => {
         const targetServer = input.server ?? server.key
         updateClosed((stack) => removeClosedTabs(stack, targetServer, input.sessionIDs))
+        const terminalScope = server.scope(targetServer)
+        for (const sessionID of input.sessionIDs) {
+          void destroySessionTerminals({ dir: input.directory, sessionID, scope: terminalScope, platform })
+        }
         const removed = store
           .filter(
             (tab) => tab.type === "session" && tab.server === targetServer && input.sessionIDs.includes(tab.sessionId),

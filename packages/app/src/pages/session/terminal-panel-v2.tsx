@@ -34,7 +34,7 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
   const language = useLanguage()
   const command = useCommand()
   const settings = useSettings()
-  const { workspaceKey, view } = useSessionLayout()
+  const { sessionKey, view } = useSessionLayout()
 
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const newLayout = createMemo(() => settings.general.newLayoutDesigns())
@@ -72,6 +72,14 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
     makeEventListener(window, "resize", sync)
     if (port) makeEventListener(port, "resize", sync)
   })
+
+  // Terminals are session-scoped now, so a session switch swaps to a
+  // different (initially disconnected) terminal set without this page
+  // remounting -- reset the recovery-in-flight map so a stale key from the
+  // previous session can't block the new session's own recovery.
+  createEffect(
+    on(sessionKey, () => setStore("recovered", {}), { defer: true }),
+  )
 
   createEffect(() => {
     if (!opened()) {
@@ -120,7 +128,7 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
     language.locale()
 
     setTerminalHandoff(
-      workspaceKey(),
+      sessionKey(),
       terminal.all().map((pty) =>
         terminalTabLabel({
           title: pty.title,
@@ -134,7 +142,7 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
   const handoff = createMemo(() => {
     const dir = sdk().directory
     if (!dir) return []
-    return getTerminalHandoff(workspaceKey()) ?? []
+    return getTerminalHandoff(sessionKey()) ?? []
   })
 
   const all = terminal.all

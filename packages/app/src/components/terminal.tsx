@@ -89,6 +89,7 @@ const useTerminalUiBindings = (input: {
   cleanups: VoidFunction[]
   handlePointerDown: () => void
   handleLinkClick: (event: MouseEvent) => void
+  handleFocusOut: () => void
 }) => {
   const handleCopy = (event: ClipboardEvent) => {
     const selection = input.term.getSelection()
@@ -111,11 +112,16 @@ const useTerminalUiBindings = (input: {
     input.term.paste(text)
   }
 
-  const handleTextareaFocus = () => {
+  // Driven off the container, not the textarea: a click can land focus on
+  // either the textarea or ghostty-web's own contenteditable container
+  // element (browsers vary on whether preventDefault() on the canvas's
+  // mousedown fully suppresses the native contenteditable focus-and-place-
+  // caret behavior) -- focusin/focusout bubble and fire for either target,
+  // so this is the one signal that reliably tracks "is focus anywhere in
+  // this terminal" regardless of which internal element actually ends up
+  // as document.activeElement.
+  const handleFocusIn = () => {
     input.term.options.cursorBlink = true
-  }
-  const handleTextareaBlur = () => {
-    input.term.options.cursorBlink = false
   }
 
   input.container.addEventListener("copy", handleCopy, true)
@@ -136,10 +142,15 @@ const useTerminalUiBindings = (input: {
     }),
   )
 
-  input.term.textarea?.addEventListener("focus", handleTextareaFocus)
-  input.term.textarea?.addEventListener("blur", handleTextareaBlur)
-  input.cleanups.push(() => input.term.textarea?.removeEventListener("focus", handleTextareaFocus))
-  input.cleanups.push(() => input.term.textarea?.removeEventListener("blur", handleTextareaBlur))
+  input.container.addEventListener("focusin", handleFocusIn)
+  input.cleanups.push(() => input.container.removeEventListener("focusin", handleFocusIn))
+
+  // focusout (unlike blur) fires for any descendant losing focus and bubbles,
+  // so this catches focus leaving the whole terminal container -- textarea,
+  // the contenteditable container itself, or any other focusable node inside
+  // it (selection, link) -- as the single source of truth for "focus left."
+  input.container.addEventListener("focusout", input.handleFocusOut)
+  input.cleanups.push(() => input.container.removeEventListener("focusout", input.handleFocusOut))
 }
 
 const persistTerminal = (input: {
@@ -357,9 +368,40 @@ export const Terminal = (props: TerminalProps) => {
   const focusTerminal = () => {
     const t = term
     if (!t) return
-    t.focus()
+    // Not t.focus(): ghostty-web's own Terminal.focus() focuses the
+    // container element AND schedules its own delayed
+    // `setTimeout(() => this.element.focus(), 0)` "backup" refocus. That
+    // backup fires a tick after this call returns and steals focus back to
+    // the container, away from the textarea -- racing our own focus/blur
+    // wiring (which only listens on the textarea) and leaving the cursor
+    // blinking (set true by the textarea's own focus a moment earlier) even
+    // though nothing is actually focused anymore. The textarea is the real
+    // input target; focusing it is sufficient.
     t.textarea?.focus()
-    setTimeout(() => t.textarea?.focus(), 0)
+  }
+  const blurTerminal = () => {
+    const t = term
+    if (!t) return
+    t.textarea?.blur()
+    t.options.cursorBlink = false
+  }
+  const handleFocusOut = () => {
+    // Not event.relatedTarget: a single click can synchronously bounce focus
+    // between the container (ghostty-web's own contenteditable element) and
+    // the textarea multiple times -- ghostty's canvas mousedown handler, our
+    // own pointerdown handler, and the browser's native contenteditable
+    // click-to-focus behavior all race to focus different targets in the
+    // same click. relatedTarget on the intermediate focusout events in that
+    // burst is unreliably `null` (not the element that ends up focused a
+    // moment later), so trusting it flips cursorBlink off mid-bounce even
+    // though focus is about to land back inside this same terminal.
+    // Deferring to a microtask lets the whole synchronous bounce finish
+    // before checking where focus actually settled.
+    queueMicrotask(() => {
+      if (disposed) return
+      if (container.contains(document.activeElement)) return
+      blurTerminal()
+    })
   }
   const handlePointerDown = () => {
     const activeElement = document.activeElement
@@ -398,7 +440,7 @@ export const Terminal = (props: TerminalProps) => {
       const g = loaded.ghostty
 
       const t = new mod.Terminal({
-        cursorBlink: true,
+        cursorBlink: false,
         cursorStyle: "bar",
         cols: restoreSize?.cols,
         rows: restoreSize?.rows,
@@ -455,6 +497,7 @@ export const Terminal = (props: TerminalProps) => {
         cleanups,
         handlePointerDown,
         handleLinkClick,
+        handleFocusOut,
       })
 
       if (local.autoFocus === true) {
@@ -718,6 +761,7 @@ export const Terminal = (props: TerminalProps) => {
 
   onCleanup(() => {
     disposed = true
+    blurTerminal()
     if (fitFrame !== undefined) cancelAnimationFrame(fitFrame)
     if (sizeTimer !== undefined) clearTimeout(sizeTimer)
     if (reconn !== undefined) clearTimeout(reconn)
@@ -744,7 +788,16 @@ export const Terminal = (props: TerminalProps) => {
       dir="ltr"
       data-prevent-autofocus
       tabIndex={-1}
-      style={{ "background-color": terminalColors().background }}
+      style={{
+        "background-color": terminalColors().background,
+        // ghostty-web only hides the native caret on its hidden textarea
+        // (via clip-path); it never accounts for this container itself --
+        // contenteditable="true", set by ghostty-web's own open() -- ending
+        // up genuinely focused. A native contenteditable caret then renders
+        // independently of, and visually on top of, ghostty's own
+        // canvas-drawn cursor: two blinking cursors at once.
+        "caret-color": "transparent",
+      }}
       classList={{
         ...local.classList,
         "select-text": true,

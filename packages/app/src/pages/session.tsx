@@ -292,7 +292,15 @@ function ResolvedTargetSessionRoute() {
 
 // Owns the workspace-identity remount. Must not include the session ID in the
 // key: SessionPage handles session changes reactively, and remounting here
-// destroys workspace-scoped state (terminal PTYs, file/prompt providers).
+// destroys workspace-scoped state (file/prompt providers). Terminals are now
+// session-scoped too (context/terminal.tsx keys its own cache by
+// (dir,sessionID,scope)), but that swap happens inside the terminal context's
+// own reactive memo when params.id changes -- it doesn't need this page to
+// remount to pick up a different session's terminal set, and remounting the
+// whole workspace subtree on every session switch would be a much bigger
+// perf/state-loss hit than the terminal panels resetting their own small
+// `recovered` map (see terminal-panel.tsx/terminal-panel-v2.tsx) on sessionKey
+// change.
 function TargetSessionPage() {
   const sdk = useSDK()
   const serverSDK = useServerSDK()
