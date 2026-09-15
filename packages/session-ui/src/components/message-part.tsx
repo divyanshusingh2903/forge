@@ -35,6 +35,7 @@ import { useData } from "../context"
 import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { type UiI18n, useI18n } from "@opencode-ai/ui/context/i18n"
+import { formatElapsed, useElapsed } from "@opencode-ai/ui/hooks"
 import { BasicTool, GenericTool } from "./basic-tool"
 import { Accordion } from "@opencode-ai/ui/accordion"
 import { StickyAccordionHeader } from "@opencode-ai/ui/sticky-accordion-header"
@@ -1490,6 +1491,7 @@ export interface ToolProps {
   sessionID?: string
   output?: string
   status?: string
+  time?: { start: number; end?: number }
   hideDetails?: boolean
   defaultOpen?: boolean
   open?: boolean
@@ -1577,6 +1579,10 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
   const input = () => part().state?.input ?? emptyInput
   // @ts-expect-error
   const partMetadata = () => part().state?.metadata ?? emptyMetadata
+  const partTime = createMemo(() => {
+    const state = part().state
+    return state.status === "pending" ? undefined : state.time
+  })
   const taskId = createMemo(() => {
     if (part().tool !== "task") return
     const value = partMetadata().sessionId
@@ -1613,7 +1619,8 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
                   </div>
                 )
               }
-              const interruptedTool = part().tool === "question" || part().tool === "present_plan" || part().tool === "plan_enter"
+              const interruptedTool =
+                part().tool === "question" || part().tool === "present_plan" || part().tool === "plan_enter"
               const interrupted =
                 interruptedTool &&
                 (partMetadata().interrupted === true ||
@@ -1655,6 +1662,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
               // @ts-expect-error
               output={part().state.output}
               status={part().state.status}
+              time={partTime()}
               hideDetails={props.hideDetails}
               defaultOpen={props.defaultOpen}
               open={controlledOpen()}
@@ -1706,25 +1714,29 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
     return match?.models?.[message.modelID]?.name ?? message.modelID
   })
 
+  const elapsed = useElapsed(
+    () => (props.message.role === "assistant" ? (props.message as AssistantMessage).time.created : undefined),
+    () => {
+      if (props.message.role !== "assistant") return undefined
+      const message = props.message as AssistantMessage
+      if (typeof props.turnDurationMs === "number") return message.time.created + props.turnDurationMs
+      return message.time.completed
+    },
+  )
   const duration = createMemo(() => {
+    const ms = elapsed()
+    if (ms === undefined) return ""
+    return formatElapsed(i18n, numfmt(), ms)
+  })
+
+  const tokenfmt = createMemo(
+    () => new Intl.NumberFormat(i18n.locale(), { notation: "compact", maximumFractionDigits: 1 }),
+  )
+  const tokens = createMemo(() => {
     if (props.message.role !== "assistant") return ""
-    const message = props.message as AssistantMessage
-    const completed = message.time.completed
-    const ms =
-      typeof props.turnDurationMs === "number"
-        ? props.turnDurationMs
-        : typeof completed === "number"
-          ? completed - message.time.created
-          : -1
-    if (!(ms >= 0)) return ""
-    const total = Math.round(ms / 1000)
-    if (total < 60) return i18n.t("ui.message.duration.seconds", { count: numfmt().format(total) })
-    const minutes = Math.floor(total / 60)
-    const seconds = total % 60
-    return i18n.t("ui.message.duration.minutesSeconds", {
-      minutes: numfmt().format(minutes),
-      seconds: numfmt().format(seconds),
-    })
+    const { input, output } = (props.message as AssistantMessage).tokens
+    if (!input && !output) return ""
+    return i18n.t("ui.message.tokens", { input: tokenfmt().format(input), output: tokenfmt().format(output) })
   })
 
   const meta = createMemo(() => {
@@ -1734,6 +1746,7 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
       agent ? agent[0]?.toUpperCase() + agent.slice(1) : "",
       model(),
       duration(),
+      tokens(),
       interrupted() ? i18n.t("ui.message.interrupted") : "",
     ]
     return items.filter((x) => !!x).join(" \u00B7 ")
@@ -1796,16 +1809,32 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
 
 PART_MAPPING["reasoning"] = function ReasoningPartDisplay(props) {
   const data = useData()
+  const i18n = useI18n()
+  const numfmt = createMemo(() => new Intl.NumberFormat(i18n.locale()))
   const part = () => props.part as ReasoningPart
   const streaming = createMemo(
     () => props.message.role === "assistant" && typeof (props.message as AssistantMessage).time.completed !== "number",
   )
   const text = () => readPartText(data.store.part_text_accum_delta, part())
+  const elapsed = useElapsed(
+    () => part().time.start,
+    () => part().time.end,
+  )
+  const durationText = createMemo(() => {
+    const ms = elapsed()
+    if (ms === undefined) return ""
+    return formatElapsed(i18n, numfmt(), ms)
+  })
 
   return (
     <Show when={text()}>
       <div data-component="reasoning-part" data-timeline-part-id={part().id}>
         <PacedMarkdown text={text()} cacheKey={part().id} streaming={streaming()} />
+        <Show when={durationText()}>
+          <span data-slot="reasoning-part-duration" class="text-12-regular text-text-weak">
+            {durationText()}
+          </span>
+        </Show>
       </div>
     </Show>
   )
@@ -2108,6 +2137,7 @@ ToolRegistry.register({
       <BasicTool
         icon="task"
         status={props.status}
+        time={props.time}
         trigger={trigger()}
         hideDetails
         triggerAsLink
@@ -2697,6 +2727,6 @@ ToolRegistry.register({
       </div>
     )
 
-    return <BasicTool icon="brain" status={props.status} trigger={trigger()} hideDetails />
+    return <BasicTool icon="brain" status={props.status} time={props.time} trigger={trigger()} hideDetails />
   },
 })

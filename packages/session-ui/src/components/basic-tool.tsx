@@ -1,10 +1,23 @@
-import { createEffect, For, Match, on, onCleanup, onMount, Show, Switch, type Accessor, type JSX } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  For,
+  Match,
+  on,
+  onCleanup,
+  onMount,
+  Show,
+  Switch,
+  type Accessor,
+  type JSX,
+} from "solid-js"
 import { animate, type AnimationPlaybackControls } from "motion"
 import { useI18n } from "@opencode-ai/ui/context/i18n"
 import { createStore } from "solid-js/store"
 import { Collapsible } from "@opencode-ai/ui/collapsible"
 import type { IconProps } from "@opencode-ai/ui/icon"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
+import { formatElapsed, useElapsed } from "@opencode-ai/ui/hooks"
 
 export type TriggerTitle = {
   title: string
@@ -27,6 +40,7 @@ export interface BasicToolProps {
   trigger: TriggerTitle | JSX.Element | ((open: Accessor<boolean>) => JSX.Element)
   children?: JSX.Element
   status?: string
+  time?: { start: number; end?: number }
   hideDetails?: boolean
   defaultOpen?: boolean
   open?: boolean
@@ -84,6 +98,18 @@ function scheduleFrameMount(fn: () => void) {
 }
 
 export function BasicTool(props: BasicToolProps) {
+  const i18n = useI18n()
+  const numfmt = createMemo(() => new Intl.NumberFormat(i18n.locale()))
+  const elapsed = useElapsed(
+    () => props.time?.start,
+    () => props.time?.end,
+  )
+  const durationText = createMemo(() => {
+    const ms = elapsed()
+    if (ms === undefined) return ""
+    return formatElapsed(i18n, numfmt(), ms)
+  })
+
   const [state, setState] = createStore({
     open: props.defaultOpen ?? false,
     ready: !props.defer && (props.defaultOpen ?? false),
@@ -247,6 +273,11 @@ export function BasicTool(props: BasicToolProps) {
             <Match when={true}>{props.trigger as JSX.Element}</Match>
           </Switch>
         </div>
+        <Show when={durationText()}>
+          <span data-slot="basic-tool-tool-duration" class="text-12-regular text-text-weak">
+            {durationText()}
+          </span>
+        </Show>
       </div>
       <Show when={hasChildren() && !props.hideDetails && !props.locked && (!pending() || props.allowOpenWhilePending)}>
         <Collapsible.Arrow />
