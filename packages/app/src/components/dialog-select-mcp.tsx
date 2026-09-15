@@ -3,6 +3,7 @@ import { useSync } from "@/context/sync"
 import { Dialog } from "@opencode-ai/ui/dialog"
 import { List } from "@opencode-ai/ui/list"
 import { Switch } from "@opencode-ai/ui/switch"
+import { McpIcon } from "@opencode-ai/ui/mcp-icon"
 import { useLanguage } from "@/context/language"
 import { useMcpToggle } from "@/context/mcp"
 
@@ -64,6 +65,7 @@ export const DialogSelectMcp: Component = () => {
             <div class="w-full flex items-center justify-between gap-x-3">
               <div class="flex flex-col gap-0.5 min-w-0">
                 <div class="flex items-center gap-2">
+                  <McpIcon id={i.name} class="size-4 shrink-0" />
                   <span class="truncate">{i.name}</span>
                   <Show when={statusLabel()}>
                     <span class="text-11-regular text-text-weaker">{statusLabel()}</span>

@@ -2,6 +2,7 @@ import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Switch } from "@opencode-ai/ui/switch"
+import { McpIcon } from "@opencode-ai/ui/mcp-icon"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { showToast } from "@/utils/toast"
 import { useNavigate } from "@solidjs/router"
@@ -432,6 +433,7 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
                         />
                         <span class="flex flex-col min-w-0 flex-1">
                           <span class="flex items-center gap-2 min-w-0">
+                            <McpIcon id={name} class="size-4 shrink-0" />
                             <span class="text-14-regular text-text-base truncate">{name}</span>
                           </span>
                           <Show when={toggleMcp.isPending && toggleMcp.variables === name}>
