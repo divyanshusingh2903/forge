@@ -123,17 +123,41 @@ const layer = Layer.effect(
         const instructions = (yield* mcp.instructions()).filter(
           (item) => item.tools.length === 0 || Permission.disabled(item.tools, ruleset).size < item.tools.length,
         )
-        if (instructions.length === 0) return
 
-        return [
-          "<mcp_instructions>",
-          ...instructions.flatMap((item) => [
-            `  <server name="${item.name}">`,
-            ...item.instructions.split("\n").map((line) => `    ${line}`),
-            "  </server>",
-          ]),
-          "</mcp_instructions>",
-        ].join("\n")
+        const status = yield* mcp.status()
+        const disabled = Object.entries(status)
+          .filter(([, value]) => value.status === "disabled")
+          .map(([name]) => name)
+          .toSorted((a, b) => a.localeCompare(b))
+
+        if (instructions.length === 0 && disabled.length === 0) return
+
+        const parts: string[] = []
+        if (instructions.length > 0) {
+          parts.push(
+            [
+              "<mcp_instructions>",
+              ...instructions.flatMap((item) => [
+                `  <server name="${item.name}">`,
+                ...item.instructions.split("\n").map((line) => `    ${line}`),
+                "  </server>",
+              ]),
+              "</mcp_instructions>",
+            ].join("\n"),
+          )
+        }
+        if (disabled.length > 0) {
+          parts.push(
+            [
+              "<mcp_servers_disabled>",
+              `  These MCP servers are configured but disabled by default, so none of their tools are currently loaded: ${disabled.join(", ")}.`,
+              `  If asked what MCP servers exist or are available, mention these rather than saying none are configured.`,
+              `  To enable one, set "enabled": true for it in the mcp config, then run \`opencode mcp auth <name>\` if it requires OAuth.`,
+              "</mcp_servers_disabled>",
+            ].join("\n"),
+          )
+        }
+        return parts.join("\n")
       }),
     })
   }),

@@ -61,6 +61,14 @@ const it = testEffect(
               tools: ["tool-server_search", "tool-server_update"],
             },
           ]),
+        status: () =>
+          Effect.succeed({
+            "guide-server": { status: "connected" },
+            "tool-server": { status: "connected" },
+            linear: { status: "disabled" },
+            github: { status: "disabled" },
+            notion: { status: "disabled" },
+          }),
       }),
     ],
     [
@@ -129,21 +137,30 @@ describe("session.system", () => {
     }),
   )
 
-  it.effect("MCP output includes connected server instructions", () =>
+  it.effect("MCP output includes connected server instructions and disabled servers", () =>
     Effect.gen(function* () {
       const prompt = yield* SystemPrompt.Service
       const output = yield* prompt.mcp(build)
 
       expect(output).toBe(
         [
-          "<mcp_instructions>",
-          '  <server name="guide-server">',
-          "    Use lookup before mutate.",
-          "  </server>",
-          '  <server name="tool-server">',
-          "    Prefer search before update.",
-          "  </server>",
-          "</mcp_instructions>",
+          [
+            "<mcp_instructions>",
+            '  <server name="guide-server">',
+            "    Use lookup before mutate.",
+            "  </server>",
+            '  <server name="tool-server">',
+            "    Prefer search before update.",
+            "  </server>",
+            "</mcp_instructions>",
+          ].join("\n"),
+          [
+            "<mcp_servers_disabled>",
+            "  These MCP servers are configured but disabled by default, so none of their tools are currently loaded: github, linear, notion.",
+            "  If asked what MCP servers exist or are available, mention these rather than saying none are configured.",
+            '  To enable one, set "enabled": true for it in the mcp config, then run `opencode mcp auth <name>` if it requires OAuth.',
+            "</mcp_servers_disabled>",
+          ].join("\n"),
         ].join("\n"),
       )
     }),
@@ -156,11 +173,20 @@ describe("session.system", () => {
 
       expect(output).toBe(
         [
-          "<mcp_instructions>",
-          '  <server name="guide-server">',
-          "    Use lookup before mutate.",
-          "  </server>",
-          "</mcp_instructions>",
+          [
+            "<mcp_instructions>",
+            '  <server name="guide-server">',
+            "    Use lookup before mutate.",
+            "  </server>",
+            "</mcp_instructions>",
+          ].join("\n"),
+          [
+            "<mcp_servers_disabled>",
+            "  These MCP servers are configured but disabled by default, so none of their tools are currently loaded: github, linear, notion.",
+            "  If asked what MCP servers exist or are available, mention these rather than saying none are configured.",
+            '  To enable one, set "enabled": true for it in the mcp config, then run `opencode mcp auth <name>` if it requires OAuth.',
+            "</mcp_servers_disabled>",
+          ].join("\n"),
         ].join("\n"),
       )
     }),
