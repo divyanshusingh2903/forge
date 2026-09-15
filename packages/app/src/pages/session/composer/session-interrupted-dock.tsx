@@ -32,7 +32,7 @@ export function SessionInterruptedDock(props: {
   }
 
   const recoverMutation = useMutation(() => ({
-    mutationFn: () => sdk().client.session.planRecover({ sessionID: props.sessionID, body: {} }),
+    mutationFn: () => sdk().client.session.planRecover({ sessionID: props.sessionID, action: "continue" }),
     onSuccess: () => {
       setDismissed(true)
       props.onRecovered?.()
@@ -40,10 +40,20 @@ export function SessionInterruptedDock(props: {
     onError: fail,
   }))
 
-  const sending = () => recoverMutation.isPending
+  const discardMutation = useMutation(() => ({
+    mutationFn: () => sdk().client.session.planRecover({ sessionID: props.sessionID, action: "discard" }),
+    onSuccess: () => setDismissed(true),
+    onError: fail,
+  }))
+
+  const sending = () => recoverMutation.isPending || discardMutation.isPending
   const recover = () => {
     if (sending()) return
     void recoverMutation.mutateAsync()
+  }
+  const discard = () => {
+    if (sending()) return
+    void discardMutation.mutateAsync()
   }
 
   return (
@@ -71,6 +81,9 @@ export function SessionInterruptedDock(props: {
               <div data-slot="permission-footer-actions">
                 <Button variant="ghost" size="normal" disabled={sending()} onClick={() => setDismissed(true)}>
                   {language.t("session.plan.dismiss")}
+                </Button>
+                <Button variant="ghost" size="normal" disabled={sending()} onClick={discard}>
+                  {language.t("session.plan.discard")}
                 </Button>
                 <Button variant="primary" size="normal" disabled={sending()} onClick={recover}>
                   {language.t("session.plan.recover")}

@@ -9794,7 +9794,7 @@ export type SessionPlanResponse = SessionPlanResponses[keyof SessionPlanResponse
 
 export type SessionPlanRecoverData = {
   body?: {
-    [key: string]: unknown
+    action?: "discard" | "continue"
   }
   path: {
     sessionID: string
@@ -9831,6 +9831,7 @@ export type SessionPlanRecoverResponses = {
     path: string
     exists: boolean
     recovered: boolean
+    resumed: boolean
   }
 }
 

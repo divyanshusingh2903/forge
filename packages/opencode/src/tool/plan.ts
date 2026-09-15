@@ -28,6 +28,24 @@ const ACCEPT_AUTO = "Accept (Auto)"
 const REVISE = "Revise"
 const DENY = "Deny"
 
+// Single source of truth for present_plan's question, so a future direct
+// re-ask (e.g. session recovery) can't drift from what the tool itself asks.
+export function presentPlanQuestion(plan: string) {
+  return [
+    {
+      question: `Plan at ${plan} is complete. How would you like to proceed?`,
+      header: "Plan Review",
+      custom: false,
+      options: [
+        { label: ACCEPT_MANUAL, description: "Switch to build agent; approve each edit yourself" },
+        { label: ACCEPT_AUTO, description: "Switch to build agent; auto-accept edits" },
+        { label: REVISE, description: "Keep refining the plan with the plan agent" },
+        { label: DENY, description: "Stop here, don't implement this plan" },
+      ],
+    },
+  ]
+}
+
 export const PresentPlanTool = Tool.define(
   "present_plan",
   Effect.gen(function* () {
@@ -53,19 +71,7 @@ export const PresentPlanTool = Tool.define(
           const plan = path.relative(instance.worktree, resolved)
           const answers = yield* question.ask({
             sessionID: ctx.sessionID,
-            questions: [
-              {
-                question: `Plan at ${plan} is complete. How would you like to proceed?`,
-                header: "Plan Review",
-                custom: false,
-                options: [
-                  { label: ACCEPT_MANUAL, description: "Switch to build agent; approve each edit yourself" },
-                  { label: ACCEPT_AUTO, description: "Switch to build agent; auto-accept edits" },
-                  { label: REVISE, description: "Keep refining the plan with the plan agent" },
-                  { label: DENY, description: "Stop here, don't implement this plan" },
-                ],
-              },
-            ],
+            questions: presentPlanQuestion(plan),
             tool: ctx.callID ? { messageID: ctx.messageID, callID: ctx.callID } : undefined,
           })
 
