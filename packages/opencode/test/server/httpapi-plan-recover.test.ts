@@ -242,6 +242,27 @@ describe("plan recover HttpApi", () => {
         const headers = { "x-opencode-directory": test.directory, "content-type": "application/json" }
         const session = yield* Session.use.create({ title: "plan-recover-no-anchor" })
 
+        // Message history exists (just not one planCycleAnchor recognizes as a plan-mode
+        // stretch) -- a session with zero messages can never have generated its own plan
+        // file, so the handler now short-circuits that case without touching the
+        // filesystem; this test is specifically about the anchor-missing-but-history-exists
+        // case, so it needs at least one ordinary message.
+        const user = yield* Session.use.updateMessage({
+          id: MessageID.ascending(),
+          role: "user",
+          sessionID: session.id,
+          agent: "build",
+          model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test") },
+          time: { created: Date.now() },
+        })
+        yield* Session.use.updatePart({
+          id: PartID.ascending(),
+          sessionID: session.id,
+          messageID: user.id,
+          type: "text",
+          text: "do something unrelated to planning",
+        })
+
         const dir = `${test.directory}/.opencode/plans`
         yield* Effect.promise(() => import("node:fs/promises").then((fs) => fs.mkdir(dir, { recursive: true })))
         const file = `${dir}/${Date.now() + 60_000}-${session.slug}.md`
@@ -261,6 +282,27 @@ describe("plan recover HttpApi", () => {
         expect(recovered.exists).toBe(true)
         expect(recovered.path).toBe(file)
         expect(recovered.recovered).toBe(false)
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
+    "reports no plan for a brand-new session with zero messages, without a directory scan",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const headers = { "x-opencode-directory": test.directory, "content-type": "application/json" }
+        // No messages at all -- this is the hot path every new session hits on its very
+        // first load. A session with no messages can never have generated its own plan
+        // file, so this must resolve instantly without touching the filesystem, unlike
+        // the anchor-missing-but-history-exists case above.
+        const session = yield* Session.use.create({ title: "plan-recover-brand-new" })
+
+        const info = yield* requestJson<{ path: string; exists: boolean }>(
+          pathFor(SessionPaths.plan, { sessionID: session.id }),
+          { headers },
+        )
+        expect(info.exists).toBe(false)
       }),
     { git: true, config: { formatter: false, lsp: false } },
   )

@@ -113,17 +113,29 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     // against the session itself instead of immediately reporting "no plan" --
     // resolvePlanFile's own directory-scan fallback can still find a real file
     // this way, matching the "Files Changed" tab which has no such blind spot.
+    //
+    // But a session with NO messages at all has never touched plan mode and
+    // cannot possibly have a plan file yet -- that's the overwhelmingly common
+    // case (every brand-new session hits this endpoint on its very first
+    // load), so skip resolvePlanFile's filesystem scan entirely here rather
+    // than doing unconditional directory I/O on every single session view.
+    // Only fall back to the full scan when there's actual history to have
+    // lost an anchor from.
     const resolvePlan = Effect.fn("SessionHttpApi.resolvePlan")(function* (input: {
       info: Session.Info
       instance: InstanceContext
       messages: SessionV1.WithParts[]
     }) {
-      const anchor = Session.planCycleAnchor(input.messages, input.info) ?? input.info
+      const anchor = Session.planCycleAnchor(input.messages, input.info)
+      if (!anchor && input.messages.length === 0) {
+        return { path: Session.plan(input.info, input.instance), exists: false as const }
+      }
+      const resolvedAnchor = anchor ?? input.info
       const path = yield* Session.resolvePlanFile({
         fs: fsSvc,
-        expected: Session.plan(anchor, input.instance),
-        since: anchor.time.created,
-        slug: anchor.slug,
+        expected: Session.plan(resolvedAnchor, input.instance),
+        since: resolvedAnchor.time.created,
+        slug: resolvedAnchor.slug,
       })
       const exists = yield* fsSvc.existsSafe(path)
       return { path, exists }
