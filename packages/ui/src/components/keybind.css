@@ -17,12 +17,13 @@
   color: var(--text-weak);
 }
 
-/* On a dark/filled button (e.g. primary), the default light opaque badge
-   reads as a stray light patch rather than part of the button. Use a
-   translucent white treatment that sits on top of whatever the button's
-   own background is instead. */
+/* The primary button's own background flips between a dark fill (light
+   theme) and a light fill (dark theme) via --icon-invert-base already
+   tracking that flip for its label/icon color. Mirror it here instead of
+   hardcoding white: a fixed white-on-white badge on a dark-theme primary
+   button (light fill) renders as a washed-out, barely legible digit. */
 [data-component="button"][data-variant="primary"] [data-component="keybind"] {
-  background: rgba(255, 255, 255, 0.16);
-  color: rgba(255, 255, 255, 0.7);
+  background: color-mix(in srgb, var(--icon-invert-base) 16%, transparent);
+  color: color-mix(in srgb, var(--icon-invert-base) 70%, transparent);
   box-shadow: none;
 }
