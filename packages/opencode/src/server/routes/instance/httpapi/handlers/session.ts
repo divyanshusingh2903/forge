@@ -1,6 +1,7 @@
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
 import { Agent } from "@/agent/agent"
 import { SessionV1 } from "@opencode-ai/core/v1/session"
+import type { InstanceContext } from "@/project/instance-context"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Command } from "@/command"
 import { Permission } from "@/permission"
@@ -106,20 +107,33 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       return yield* summary.diff({ sessionID: ctx.params.sessionID, messageID: ctx.query.messageID })
     })
 
-    const plan = Effect.fn("SessionHttpApi.plan")(function* (ctx: { params: { sessionID: SessionID } }) {
-      const info = yield* requireSession(ctx.params.sessionID)
-      const instance = yield* InstanceState.context
-      const messages = yield* session.messages({ sessionID: ctx.params.sessionID }).pipe(Effect.orDie)
-      const anchor = Session.planCycleAnchor(messages, info)
-      if (!anchor) return { path: Session.plan(info, instance), exists: false as const }
+    // Shared by `plan` and `planRecover`: locate this session's plan file. When
+    // planCycleAnchor finds no plan-mode stretch in history (e.g. the anchoring
+    // message got reordered/lost across a restart), fall back to resolving
+    // against the session itself instead of immediately reporting "no plan" --
+    // resolvePlanFile's own directory-scan fallback can still find a real file
+    // this way, matching the "Files Changed" tab which has no such blind spot.
+    const resolvePlan = Effect.fn("SessionHttpApi.resolvePlan")(function* (input: {
+      info: Session.Info
+      instance: InstanceContext
+      messages: SessionV1.WithParts[]
+    }) {
+      const anchor = Session.planCycleAnchor(input.messages, input.info) ?? input.info
       const path = yield* Session.resolvePlanFile({
         fs: fsSvc,
-        expected: Session.plan(anchor, instance),
+        expected: Session.plan(anchor, input.instance),
         since: anchor.time.created,
         slug: anchor.slug,
       })
       const exists = yield* fsSvc.existsSafe(path)
       return { path, exists }
+    })
+
+    const plan = Effect.fn("SessionHttpApi.plan")(function* (ctx: { params: { sessionID: SessionID } }) {
+      const info = yield* requireSession(ctx.params.sessionID)
+      const instance = yield* InstanceState.context
+      const messages = yield* session.messages({ sessionID: ctx.params.sessionID }).pipe(Effect.orDie)
+      return yield* resolvePlan({ info, instance, messages })
     })
 
     const planRecover = Effect.fn("SessionHttpApi.planRecover")(function* (ctx: {
@@ -130,28 +144,37 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       yield* SessionError.mapBusy(runState.assertNotBusy(ctx.params.sessionID))
       const instance = yield* InstanceState.context
       const messages = yield* session.messages({ sessionID: ctx.params.sessionID }).pipe(Effect.orDie)
-      let stale: Extract<SessionV1.Part, { type: "tool" }> | undefined
+
+      const isInterrupted = (metadata: unknown) =>
+        typeof metadata === "object" && metadata !== null && (metadata as Record<string, unknown>).interrupted === true
+
+      // A recoverable present_plan is either still stuck "running" (the
+      // question rendezvous was lost, e.g. across a restart) or was already
+      // marked interrupted by a previous call to this endpoint -- keep
+      // matching it afterwards too, so "continue" can still nudge the agent
+      // even after an earlier "discard" (see part B: the client's dock stays
+      // visible for both states via `needsRecovery`).
+      let target: Extract<SessionV1.Part, { type: "tool" }> | undefined
       for (const msg of messages) {
         for (const part of msg.parts) {
-          if (part.type === "tool" && part.tool === "present_plan" && part.state.status === "running") stale = part
+          if (part.type !== "tool" || part.tool !== "present_plan") continue
+          if (part.state.status === "running" || (part.state.status === "error" && isInterrupted(part.state.metadata)))
+            target = part
         }
       }
+
       let recovered = false
-      if (stale) {
+      if (target && target.state.status === "running") {
         const metadata =
-          "metadata" in stale.state &&
-          typeof stale.state.metadata === "object" &&
-          stale.state.metadata !== null
-            ? (stale.state.metadata as Record<string, unknown>)
+          "metadata" in target.state && typeof target.state.metadata === "object" && target.state.metadata !== null
+            ? (target.state.metadata as Record<string, unknown>)
             : {}
         const start =
-          "time" in stale.state && typeof stale.state.time?.start === "number"
-            ? stale.state.time.start
-            : Date.now()
+          "time" in target.state && typeof target.state.time?.start === "number" ? target.state.time.start : Date.now()
         yield* session.updatePart({
-          ...stale,
+          ...target,
           state: {
-            ...stale.state,
+            ...target.state,
             status: "error",
             error: "Tool execution interrupted",
             metadata: { ...metadata, interrupted: true },
@@ -160,16 +183,39 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
         })
         recovered = true
       }
-      const anchor = Session.planCycleAnchor(messages, info)
-      if (!anchor) return { path: Session.plan(info, instance), exists: false as const, recovered }
-      const path = yield* Session.resolvePlanFile({
-        fs: fsSvc,
-        expected: Session.plan(anchor, instance),
-        since: anchor.time.created,
-        slug: anchor.slug,
-      })
-      const exists = yield* fsSvc.existsSafe(path)
-      return { path, exists, recovered }
+
+      const { path, exists } = yield* resolvePlan({ info, instance, messages })
+
+      const action = ctx.payload.action ?? "discard"
+      let resumed = false
+      if (action === "continue" && target) {
+        const relative = path.startsWith(instance.worktree) ? path.slice(instance.worktree.length + 1) : path
+        const text = exists
+          ? `Your plan presentation was interrupted before I could answer. The plan file at ${relative} is unchanged -- call present_plan again to re-present it for review.`
+          : `Planning was interrupted before the plan file was written. Continue researching and writing the plan, then call present_plan when ready.`
+        yield* promptSvc
+          .prompt({
+            sessionID: ctx.params.sessionID,
+            messageID: MessageID.ascending(),
+            agent: "plan",
+            parts: [{ id: PartID.ascending(), type: "text", text }],
+          })
+          .pipe(
+            Effect.catchCause((cause) =>
+              Effect.gen(function* () {
+                yield* Effect.logError("plan_recover_continue failed", { sessionID: ctx.params.sessionID, cause })
+                yield* events.publish(Session.Event.Error, {
+                  sessionID: ctx.params.sessionID,
+                  error: new NamedError.Unknown({ message: Cause.pretty(cause) }).toObject(),
+                })
+              }),
+            ),
+            Effect.forkIn(scope, { startImmediately: true }),
+          )
+        resumed = true
+      }
+
+      return { path, exists, recovered, resumed }
     })
 
     const messages = Effect.fn("SessionHttpApi.messages")(function* (ctx: {

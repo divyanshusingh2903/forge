@@ -202,11 +202,11 @@ const ProjectPreviewPanel = (props: {
       <div class="text-14-medium text-text-strong truncate grow">{displayName(props.project)}</div>
     </div>
     <div class="px-4 pb-2 text-12-medium text-text-weak">{props.language.t("sidebar.project.recentSessions")}</div>
-    <div class="px-2 pb-2 flex flex-col gap-2">
+    <div class="px-2 pb-2 flex flex-col gap-2 max-h-96 overflow-y-auto">
       <Show
         when={props.workspaceEnabled()}
         fallback={
-          <For each={props.projectSessions().slice(0, 2)}>
+          <For each={props.projectSessions()}>
             {(session) => (
               <SessionItem
                 {...props.ctx.sessionProps}
@@ -232,7 +232,7 @@ const ProjectPreviewPanel = (props: {
                   </div>
                   <span class="truncate text-14-medium text-text-base">{props.label(directory)}</span>
                 </div>
-                <For each={sessions().slice(0, 2)}>
+                <For each={sessions()}>
                   {(session) => (
                     <SessionItem
                       {...props.ctx.sessionProps}
@@ -278,7 +278,7 @@ export const SortableProject = (props: {
   const language = useLanguage()
   const sortable = createSortable(props.project.worktree)
   const selected = createMemo(() => props.ctx.currentProject()?.worktree === props.project.worktree)
-  const workspaces = createMemo(() => props.ctx.workspaceIds(props.project).slice(0, 2))
+  const workspaces = createMemo(() => props.ctx.workspaceIds(props.project))
   const workspaceEnabled = createMemo(() => props.ctx.workspacesEnabled(props.project))
   const dirs = createMemo(() => props.ctx.workspaceIds(props.project))
   const [state, setState] = createStore({

@@ -62,7 +62,7 @@ export function SessionComposerRegion(props: {
           )}
         </Show>
 
-        <Show when={!controller.state.questionRequest() && plan.orphaned() && params.id} keyed>
+        <Show when={!controller.state.questionRequest() && plan.needsRecovery() && params.id} keyed>
           {(sessionID) => (
             <div>
               <SessionInterruptedDock

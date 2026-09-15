@@ -3737,16 +3737,14 @@ export class Session2 extends HeyApiClient {
   /**
    * Recover interrupted plan
    *
-   * Fail a stale running present_plan tool left behind by a restart so the session can continue. Never deletes the plan file.
+   * Fail a stale present_plan tool left behind by a restart. With action "continue" (default "discard"), also nudges the agent to re-present or continue the plan. Never deletes the plan file.
    */
   public planRecover<ThrowOnError extends boolean = false>(
     parameters: {
       sessionID: string
       directory?: string
       workspace?: string
-      body?: {
-        [key: string]: unknown
-      }
+      action?: "discard" | "continue"
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -3758,7 +3756,7 @@ export class Session2 extends HeyApiClient {
             { in: "path", key: "sessionID" },
             { in: "query", key: "directory" },
             { in: "query", key: "workspace" },
-            { key: "body", map: "body" },
+            { in: "body", key: "action" },
           ],
         },
       ],

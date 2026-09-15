@@ -516,13 +516,22 @@ function HomeProjectSessions(props: {
   language: ReturnType<typeof useLanguage>
 }) {
   const global = useGlobal()
-  const [store] = global.ensureServerCtx(props.server).sync.child(props.directory, { bootstrap: true })
+  const serverCtx = createMemo(() => global.ensureServerCtx(props.server))
+  const [store, setStore] = serverCtx().sync.child(props.directory, { bootstrap: true })
   const sessions = createMemo(() => sortedRootSessions(store, 0))
   // status goes "loading" -> "partial" -> "complete"; sessions are fetched as
   // one of several "slow" bootstrap tasks awaited before the "complete" flip,
   // so the actual loading window is spent in "partial", not "loading" --
   // checking only for "loading" would miss almost the whole fetch.
   const loading = createMemo(() => store.status !== "complete")
+  // Session lists are capped at SESSION_RECENT_LIMIT server-side; sessionTotal
+  // (an estimate -- see estimateRootSessionTotal) tells us whether there's more
+  // beyond what's currently loaded, mirroring sidebar-workspace.tsx's v1 pattern.
+  const hasMore = createMemo(() => store.sessionTotal > sessions().length)
+  const loadMore = async () => {
+    setStore("limit", (limit) => (limit ?? 0) + 5)
+    await serverCtx().sync.project.loadSessions(props.directory)
+  }
 
   return (
     <div class="flex min-w-0 flex-col gap-0.5 pl-6">
@@ -554,6 +563,11 @@ function HomeProjectSessions(props: {
               />
             )}
           </For>
+          <Show when={hasMore()}>
+            <HomeProjectNavButton type="button" class="h-6 text-[13px]" onClick={loadMore}>
+              <span class={HOME_PROJECT_NAV_LABEL}>{props.language.t("common.loadMore")}</span>
+            </HomeProjectNavButton>
+          </Show>
         </Show>
       </Show>
     </div>

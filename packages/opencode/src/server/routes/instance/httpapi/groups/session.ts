@@ -50,11 +50,14 @@ export const PlanInfo = Schema.Struct({
   path: Schema.String,
   exists: Schema.Boolean,
 })
-export const PlanRecoverPayload = Schema.Struct({})
+export const PlanRecoverPayload = Schema.Struct({
+  action: Schema.optional(Schema.Literals(["discard", "continue"])),
+})
 export const PlanRecoverResult = Schema.Struct({
   path: Schema.String,
   exists: Schema.Boolean,
   recovered: Schema.Boolean,
+  resumed: Schema.Boolean,
 })
 export const UpdatePayload = Schema.Struct({
   title: Schema.optional(Schema.String),
@@ -211,7 +214,7 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.planRecover",
             summary: "Recover interrupted plan",
             description:
-              "Fail a stale running present_plan tool left behind by a restart so the session can continue. Never deletes the plan file.",
+              "Fail a stale present_plan tool left behind by a restart. With action \"continue\" (default \"discard\"), also nudges the agent to re-present or continue the plan. Never deletes the plan file.",
           }),
         ),
         HttpApiEndpoint.get("messages", SessionPaths.messages, {

@@ -10,21 +10,42 @@ export function usePlanInfo(sessionId: () => string | undefined) {
   const sync = useSync()
   const file = useFile()
 
-  const pendingTool = createMemo(() => {
+  // Latest present_plan tool part by any status, not just "running" -- lets
+  // us tell a genuinely orphaned/pending call apart from one already marked
+  // failed (e.g. by a previous recover call), so the recovery affordance
+  // doesn't disappear the moment it's used once (see failedTool/needsRecovery
+  // below).
+  const latestPlanPart = createMemo(() => {
     const id = sessionId()
     if (!id) return undefined
     const messages = sync().data.message[id] ?? []
+    let latest: { messageID: string; callID: string; state: Extract<Part, { type: "tool" }>["state"] } | undefined
     for (const message of messages) {
       const parts = (sync().data.part[message.id] ?? []) as Part[]
       for (const part of parts) {
-        if (part.type === "tool" && part.tool === "present_plan" && part.state.status === "running")
-          return { messageID: message.id, callID: part.callID }
+        if (part.type === "tool" && part.tool === "present_plan")
+          latest = { messageID: message.id, callID: part.callID, state: part.state }
       }
     }
-    return undefined
+    return latest
+  })
+
+  const pendingTool = createMemo(() => {
+    const latest = latestPlanPart()
+    if (!latest || latest.state.status !== "running") return undefined
+    return { messageID: latest.messageID, callID: latest.callID }
   })
 
   const pending = createMemo(() => !!pendingTool())
+
+  // A present_plan already marked failed+interrupted (e.g. by a previous
+  // recover call, or by any other path that fails a stale tool call).
+  const failedTool = createMemo(() => {
+    const latest = latestPlanPart()
+    if (!latest || latest.state.status !== "error") return undefined
+    if (latest.state.metadata?.interrupted !== true) return undefined
+    return { messageID: latest.messageID, callID: latest.callID }
+  })
 
   const planKey = createMemo(() => {
     const id = sessionId()
@@ -91,6 +112,13 @@ export function usePlanInfo(sessionId: () => string | undefined) {
     return true
   })
 
+  // Whether the interrupted-session recovery dock should be offered: either
+  // still-orphaned (running, no live question) or already failed+interrupted
+  // by a previous recover call. Without the second half, clicking "Discard"
+  // (which marks the part failed but doesn't resume) would make the dock --
+  // and with it any way to later click "Recover" -- vanish for good.
+  const needsRecovery = createMemo(() => orphaned() || !!failedTool())
+
   return {
     // planKey changes on every new message, so this resource refetches constantly
     // during normal chat activity. Reading it as `.latest` (rather than calling it
@@ -111,5 +139,6 @@ export function usePlanInfo(sessionId: () => string | undefined) {
     pendingCallID: createMemo(() => pendingTool()?.callID),
     pendingRequest,
     orphaned,
+    needsRecovery,
   }
 }

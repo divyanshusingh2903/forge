@@ -153,6 +153,119 @@ describe("plan recover HttpApi", () => {
   )
 
   it.instance(
+    "action=continue forks a resume prompt without erroring, and stays idempotent on an already-interrupted part",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const headers = { "x-opencode-directory": test.directory, "content-type": "application/json" }
+        const session = yield* Session.use.create({ title: "plan-recover-continue" })
+
+        const user = yield* Session.use.updateMessage({
+          id: MessageID.ascending(),
+          role: "user",
+          sessionID: session.id,
+          agent: "plan",
+          model: { providerID: ProviderV2.ID.make("test"), modelID: ModelV2.ID.make("test") },
+          time: { created: Date.now() },
+        })
+        yield* Session.use.updatePart({
+          id: PartID.ascending(),
+          sessionID: session.id,
+          messageID: user.id,
+          type: "text",
+          text: "plan something",
+        })
+
+        const assistant = yield* Session.use.updateMessage({
+          id: MessageID.ascending(),
+          role: "assistant",
+          parentID: user.id,
+          sessionID: session.id,
+          mode: "plan",
+          agent: "plan",
+          cost: 0,
+          path: { cwd: "/tmp", root: "/tmp" },
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+          modelID: ModelV2.ID.make("test"),
+          providerID: ProviderV2.ID.make("test"),
+          time: { created: Date.now() },
+        })
+        yield* Session.use.updatePart({
+          id: PartID.ascending(),
+          sessionID: session.id,
+          messageID: assistant.id,
+          type: "tool",
+          tool: "present_plan",
+          callID: "call_continue",
+          state: { status: "running", input: {}, time: { start: Date.now() } },
+        })
+
+        // First call: the part is still "running" -- continue should mark it
+        // interrupted (recovered) AND resume, without the endpoint itself
+        // erroring even though there's no LLM configured in this test layer
+        // to actually answer the forked follow-up (that failure is caught and
+        // only logged/published as a Session.Event.Error, not surfaced here).
+        const first = yield* requestJson<{ path: string; exists: boolean; recovered: boolean; resumed: boolean }>(
+          pathFor(SessionPaths.planRecover, { sessionID: session.id }),
+          { method: "POST", headers, body: JSON.stringify({ action: "continue" }) },
+        )
+        expect(first.recovered).toBe(true)
+        expect(first.resumed).toBe(true)
+
+        const messages = yield* Session.use.messages({ sessionID: session.id }).pipe(
+          provideInstanceEffect(test.directory),
+          Effect.orDie,
+        )
+        const parts = messages.flatMap((msg) => msg.parts)
+        const tool = parts.find(
+          (part): part is SessionV1.ToolPart => part.type === "tool" && part.tool === "present_plan",
+        )
+        expect(tool?.state.status).toBe("error")
+
+        // Second call: the part is already error+interrupted -- continue
+        // should still resume (not a no-op) but must not re-mark it.
+        const second = yield* requestJson<{ path: string; exists: boolean; recovered: boolean; resumed: boolean }>(
+          pathFor(SessionPaths.planRecover, { sessionID: session.id }),
+          { method: "POST", headers, body: JSON.stringify({ action: "continue" }) },
+        )
+        expect(second.recovered).toBe(false)
+        expect(second.resumed).toBe(true)
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
+    "finds an existing plan file even when no plan-cycle anchor is found in history",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const headers = { "x-opencode-directory": test.directory, "content-type": "application/json" }
+        const session = yield* Session.use.create({ title: "plan-recover-no-anchor" })
+
+        const dir = `${test.directory}/.opencode/plans`
+        yield* Effect.promise(() => import("node:fs/promises").then((fs) => fs.mkdir(dir, { recursive: true })))
+        const file = `${dir}/${Date.now() + 60_000}-${session.slug}.md`
+        yield* Effect.promise(() => Bun.write(file, "# Plan\n\nSome plan content."))
+
+        const info = yield* requestJson<{ path: string; exists: boolean }>(
+          pathFor(SessionPaths.plan, { sessionID: session.id }),
+          { headers },
+        )
+        expect(info.exists).toBe(true)
+        expect(info.path).toBe(file)
+
+        const recovered = yield* requestJson<{ path: string; exists: boolean; recovered: boolean; resumed: boolean }>(
+          pathFor(SessionPaths.planRecover, { sessionID: session.id }),
+          { method: "POST", headers, body: JSON.stringify({}) },
+        )
+        expect(recovered.exists).toBe(true)
+        expect(recovered.path).toBe(file)
+        expect(recovered.recovered).toBe(false)
+      }),
+    { git: true, config: { formatter: false, lsp: false } },
+  )
+
+  it.instance(
     "returns 404 for unknown sessions",
     () =>
       Effect.gen(function* () {
