@@ -79,7 +79,7 @@ describe("focusTerminalById", () => {
     expect(document.activeElement?.tagName).toBe("TEXTAREA")
   })
 
-  test("falls back to terminal element focus", () => {
+  test("returns false without focusing or dispatching a synthetic event when the textarea isn't mounted yet", () => {
     document.body.innerHTML = `<div id="terminal-wrapper-two"><div data-component="terminal" tabindex="0"></div></div>`
     const terminal = document.querySelector('[data-component="terminal"]') as HTMLElement
     let pointerDown = false
@@ -89,9 +89,14 @@ describe("focusTerminalById", () => {
 
     const focused = focusTerminalById("two")
 
-    expect(focused).toBe(true)
-    expect(document.activeElement).toBe(terminal)
-    expect(pointerDown).toBe(true)
+    expect(focused).toBe(false)
+    expect(document.activeElement).not.toBe(terminal)
+    expect(pointerDown).toBe(false)
+  })
+
+  test("returns false for an unknown terminal id", () => {
+    document.body.innerHTML = ""
+    expect(focusTerminalById("missing")).toBe(false)
   })
 })
 

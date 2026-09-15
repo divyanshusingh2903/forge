@@ -1,9 +1,11 @@
 import { beforeAll, describe, expect, mock, test } from "bun:test"
 import { ServerScope } from "@/utils/server-scope"
+import { Persist, PersistTesting } from "@/utils/persist"
 
-let getWorkspaceTerminalCacheKey: typeof import("./terminal").getWorkspaceTerminalCacheKey
+let getSessionTerminalCacheKey: typeof import("./terminal").getSessionTerminalCacheKey
 let getLegacyTerminalStorageKeys: (dir: string, legacySessionID?: string) => string[]
 let migrateTerminalState: (value: unknown) => unknown
+let destroySessionTerminals: typeof import("./terminal").destroySessionTerminals
 
 beforeAll(async () => {
   mock.module("@solidjs/router", () => ({
@@ -19,19 +21,32 @@ beforeAll(async () => {
     }),
   }))
   const mod = await import("./terminal")
-  getWorkspaceTerminalCacheKey = mod.getWorkspaceTerminalCacheKey
+  getSessionTerminalCacheKey = mod.getSessionTerminalCacheKey
   getLegacyTerminalStorageKeys = mod.getLegacyTerminalStorageKeys
   migrateTerminalState = mod.migrateTerminalState
+  destroySessionTerminals = mod.destroySessionTerminals
 })
 
-describe("getWorkspaceTerminalCacheKey", () => {
-  test("uses workspace-only directory cache key", () => {
-    expect(String(getWorkspaceTerminalCacheKey("/repo"))).toBe("local\u0000/repo\u0000__workspace__")
+describe("getSessionTerminalCacheKey", () => {
+  test("keys by directory and session id", () => {
+    expect(String(getSessionTerminalCacheKey("/repo", "ses_1"))).toBe("local\u0000/repo\u0000ses_1")
   })
 
-  test("can include a server scope", () => {
-    expect(String(getWorkspaceTerminalCacheKey("/repo", "ssh:debian" as ServerScope))).toBe(
-      "ssh:debian\u0000/repo\u0000__workspace__",
+  test("differs per session in the same directory", () => {
+    expect(String(getSessionTerminalCacheKey("/repo", "ses_1"))).not.toBe(
+      String(getSessionTerminalCacheKey("/repo", "ses_2")),
+    )
+  })
+
+  test("differs per directory for the same session", () => {
+    expect(String(getSessionTerminalCacheKey("/repo-a", "ses_1"))).not.toBe(
+      String(getSessionTerminalCacheKey("/repo-b", "ses_1")),
+    )
+  })
+
+  test("differs per server scope", () => {
+    expect(String(getSessionTerminalCacheKey("/repo", "ses_1"))).not.toBe(
+      String(getSessionTerminalCacheKey("/repo", "ses_1", "ssh:debian" as ServerScope)),
     )
   })
 })
@@ -87,5 +102,47 @@ describe("migrateTerminalState", () => {
         { id: "two", title: "shell", titleNumber: 7 },
       ],
     })
+  })
+})
+
+describe("destroySessionTerminals", () => {
+  const seed = (dir: string, sessionID: string, value: { active?: string; all: unknown[] }) => {
+    const target = Persist.serverSession(ServerScope.local, dir, sessionID, "terminal")
+    PersistTesting.localStorageWithPrefix(target.storage!).setItem(target.key, JSON.stringify(value))
+    return target
+  }
+
+  const read = (target: { storage?: string; key: string }) =>
+    PersistTesting.localStorageWithPrefix(target.storage!).getItem(target.key)
+
+  test("removes the persisted terminal entry for that session", async () => {
+    const target = seed("/repo", "ses_destroy_1", { active: "pty_1", all: [{ id: "pty_1", title: "Terminal 1" }] })
+    expect(read(target)).not.toBeNull()
+
+    await destroySessionTerminals({ dir: "/repo", sessionID: "ses_destroy_1" })
+
+    expect(read(target)).toBeNull()
+  })
+
+  test("leaves other sessions in the same directory untouched", async () => {
+    seed("/repo", "ses_destroy_2", { active: "pty_2", all: [{ id: "pty_2", title: "Terminal 1" }] })
+    const other = seed("/repo", "ses_destroy_3", { active: "pty_3", all: [{ id: "pty_3", title: "Terminal 1" }] })
+
+    await destroySessionTerminals({ dir: "/repo", sessionID: "ses_destroy_2" })
+
+    expect(read(other)).not.toBeNull()
+  })
+
+  test("is safe to call twice for the same session (no cache/sdk, no throw)", async () => {
+    const target = seed("/repo", "ses_destroy_4", { active: "pty_4", all: [{ id: "pty_4", title: "Terminal 1" }] })
+
+    await destroySessionTerminals({ dir: "/repo", sessionID: "ses_destroy_4" })
+    await destroySessionTerminals({ dir: "/repo", sessionID: "ses_destroy_4" })
+
+    expect(read(target)).toBeNull()
+  })
+
+  test("is a no-op for a session that was never persisted", async () => {
+    await expect(destroySessionTerminals({ dir: "/repo", sessionID: "ses_never_existed" })).resolves.toBeUndefined()
   })
 })

@@ -5,7 +5,6 @@ import { useParams } from "@solidjs/router"
 import { useSDK, type DirectorySDK } from "./sdk"
 import type { Platform } from "./platform"
 import { useServerSDK } from "./server-sdk"
-import { base64Encode } from "@opencode-ai/core/util/encode"
 import { defaultTitle, titleNumber } from "./terminal-title"
 import { Persist, persisted, removePersisted } from "@/utils/persist"
 import { ScopedKey, ServerScope, type ServerScope as ServerScopeValue } from "@/utils/server-scope"
@@ -21,8 +20,7 @@ export type LocalPTY = {
   cursor?: number
 }
 
-const WORKSPACE_KEY = "__workspace__"
-const MAX_TERMINAL_SESSIONS = 20
+const MAX_TERMINAL_SESSIONS = 60
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -85,8 +83,12 @@ export function migrateTerminalState(value: unknown) {
   }
 }
 
-export function getWorkspaceTerminalCacheKey(dir: string, scope: ServerScopeValue = ServerScope.local) {
-  return ScopedKey.from(scope, dir, WORKSPACE_KEY)
+export function getSessionTerminalCacheKey(
+  dir: string,
+  sessionID: string,
+  scope: ServerScopeValue = ServerScope.local,
+) {
+  return ScopedKey.from(scope, dir, sessionID)
 }
 
 export function getLegacyTerminalStorageKeys(dir: string, legacySessionID?: string) {
@@ -94,7 +96,7 @@ export function getLegacyTerminalStorageKeys(dir: string, legacySessionID?: stri
   return [`${dir}/terminal/${legacySessionID}.v1`, `${dir}/terminal.v1`]
 }
 
-type TerminalSession = ReturnType<typeof createWorkspaceTerminalSession>
+type TerminalSession = ReturnType<typeof createSessionTerminalSession>
 
 type TerminalCacheEntry = {
   value: TerminalSession
@@ -113,23 +115,85 @@ const trimTerminal = (pty: LocalPTY) => {
   }
 }
 
-function terminalPersistTarget(scope: ServerScopeValue, dir: string, legacy?: string[]) {
-  return Persist.serverWorkspace(scope, dir, "terminal", legacy)
+function terminalPersistTarget(scope: ServerScopeValue, dir: string, sessionID: string, legacy?: string[]) {
+  return Persist.serverSession(scope, dir, sessionID, "terminal", legacy)
 }
 
+// Only the pieces needed for a best-effort pty.remove -- deliberately not the
+// full DirectorySDK, since a caller's sdk may be bound to a different
+// directory than the one being cleaned up (location is always built from
+// input.dir below, never from the sdk).
+type PtyRemovalSDK = Pick<DirectorySDK, "protocol" | "client" | "api">
+
+// Clears a single session's cached + persisted terminals. Best-effort backend
+// pty.remove when an sdk is available; always safe to call more than once for
+// the same session (empty cache/already-removed keys/404 pty.remove are all
+// no-ops) since archive/delete and the backend-pushed session.deleted event
+// can both race to call this for the same session.
+export async function destroySessionTerminals(input: {
+  dir: string
+  sessionID: string
+  scope?: ServerScopeValue
+  platform?: Platform
+  sdk?: PtyRemovalSDK
+}) {
+  const scope = input.scope ?? ServerScope.local
+  const key = getSessionTerminalCacheKey(input.dir, input.sessionID, scope)
+
+  const ptyIDs = new Set<string>()
+  for (const cache of caches) {
+    const entry = cache.get(key)
+    if (!entry) continue
+    for (const pty of entry.value.all()) ptyIDs.add(pty.id)
+    entry.value.clear()
+    entry.dispose()
+    cache.delete(key)
+  }
+
+  void removePersisted(terminalPersistTarget(scope, input.dir, input.sessionID), input.platform)
+  if (scope === ServerScope.local) {
+    for (const legacyKey of getLegacyTerminalStorageKeys(input.dir, input.sessionID)) {
+      void removePersisted({ key: legacyKey }, input.platform)
+    }
+  }
+
+  if (!input.sdk || ptyIDs.size === 0) return
+
+  // Use input.dir, not input.sdk.directory: a caller may pass an sdk bound to
+  // a different directory than the one being cleaned up (e.g. the home page
+  // archiving a session in a project that isn't the currently focused one).
+  const location = { directory: input.dir }
+  await Promise.all(
+    Array.from(ptyIDs, async (ptyID) => {
+      const removePromise =
+        (await input.sdk!.protocol) === "v1"
+          ? input.sdk!.client.pty.remove({ ptyID })
+          : input.sdk!.api.pty.remove({ ptyID, location })
+      await removePromise.catch(() => {
+        // Already gone (this client's own delete, or another client's) -- fine.
+      })
+    }),
+  ).catch(() => {})
+}
+
+// Compatibility shim for callers that only have a directory (e.g. resetting a
+// whole workspace on drop/rename): clears every cached/persisted terminal
+// entry for that directory, one session at a time. No backend pty.remove --
+// callers of this path historically didn't do one either.
 export function clearWorkspaceTerminals(
   dir: string,
   sessionIDs?: string[],
   platform?: Platform,
   scope: ServerScopeValue = ServerScope.local,
 ) {
-  const key = getWorkspaceTerminalCacheKey(dir, scope)
-  for (const cache of caches) {
-    const entry = cache.get(key)
-    entry?.value.clear()
+  for (const id of sessionIDs ?? []) {
+    const key = getSessionTerminalCacheKey(dir, id, scope)
+    for (const cache of caches) {
+      const entry = cache.get(key)
+      entry?.value.clear()
+    }
+    void removePersisted(terminalPersistTarget(scope, dir, id), platform)
   }
-
-  void removePersisted(terminalPersistTarget(scope, dir), platform)
 
   if (scope !== ServerScope.local) return
   const legacy = new Set(getLegacyTerminalStorageKeys(dir))
@@ -143,18 +207,18 @@ export function clearWorkspaceTerminals(
   }
 }
 
-function createWorkspaceTerminalSession(
+function createSessionTerminalSession(
   sdk: DirectorySDK,
   dir: string,
+  sessionID: string,
   scope: ServerScopeValue,
-  legacySessionID?: string,
+  legacy: string[],
 ) {
   const location = { directory: sdk.directory }
-  const legacy = scope === ServerScope.local ? getLegacyTerminalStorageKeys(dir, legacySessionID) : []
 
   const [store, setStore, _, ready] = persisted(
     {
-      ...terminalPersistTarget(scope, dir, legacy),
+      ...terminalPersistTarget(scope, dir, sessionID, legacy),
       migrate: migrateTerminalState,
     },
     createStore<{
@@ -164,6 +228,7 @@ function createWorkspaceTerminalSession(
       all: [],
     }),
   )
+
   const [ui, setUi] = createStore({
     focus: undefined as { request: number; id?: string; pending: boolean } | undefined,
   })
@@ -178,7 +243,8 @@ function createWorkspaceTerminalSession(
   const focusRequested = (id?: string) => {
     if (!id) return false
     if (!ui.focus || ui.focus.pending) return false
-    return !ui.focus.id || ui.focus.id === id
+    const result = !ui.focus.id || ui.focus.id === id
+    return result
   }
 
   const consumeFocus = (id: string) => {
@@ -454,6 +520,11 @@ function createWorkspaceTerminalSession(
   }
 }
 
+// Sentinel session id for terminals opened before a session exists yet (a
+// draft/new-session route with no params.id). Ordinary cache/persist key,
+// just scoped to "no session" instead of a real session id.
+export const NO_SESSION_ID = "__nosession__"
+
 export const { use: useTerminal, provider: TerminalProvider } = createSimpleContext({
   name: "Terminal",
   gate: false,
@@ -463,7 +534,8 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
     const params = useParams()
     const cache = new Map<string, TerminalCacheEntry>()
     const scope = () => serverSDK().scope
-    const directory = createMemo(() => base64Encode(sdk().directory))
+    const directory = createMemo(() => sdk().directory)
+    const sessionID = createMemo(() => params.id ?? NO_SESSION_ID)
 
     caches.add(cache)
     onCleanup(() => caches.delete(cache))
@@ -477,19 +549,19 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
 
     onCleanup(disposeAll)
 
-    const prune = () => {
-      while (cache.size > MAX_TERMINAL_SESSIONS) {
-        const first = cache.keys().next().value
-        if (!first) return
-        const entry = cache.get(first)
+    const prune = (activeKey: string) => {
+      if (cache.size <= MAX_TERMINAL_SESSIONS) return
+      for (const key of cache.keys()) {
+        if (cache.size <= MAX_TERMINAL_SESSIONS) return
+        if (key === activeKey) continue
+        const entry = cache.get(key)
         entry?.dispose()
-        cache.delete(first)
+        cache.delete(key)
       }
     }
 
-    const loadWorkspace = (dir: string, legacySessionID: string | undefined, serverScope: ServerScopeValue) => {
-      // Terminals are workspace-scoped so tabs persist while switching sessions in the same directory.
-      const key = getWorkspaceTerminalCacheKey(dir, serverScope)
+    const loadSession = (dir: string, id: string, serverScope: ServerScopeValue) => {
+      const key = getSessionTerminalCacheKey(dir, id, serverScope)
       const existing = cache.get(key)
       if (existing) {
         cache.delete(key)
@@ -498,49 +570,48 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
       }
 
       const entry = createRoot((dispose) => ({
-        value: createWorkspaceTerminalSession(sdk(), dir, serverScope, legacySessionID),
+        value: createSessionTerminalSession(sdk(), dir, id, serverScope, getLegacyTerminalStorageKeys(dir, id)),
         dispose,
       }))
 
       cache.set(key, entry)
-      prune()
+      prune(key)
       return entry.value
     }
 
-    const workspace = createMemo(() => loadWorkspace(directory(), params.id, scope()))
+    const session = createMemo(() => loadSession(directory(), sessionID(), scope()))
 
     createEffect(
       on(
-        () => ({ dir: directory(), id: params.id, scope: scope() }),
+        () => ({ dir: directory(), id: sessionID(), scope: scope() }),
         (next, prev) => {
           if (!prev?.dir) return
           if (next.dir === prev.dir && next.id === prev.id && next.scope === prev.scope) return
-          if (next.dir === prev.dir && next.id && next.scope === prev.scope) return
-          loadWorkspace(prev.dir, prev.id, prev.scope).trimAll()
+          loadSession(prev.dir, prev.id, prev.scope).trimAll()
         },
         { defer: true },
       ),
     )
 
     return {
-      ready: () => workspace().ready(),
-      all: () => workspace().all(),
-      active: () => workspace().active(),
-      new: (options?: { focus?: boolean }) => workspace().new(options),
-      update: (pty: Partial<LocalPTY> & { id: string }) => workspace().update(pty),
-      trim: (id: string) => workspace().trim(id),
-      trimAll: () => workspace().trimAll(),
-      clone: (id: string) => workspace().clone(id),
-      bind: () => workspace(),
-      open: (id: string) => workspace().open(id),
-      requestFocus: (id?: string) => workspace().requestFocus(id),
-      focusRequested: (id?: string) => workspace().focusRequested(id),
-      consumeFocus: (id: string) => workspace().consumeFocus(id),
-      cancelFocus: () => workspace().cancelFocus(),
-      close: (id: string) => workspace().close(id),
-      move: (id: string, to: number) => workspace().move(id, to),
-      next: () => workspace().next(),
-      previous: () => workspace().previous(),
+      ready: () => session().ready(),
+      all: () => session().all(),
+      active: () => session().active(),
+      new: (options?: { focus?: boolean }) => session().new(options),
+      update: (pty: Partial<LocalPTY> & { id: string }) => session().update(pty),
+      trim: (id: string) => session().trim(id),
+      trimAll: () => session().trimAll(),
+      clone: (id: string) => session().clone(id),
+      bind: () => session(),
+      open: (id: string) => session().open(id),
+      requestFocus: (id?: string) => session().requestFocus(id),
+      focusRequested: (id?: string) => session().focusRequested(id),
+      consumeFocus: (id: string) => session().consumeFocus(id),
+      cancelFocus: () => session().cancelFocus(),
+      close: (id: string) => session().close(id),
+      move: (id: string, to: number) => session().move(id, to),
+      next: () => session().next(),
+      previous: () => session().previous(),
     }
   },
 })

@@ -23,14 +23,13 @@ import { getTerminalHandoff, setTerminalHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
 
 export function TerminalPanel() {
-  const delays = [120, 240]
   const layout = useLayout()
   const terminal = useTerminal()
   const sdk = useSDK()
   const language = useLanguage()
   const command = useCommand()
   const settings = useSettings()
-  const { workspaceKey, view } = useSessionLayout()
+  const { sessionKey, view } = useSessionLayout()
 
   const opened = createMemo(() => view().terminal.opened())
   const size = createSizing()
@@ -61,6 +60,14 @@ export function TerminalPanel() {
     if (port) makeEventListener(port, "resize", sync)
   })
 
+  // Terminals are session-scoped now, so a session switch swaps to a
+  // different (initially disconnected) terminal set without this page
+  // remounting -- reset the recovery-in-flight map so a stale key from the
+  // previous session can't block the new session's own recovery.
+  createEffect(
+    on(sessionKey, () => setStore("recovered", {}), { defer: true }),
+  )
+
   createEffect(() => {
     if (!opened()) {
       setStore("autoCreated", false)
@@ -83,36 +90,12 @@ export function TerminalPanel() {
     ),
   )
 
-  const focus = (id: string) => {
-    focusTerminalById(id)
-
-    const frame = requestAnimationFrame(() => {
-      if (!opened()) return
-      if (terminal.active() !== id) return
-      focusTerminalById(id)
-    })
-
-    const timers = delays.map((ms) =>
-      window.setTimeout(() => {
-        if (!opened()) return
-        if (terminal.active() !== id) return
-        focusTerminalById(id)
-      }, ms),
-    )
-
-    return () => {
-      cancelAnimationFrame(frame)
-      for (const timer of timers) clearTimeout(timer)
-    }
-  }
-
   createEffect(
     on(
-      () => [opened(), terminal.active()] as const,
-      ([next, id]) => {
-        if (!next || !id) return
-        const stop = focus(id)
-        onCleanup(stop)
+      () => [opened(), terminal.active(), terminal.focusRequested(terminal.active())] as const,
+      ([next, id, requested]) => {
+        if (!next || !id || !requested) return
+        focusTerminalById(id)
       },
     ),
   )
@@ -132,7 +115,7 @@ export function TerminalPanel() {
     language.locale()
 
     setTerminalHandoff(
-      workspaceKey(),
+      sessionKey(),
       terminal.all().map((pty) =>
         terminalTabLabel({
           title: pty.title,
@@ -146,7 +129,7 @@ export function TerminalPanel() {
   const handoff = createMemo(() => {
     const dir = sdk().directory
     if (!dir) return []
-    return getTerminalHandoff(workspaceKey()) ?? []
+    return getTerminalHandoff(sessionKey()) ?? []
   })
 
   const all = terminal.all
@@ -287,7 +270,7 @@ export function TerminalPanel() {
                         icon="plus-small"
                         variant="ghost"
                         iconSize="large"
-                        onClick={() => terminal.new()}
+                        onClick={() => terminal.new({ focus: true })}
                         aria-label={language.t("command.terminal.new")}
                       />
                     </TooltipKeybind>
@@ -304,7 +287,7 @@ export function TerminalPanel() {
                           <div id={`terminal-wrapper-${id}`} class="absolute inset-0">
                             <Terminal
                               pty={pty()}
-                              autoFocus={opened()}
+                              autoFocus={terminal.focusRequested(id)}
                               onAutoFocus={() => terminal.consumeFocus(id)}
                               onConnect={() => markTerminalConnected(terminalRecoveryKey(pty()), id, ops.trim)}
                               onCleanup={ops.update}

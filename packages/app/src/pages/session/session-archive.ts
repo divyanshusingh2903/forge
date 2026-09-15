@@ -3,9 +3,11 @@ import { produce } from "solid-js/store"
 import { notifySessionTabsRemoved } from "@/components/titlebar-session-events"
 import { useLanguage } from "@/context/language"
 import { useSDK } from "@/context/sdk"
+import { useServerSDK } from "@/context/server-sdk"
 import { useServerSync } from "@/context/server-sync"
 import { useSync } from "@/context/sync"
 import { useTabs } from "@/context/tabs"
+import { destroySessionTerminals } from "@/context/terminal"
 import { errorMessage } from "@/pages/layout/helpers"
 import { useSessionKey } from "@/pages/session/session-layout"
 import { legacySessionHref, requireServerKey, sessionHref } from "@/utils/session-route"
@@ -15,6 +17,7 @@ export function useSessionArchive() {
   const language = useLanguage()
   const navigate = useNavigate()
   const sdk = useSDK()
+  const serverSDK = useServerSDK()
   const sync = useSync()
   const serverSync = useServerSync()
   const tabs = useTabs()
@@ -60,6 +63,17 @@ export function useSessionArchive() {
         sync().session.evict(sessionID)
         serverSync().homeSessions.remove(sessionID)
         navigateAfterRemoval(sessionID, session.parentID, nextSession?.id)
+        // Destroy (real pty.remove, since a live sdk is on hand) before the
+        // notify below -- that fires tabs.removeSessions synchronously via a
+        // window event, which also calls destroySessionTerminals but without
+        // an sdk. Whichever call runs first empties the cache, so the sdk-ful
+        // one must go first or the backend pty never actually gets removed.
+        void destroySessionTerminals({
+          dir: sdk().directory,
+          sessionID,
+          scope: serverSDK().scope,
+          sdk: sdk(),
+        })
         notifySessionTabsRemoved({ directory: sdk().directory, sessionIDs: [sessionID] })
       })
       .catch((err) => {

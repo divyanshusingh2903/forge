@@ -15,6 +15,7 @@ import type { LocalProject } from "@/context/layout"
 import { useLanguage } from "@/context/language"
 import { ServerConnection } from "@/context/server"
 import { sessionHasOpenTab, useTabs } from "@/context/tabs"
+import { destroySessionTerminals } from "@/context/terminal"
 import { compareSessionTime, displayName, errorMessage, projectForSession } from "@/pages/layout/helpers"
 import { useSessionTabAvatarState } from "@/pages/layout/project-avatar-state"
 import { pathKey } from "@/utils/path-key"
@@ -228,6 +229,13 @@ export function createHomeSessionsController(home: HomeController) {
             )
             homeSessions().remove(session.id)
           },
+          destroy: () =>
+            destroySessionTerminals({
+              dir: session.directory,
+              sessionID: session.id,
+              scope: ctx.sdk.scope,
+              sdk: ctx.sdk,
+            }),
           onError: (cause) =>
             showToast({
               title: language.t("common.requestFailed"),
