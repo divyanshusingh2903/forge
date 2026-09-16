@@ -22,9 +22,11 @@ const mcpTest = testEffect(
 
 interface OAuthMcpOptions {
   capabilities?: "tools" | "resources"
+  supportsRegistration?: boolean
 }
 
 function serveOAuthMcp(options: OAuthMcpOptions = {}) {
+  const supportsRegistration = options.supportsRegistration ?? true
   return Effect.acquireRelease(
     Effect.promise(async () => {
       const capabilities = options.capabilities ?? "tools"
@@ -78,7 +80,7 @@ function serveOAuthMcp(options: OAuthMcpOptions = {}) {
               issuer: origin,
               authorization_endpoint: `${origin}/authorize`,
               token_endpoint: `${origin}/token`,
-              registration_endpoint: `${origin}/register`,
+              ...(supportsRegistration ? { registration_endpoint: `${origin}/register` } : {}),
               response_types_supported: ["code"],
               grant_types_supported: ["authorization_code", "refresh_token"],
               token_endpoint_auth_methods_supported: ["none"],
@@ -146,6 +148,23 @@ mcpTest.instance("first connect to OAuth server shows needs_auth instead of fail
     const result = yield* mcp.add("test-oauth", remote(server.url))
 
     expect((result.status as Record<string, { status: string }>)["test-oauth"]).toEqual({ status: "needs_auth" })
+  }),
+)
+
+// Regresses a bug where an auth server without a registration_endpoint (e.g. GitHub's,
+// which requires a pre-registered clientId) surfaced as "failed" instead of
+// "needs_client_registration": the dynamic-client-registration error from the SDK is
+// neither an UnauthorizedError nor mentions "OAuth", so it must be classified as a
+// registration error independently of the generic auth-error check.
+mcpTest.instance("connect to OAuth server without dynamic client registration shows needs_client_registration", () =>
+  Effect.gen(function* () {
+    const server = yield* serveOAuthMcp({ supportsRegistration: false })
+    const mcp = yield* MCP.Service
+    const result = yield* mcp.add("test-oauth-no-dcr", remote(server.url))
+
+    expect((result.status as Record<string, { status: string }>)["test-oauth-no-dcr"]).toMatchObject({
+      status: "needs_client_registration",
+    })
   }),
 )
 

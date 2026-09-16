@@ -1,11 +1,14 @@
 import { Component, createMemo, Show } from "solid-js"
 import { useSync } from "@/context/sync"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Dialog } from "@opencode-ai/ui/dialog"
+import { IconButton } from "@opencode-ai/ui/icon-button"
 import { List } from "@opencode-ai/ui/list"
 import { Switch } from "@opencode-ai/ui/switch"
 import { McpIcon } from "@opencode-ai/ui/mcp-icon"
 import { useLanguage } from "@/context/language"
 import { useMcpToggle } from "@/context/mcp"
+import { DialogMcpConfigure } from "./dialog-mcp-configure"
 
 const statusLabels = {
   connected: "mcp.status.connected",
@@ -18,6 +21,7 @@ const statusLabels = {
 export const DialogSelectMcp: Component = () => {
   const sync = useSync()
   const language = useLanguage()
+  const dialog = useDialog()
 
   const items = createMemo(() =>
     Object.entries(sync().data.mcp ?? {})
@@ -75,7 +79,17 @@ export const DialogSelectMcp: Component = () => {
                   <span class="text-11-regular text-text-weaker truncate">{error()}</span>
                 </Show>
               </div>
-              <div onClick={(e) => e.stopPropagation()}>
+              <div class="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                {/* Linear and Notion support a normal browser OAuth flow via the switch below;
+                    only GitHub needs a manually-supplied token or OAuth App client ID. */}
+                <Show when={i.name === "github"}>
+                  <IconButton
+                    icon="settings-gear"
+                    variant="ghost"
+                    aria-label={language.t("mcp.configure.action")}
+                    onClick={() => dialog.push(() => <DialogMcpConfigure name={i.name} />)}
+                  />
+                </Show>
                 <Switch
                   checked={enabled()}
                   disabled={status() === "pending" || (toggle.isPending && toggle.variables === i.name)}

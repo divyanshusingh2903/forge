@@ -10,7 +10,7 @@ import fsNode from "fs/promises"
 import { Flag } from "@opencode-ai/core/flag/flag"
 import { Auth } from "../auth"
 import { Env } from "../env"
-import { applyEdits, modify } from "jsonc-parser"
+import { applyEdits, findNodeAtLocation, getNodeValue, modify, parseTree } from "jsonc-parser"
 import { InstallationLocal, InstallationVersion } from "@opencode-ai/core/installation/version"
 import { existsSync } from "fs"
 import { Account } from "@/account/account"
@@ -173,7 +173,18 @@ function globalConfigFile() {
 }
 
 function patchJsonc(input: string, patch: unknown, path: string[] = []): string {
-  if (!isRecord(patch)) {
+  // Recursing into a record only works if the existing value at this path is itself
+  // a record (or absent) — jsonc-parser can't add a property to a non-object parent
+  // (e.g. replacing `oauth: false` with `oauth: { clientId: ... }`). When the current
+  // value is a scalar/array, replace it wholesale instead of merging into it.
+  const currentIsRecord = () => {
+    if (path.length === 0) return true
+    const tree = parseTree(input)
+    const node = tree ? findNodeAtLocation(tree, path) : undefined
+    return node === undefined || isRecord(getNodeValue(node))
+  }
+
+  if (!isRecord(patch) || !currentIsRecord()) {
     const edits = modify(input, path, patch, {
       formattingOptions: {
         insertSpaces: true,

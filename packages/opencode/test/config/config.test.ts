@@ -399,6 +399,43 @@ it.effect("updates global config and omits empty shell key in jsonc", () =>
   ),
 )
 
+// Regresses a crash where switching an mcp server's `oauth` field from the scalar
+// `false` to an object (e.g. github's "personal access token" -> "OAuth app" mode in
+// the app's MCP configure dialog) threw "Can not add index to parent of type boolean"
+// from jsonc-parser, because patchJsonc recursed into `oauth.clientId` as if `oauth`
+// were already an object on disk.
+it.effect("updateGlobal replaces a scalar oauth field with an object instead of crashing", () =>
+  withGlobalConfig(
+    {
+      config: {
+        mcp: {
+          github: { type: "remote", url: "https://api.githubcopilot.com/mcp/", enabled: true, oauth: false },
+        },
+      },
+      name: "opencode.jsonc",
+    },
+    ({ dir }) =>
+      Effect.gen(function* () {
+        const updated = yield* Config.use.updateGlobal({
+          mcp: {
+            github: {
+              type: "remote",
+              url: "https://api.githubcopilot.com/mcp/",
+              enabled: true,
+              oauth: { clientId: "abc" },
+            },
+          },
+        })
+        expect(updated.info.mcp?.github).toMatchObject({ oauth: { clientId: "abc" } })
+
+        const file = path.join(dir, "opencode.jsonc")
+        const writtenConfig = yield* FSUtil.use.readFileString(file)
+        const parsed = ConfigParse.schema(ConfigV1.Info, ConfigParse.jsonc(writtenConfig, file), file)
+        expect(parsed.mcp?.github).toMatchObject({ oauth: { clientId: "abc" } })
+      }),
+  ),
+)
+
 it.effect("logs global update diagnostics once without exposing values", () =>
   withGlobalConfig(
     {
