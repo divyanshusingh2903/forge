@@ -330,8 +330,25 @@ export const dict = {
   "mcp.status.connected": "connected",
   "mcp.status.failed": "failed",
   "mcp.status.needs_auth": "needs auth",
+  "mcp.status.needs_client_registration": "needs setup",
   "mcp.status.disabled": "disabled",
   "mcp.auth.clickToAuthenticate": "Click to authenticate",
+
+  "mcp.configure.action": "Configure",
+  "mcp.configure.title": "Configure {{name}}",
+  "mcp.configure.mode.token": "Personal access token",
+  "mcp.configure.mode.oauth": "OAuth app",
+  "mcp.configure.token.label": "Personal access token",
+  "mcp.configure.token.placeholder": "ghp_...",
+  "mcp.configure.token.description": "Sent as an Authorization: Bearer header. OAuth is bypassed.",
+  "mcp.configure.token.required": "A token is required",
+  "mcp.configure.oauth.clientId.label": "Client ID",
+  "mcp.configure.oauth.clientId.placeholder": "Your OAuth App's client ID",
+  "mcp.configure.oauth.clientId.required": "A client ID is required",
+  "mcp.configure.oauth.clientSecret.label": "Client secret",
+  "mcp.configure.oauth.clientSecret.placeholder": "Optional",
+  "mcp.configure.oauth.clientSecret.description": "Required by most OAuth apps that support a confidential client.",
+  "mcp.configure.toast.saved.title": "{{name}} configured",
 
   "dialog.fork.empty": "No messages to fork from",
 
@@ -679,8 +696,10 @@ export const dict = {
   "session.plan.enteredToast": "Switched to Plan mode",
   "session.plan.openButton": "Open Plan",
   "session.plan.interrupted.title": "Session interrupted",
-  "session.plan.interrupted.withPlan": "The app restarted before you answered. Your plan is still here — recover to re-present it for review.",
-  "session.plan.interrupted.noPlan": "The app restarted before the plan was ready. Recover to have the agent continue planning.",
+  "session.plan.interrupted.withPlan":
+    "The app restarted before you answered. Your plan is still here — recover to re-present it for review.",
+  "session.plan.interrupted.noPlan":
+    "The app restarted before the plan was ready. Recover to have the agent continue planning.",
   "session.plan.recover": "Recover",
   "session.plan.discard": "Discard",
   "session.plan.dismiss": "Dismiss",

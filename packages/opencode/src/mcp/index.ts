@@ -291,11 +291,15 @@ const layer = Layer.effect(
           Effect.map((client) => ({ client, transportName: name })),
           Effect.catch((error) => {
             const lastError = error instanceof Error ? error : new Error(String(error))
+            const isRegistrationError =
+              lastError.message.includes("registration") || lastError.message.includes("client_id")
             const isAuthError =
-              error instanceof UnauthorizedError || (authProvider && lastError.message.includes("OAuth"))
+              error instanceof UnauthorizedError ||
+              isRegistrationError ||
+              (authProvider && lastError.message.includes("OAuth"))
 
             if (isAuthError) {
-              if (lastError.message.includes("registration") || lastError.message.includes("client_id")) {
+              if (isRegistrationError) {
                 lastStatus = {
                   status: "needs_client_registration" as const,
                   error: "Server does not support dynamic client registration. Please provide clientId in config.",

@@ -1,6 +1,7 @@
 import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Icon } from "@opencode-ai/ui/icon"
+import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Switch } from "@opencode-ai/ui/switch"
 import { McpIcon } from "@opencode-ai/ui/mcp-icon"
 import { Tabs } from "@opencode-ai/ui/tabs"
@@ -412,54 +413,72 @@ export function StatusPopoverBody(props: { shown: Accessor<boolean> }) {
                     const status = () => mcpStatus(name)
                     const enabled = () => status() === "connected"
                     return (
-                      <button
-                        type="button"
-                        class="flex items-center gap-2 w-full min-h-8 pl-3 pr-2 py-1 rounded-md hover:bg-surface-raised-base-hover transition-colors text-left"
-                        onClick={() => {
-                          if (toggleMcp.isPending) return
-                          toggleMcp.mutate(name)
-                        }}
-                        disabled={toggleMcp.isPending && toggleMcp.variables === name}
-                      >
-                        <div
-                          classList={{
-                            "size-1.5 rounded-full shrink-0": true,
-                            "bg-icon-success-base": status() === "connected",
-                            "bg-icon-critical-base": status() === "failed",
-                            "bg-border-weak-base": status() === "disabled",
-                            "bg-icon-warning-base":
-                              status() === "needs_auth" || status() === "needs_client_registration",
+                      <div class="flex items-center gap-1">
+                        <button
+                          type="button"
+                          class="flex items-center gap-2 flex-1 min-w-0 min-h-8 pl-3 pr-2 py-1 rounded-md hover:bg-surface-raised-base-hover transition-colors text-left"
+                          onClick={() => {
+                            if (toggleMcp.isPending) return
+                            toggleMcp.mutate(name)
                           }}
-                        />
-                        <span class="flex flex-col min-w-0 flex-1">
-                          <span class="flex items-center gap-2 min-w-0">
-                            <McpIcon id={name} class="size-4 shrink-0" />
-                            <span class="text-14-regular text-text-base truncate">{name}</span>
-                          </span>
-                          <Show when={toggleMcp.isPending && toggleMcp.variables === name}>
-                            <span class="text-11-regular text-text-weaker truncate">
-                              {language.t("common.loading")}
-                            </span>
-                          </Show>
-                          <Show
-                            when={!(toggleMcp.isPending && toggleMcp.variables === name) && status() === "needs_auth"}
-                          >
-                            <span class="text-11-regular text-text-weaker truncate">
-                              {language.t("mcp.auth.clickToAuthenticate")}
-                            </span>
-                          </Show>
-                        </span>
-                        <div onClick={(event) => event.stopPropagation()}>
-                          <Switch
-                            checked={enabled()}
-                            disabled={toggleMcp.isPending && toggleMcp.variables === name}
-                            onChange={() => {
-                              if (toggleMcp.isPending) return
-                              toggleMcp.mutate(name)
+                          disabled={toggleMcp.isPending && toggleMcp.variables === name}
+                        >
+                          <div
+                            classList={{
+                              "size-1.5 rounded-full shrink-0": true,
+                              "bg-icon-success-base": status() === "connected",
+                              "bg-icon-critical-base": status() === "failed",
+                              "bg-border-weak-base": status() === "disabled",
+                              "bg-icon-warning-base":
+                                status() === "needs_auth" || status() === "needs_client_registration",
                             }}
                           />
-                        </div>
-                      </button>
+                          <span class="flex flex-col min-w-0 flex-1">
+                            <span class="flex items-center gap-2 min-w-0">
+                              <McpIcon id={name} class="size-4 shrink-0" />
+                              <span class="text-14-regular text-text-base truncate">{name}</span>
+                            </span>
+                            <Show when={toggleMcp.isPending && toggleMcp.variables === name}>
+                              <span class="text-11-regular text-text-weaker truncate">
+                                {language.t("common.loading")}
+                              </span>
+                            </Show>
+                            <Show
+                              when={!(toggleMcp.isPending && toggleMcp.variables === name) && status() === "needs_auth"}
+                            >
+                              <span class="text-11-regular text-text-weaker truncate">
+                                {language.t("mcp.auth.clickToAuthenticate")}
+                              </span>
+                            </Show>
+                          </span>
+                          <div onClick={(event) => event.stopPropagation()}>
+                            <Switch
+                              checked={enabled()}
+                              disabled={toggleMcp.isPending && toggleMcp.variables === name}
+                              onChange={() => {
+                                if (toggleMcp.isPending) return
+                                toggleMcp.mutate(name)
+                              }}
+                            />
+                          </div>
+                        </button>
+                        {/* Linear and Notion support a normal browser OAuth flow via the switch above;
+                            only GitHub needs a manually-supplied token or OAuth App client ID. */}
+                        <Show when={name === "github"}>
+                          <IconButton
+                            icon="settings-gear"
+                            variant="ghost"
+                            aria-label={language.t("mcp.configure.action")}
+                            onClick={() => {
+                              const run = ++dialogRun
+                              void import("./dialog-mcp-configure").then((x) => {
+                                if (dialogDead || dialogRun !== run) return
+                                dialog.push(() => <x.DialogMcpConfigure name={name} />)
+                              })
+                            }}
+                          />
+                        </Show>
+                      </div>
                     )
                   }}
                 </For>
