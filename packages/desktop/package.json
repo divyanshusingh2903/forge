@@ -4,10 +4,11 @@
   "version": "1.18.30",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://opencode.ai",
+  "description": "A personal, human-in-the-loop fork of OpenCode.",
+  "homepage": "https://github.com/divyanshusingh2903/forge",
   "author": {
-    "name": "OpenCode",
-    "email": "hello@opencode.ai"
+    "name": "Divyanshu Singh",
+    "email": "divyanshusingh2903@gmail.com"
   },
   "scripts": {
     "typecheck": "tsgo -b",

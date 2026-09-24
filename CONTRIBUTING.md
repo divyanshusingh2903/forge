@@ -134,8 +134,26 @@ bun run --cwd packages/desktop dev
 To create a production build and package the app:
 
 ```bash
-bun run --cwd packages/desktop build
-bun run --cwd packages/desktop package
+NODE_OPTIONS=--max-old-space-size=8192 OPENCODE_CHANNEL=prod bun run --cwd packages/desktop build
+OPENCODE_CHANNEL=prod bun run --cwd packages/desktop package:linux
+```
+
+- `OPENCODE_CHANNEL` selects which icons/app id/product name get baked in (`dev`, `beta`, or `prod` — defaults to `dev` if omitted). `build` must run with the same channel you intend to package, since it copies that channel's resources.
+- `NODE_OPTIONS=--max-old-space-size=8192` raises Node's default heap limit; the `electron-vite build` step for the renderer bundle can exceed Node's default ~2GB ceiling and crash with an out-of-memory error otherwise. Lower it if you don't have 8GB free, or drop it entirely if your build doesn't hit the limit.
+- Swap `package:linux` for `package:mac` / `package:win` depending on your platform (or plain `package` to build for the current platform using electron-builder's defaults). Artifacts land in `packages/desktop/dist/`.
+
+To install a Linux build locally:
+
+```bash
+sudo apt install ./packages/desktop/dist/forge-desktop-linux-amd64.deb   # Debian/Ubuntu
+sudo rpm -i packages/desktop/dist/forge-desktop-linux-x86_64.rpm         # Fedora/RHEL
+```
+
+or just run the AppImage directly without installing:
+
+```bash
+chmod +x packages/desktop/dist/forge-desktop-linux-x86_64.AppImage
+./packages/desktop/dist/forge-desktop-linux-x86_64.AppImage
 ```
 
 > [!NOTE]

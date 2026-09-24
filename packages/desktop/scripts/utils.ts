@@ -13,6 +13,25 @@ export function resolveChannel(): Channel {
   return "dev"
 }
 
+// Local (non-CI) builds never set OPENCODE_VERSION, so @opencode-ai/script falls back to a
+// "0.0.0-<channel>-<timestamp>" placeholder baked into the CLI bundle as OPENCODE_VERSION. That
+// placeholder fails the real opencode.ai Console API's minimum-client-version check for the
+// bundled free-tier provider ("OpenCode 1.18.0 or newer is required"). Resolve a real version
+// from the same npm registry the official release pipeline reads from, so local builds report a
+// version the Console API actually recognizes.
+export async function resolveOpencodeVersion(): Promise<string> {
+  if (Bun.env.OPENCODE_VERSION) return Bun.env.OPENCODE_VERSION
+  try {
+    const res = await fetch("https://registry.npmjs.org/opencode-ai/latest")
+    if (!res.ok) throw new Error(res.statusText)
+    const data = (await res.json()) as { version?: string }
+    if (data.version) return data.version
+  } catch (error) {
+    console.warn("Failed to resolve latest opencode-ai version, falling back to a pinned version", error)
+  }
+  return "1.18.30"
+}
+
 export const CLI_BINARIES: Array<{ rustTarget: string; package: string; os: string; cpu: string }> = [
   {
     rustTarget: "aarch64-apple-darwin",

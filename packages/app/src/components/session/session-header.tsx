@@ -1,5 +1,6 @@
 import { AppIcon } from "@opencode-ai/ui/app-icon"
 import { Button } from "@opencode-ai/ui/button"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { DropdownMenu } from "@opencode-ai/ui/dropdown-menu"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
@@ -523,11 +524,21 @@ export function SessionHeaderQuickActions(props: {
 }) {
   const language = useLanguage()
   const settings = useSettings()
+  const dialog = useDialog()
   const showTerminal = props.terminal ?? true
   // Only call useTerminal() when this instance actually renders the terminal button --
   // routes without TerminalProvider (the draft/new-session page) would otherwise throw.
   const terminal = showTerminal ? useTerminal() : undefined
   const { view } = useSessionLayout()
+
+  let mcpDialogRun = 0
+  const openMcpDialog = () => {
+    const run = ++mcpDialogRun
+    void import("../dialog-select-mcp").then((x) => {
+      if (mcpDialogRun !== run) return
+      dialog.show(() => <x.DialogSelectMcp />)
+    })
+  }
 
   const statusVisible = settings.visibility.status
   const reviewDiffs = props.diffs ?? (() => [])
@@ -559,6 +570,17 @@ export function SessionHeaderQuickActions(props: {
       <Show when={props.plan ?? true}>
         <SessionPlanIndicator />
       </Show>
+      <TooltipV2 value={language.t("command.mcp.toggle")} placement="bottom">
+        <IconButtonV2
+          type="button"
+          variant="ghost-muted"
+          size="large"
+          class="!w-9 shrink-0"
+          aria-label={language.t("command.mcp.toggle")}
+          onClick={openMcpDialog}
+          icon={<IconV2 name="mcp" />}
+        />
+      </TooltipV2>
       <Show when={showTerminal}>
         <TooltipV2 value={language.t("command.terminal.toggle")} placement="bottom">
           <IconButtonV2
