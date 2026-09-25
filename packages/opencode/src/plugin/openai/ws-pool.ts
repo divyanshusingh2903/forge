@@ -1,8 +1,8 @@
 import WebSocket from "ws"
-import { existsSync } from "node:fs"
-import { appendFile } from "node:fs/promises"
-import path from "node:path"
-import { Global } from "@opencode-ai/core/global"
+// import { existsSync } from "node:fs"
+// import { appendFile } from "node:fs/promises"
+// import path from "node:path"
+// import { Global } from "@opencode-ai/core/global"
 import { ProviderError } from "@/provider/error"
 import { isRecord } from "@/util/record"
 import { OpenAIWebSocket } from "./ws"
@@ -10,30 +10,26 @@ import { OpenAIWebSocket } from "./ws"
 export const TITLE_HEADER = "x-opencode-title"
 export const CONTINUATION_HEADER = "x-openai-oauth-continuation"
 
-// Temporary, opt-in diagnostic for verifying the continuation mechanism
-// against a real backend. Writes into the same opencode.log the rest of the
-// app already uses, tagged so it's easy to `grep` for. Remove once the
-// mechanism has been confirmed against a live ChatGPT Codex session.
-//
-// Checked via a marker file rather than only an env var: the desktop app's
-// dev launcher (electron-vite) does not forward custom env vars down to the
-// spawned Electron/sidecar process, so `touch`ing this file is the one
-// enable-switch that reliably reaches the backend regardless of entry point
-// (plain CLI, `bun dev`, or the packaged/dev desktop app).
-const CONTINUATION_DEBUG =
-  process.env.OPENCODE_DEBUG_CONTINUATION === "1" || existsSync(path.join(Global.Path.data, "debug-continuation"))
+// Diagnostic for verifying the continuation mechanism against a real backend.
+// Enable via OPENCODE_DEBUG_CONTINUATION=1, or (desktop dev builds don't
+// forward env vars to the sidecar) by touching
+// <Global.Path.data>/debug-continuation.
+// const CONTINUATION_DEBUG =
+//   process.env.OPENCODE_DEBUG_CONTINUATION === "1" || existsSync(path.join(Global.Path.data, "debug-continuation"))
+const CONTINUATION_DEBUG = false
 
-function debugLog(sessionKey: string, message: string, detail?: Record<string, unknown>) {
-  if (!CONTINUATION_DEBUG) return
-  const suffix = detail
-    ? " " +
-      Object.entries(detail)
-        .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
-        .join(" ")
-    : ""
-  const line = `${new Date().toISOString()} level=INFO run=continuation message="openai-continuation: ${message}" session=${sessionKey}${suffix}\n`
-  appendFile(path.join(Global.Path.log, "opencode.log"), line).catch(() => {})
-}
+// function debugLog(sessionKey: string, message: string, detail?: Record<string, unknown>) {
+//   if (!CONTINUATION_DEBUG) return
+//   const suffix = detail
+//     ? " " +
+//       Object.entries(detail)
+//         .map(([key, value]) => `${key}=${JSON.stringify(value)}`)
+//         .join(" ")
+//     : ""
+//   const line = `${new Date().toISOString()} level=INFO run=continuation message="openai-continuation: ${message}" session=${sessionKey}${suffix}\n`
+//   appendFile(path.join(Global.Path.log, "opencode.log"), line).catch(() => {})
+// }
+function debugLog(_sessionKey: string, _message: string, _detail?: Record<string, unknown>) {}
 
 export interface CreateWebSocketFetchOptions {
   httpFetch?: typeof globalThis.fetch
@@ -51,9 +47,7 @@ interface PoolEntry {
   busy: boolean
   fallback: boolean
   streamFailures: number
-  // Continuation checkpoint for the last successfully completed turn on this
-  // connection. Cleared (lastResponseId undefined) whenever the next request
-  // isn't a safe incremental extension of it, forcing a full resend.
+  // Continuation checkpoint for this connection's last completed turn.
   lastResponseId?: string
   lastInvariant?: unknown
   lastInputItems?: unknown[]
@@ -143,10 +137,8 @@ export function createWebSocketFetch(options?: CreateWebSocketFetchOptions) {
     entry.busy = true
     entry.lastUsedAt = Date.now()
     try {
-      // Rotating (or otherwise reconnecting) an entry clears its checkpoint, so
-      // this must resolve before eligibility is computed below -- otherwise a
-      // checkpoint that's about to be invalidated by a rotation would still look
-      // usable.
+      // Must resolve before eligibility is computed below: rotating the
+      // socket clears the checkpoint, so a rotation has to happen first.
       entry.socket = await socket(
         entry,
         options?.url ?? url,
@@ -185,13 +177,8 @@ export function createWebSocketFetch(options?: CreateWebSocketFetchOptions) {
             }
           }
         }
-        // Confirmed against the live Codex backend: it rejects `store: true`
-        // outright ("Store must be set to false"). previous_response_id
-        // referencing still works with `store: false` left as-is here --
-        // unlike the public Responses API, this backend evidently keeps the
-        // conversation referenceable through the live socket itself, matching
-        // codex-rs's own behavior (store is hardcoded false unconditionally,
-        // even on its incremental-continuation path).
+        // Do not touch body.store here: the live Codex backend rejects
+        // `store: true` outright, unlike the public Responses API.
       }
 
       let resolveFirstEvent: (event: boolean | OpenAIWebSocket.WrappedError) => void = () => {}
@@ -216,17 +203,13 @@ export function createWebSocketFetch(options?: CreateWebSocketFetchOptions) {
           if (continuation) streamedOutputItems.push(item)
         },
         onComplete: (event) => {
-          // Plain API-key requests never carry the continuation header, so their
-          // completions must never seed a checkpoint another request could read.
           if (!continuation) return
           const completion = isRecord(event.response) ? event.response : undefined
           const responseId = typeof completion?.id === "string" ? completion.id : undefined
           // The Codex backend's terminal event routinely omits or empties
-          // `output` (confirmed live), unlike the public Responses API this
-          // client's assumptions were originally based on -- so the items
-          // streamed via response.output_item.done during the turn are the
-          // primary source, with a non-empty terminal `output` array (when
-          // present) preferred as the more authoritative, fully-reconciled copy.
+          // `output` (confirmed live), so the streamed output_item.done items
+          // are the primary source; a non-empty terminal `output` is preferred
+          // when present.
           const terminalOutput = Array.isArray(completion?.output) ? completion.output : undefined
           const output =
             terminalOutput && terminalOutput.length > 0
@@ -276,10 +259,10 @@ export function createWebSocketFetch(options?: CreateWebSocketFetchOptions) {
           const limitError = connectionLimitError(event)
           if (limitError) throw limitError
 
-          // The Codex backend rejects a stale/unknown previous_response_id as a
-          // plain invalid_request_error with no distinguishing code, so treat any
-          // otherwise-unhandled rejection of a continuation attempt as staleness:
-          // drop the checkpoint and retry once, in full, on a fresh connection.
+          // Codex rejects a stale previous_response_id with a plain
+          // invalid_request_error and no distinguishing code, so any
+          // unhandled rejection of a continuation attempt is treated as
+          // staleness: drop the checkpoint and retry once in full.
           if (!continuation || continuationRetried || started || body.previous_response_id === undefined || !fullInput)
             return undefined
 
@@ -444,16 +427,12 @@ export function withoutInternalHeaders<T extends { headers?: HeadersInit }>(init
   }
 }
 
-// Everything except `input`/`previous_response_id`/`store` -- i.e. model, tools,
-// instructions, and any other request configuration that must stay identical
-// for a later request to safely continue this connection's response chain.
+// Request config that must stay identical across turns to safely continue.
 function invariantOf(body: Record<string, unknown>) {
   const { input: _input, previous_response_id: _previousResponseId, store: _store, ...rest } = body
   return canonicalize(rest)
 }
 
-// Key-sorted so two semantically-identical bodies compare equal regardless of
-// property insertion order.
 function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize)
   if (value && typeof value === "object") {
@@ -478,14 +457,10 @@ function startsWithBaseline(input: unknown[], baseline: unknown[]) {
   return true
 }
 
-// Whether `actual` matches `expected` on every field `actual` itself carries,
-// ignoring anything extra in `expected`. This is needed, not just a
-// convenience: an assistant message Forge reconstructs for the next turn's
-// history (from its own generic message model) is a strict subset of the raw
-// item the provider streamed back live -- e.g. it omits `id`/`type`/`status`
-// and drops empty `annotations`/`logprobs` from content blocks. Full
-// deep-equality between the two would never match, defeating continuation on
-// every single turn (confirmed live before this fix).
+// Matches `actual` against `expected` on every field `actual` carries,
+// ignoring extras in `expected` -- confirmed live that Forge's reconstructed
+// history is a strict subset of the raw item the provider streamed back
+// (e.g. it omits `id`/`type`/`status`), so full deep-equality never matches.
 function isSubset(actual: unknown, expected: unknown): boolean {
   if (Array.isArray(actual)) {
     return Array.isArray(expected) && actual.length === expected.length && actual.every((item, i) => isSubset(item, expected[i]))

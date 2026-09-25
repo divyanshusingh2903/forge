@@ -332,9 +332,7 @@ describe("plugin.codex", () => {
       await oauthLoaded.fetch!("https://api.openai.com/v1/responses", firstRequest)
       await oauthLoaded.fetch!("https://api.openai.com/v1/responses", secondRequest)
 
-      // Only the OAuth loader's second turn should carry a previous_response_id
-      // -- the plain API-key path never gets the continuation marker header, so
-      // it never seeds or reads a checkpoint at all.
+      // Only the OAuth loader's second turn should carry a previous_response_id.
       expect(received).toEqual([
         { previous_response_id: undefined },
         { previous_response_id: undefined },

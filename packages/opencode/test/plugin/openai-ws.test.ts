@@ -824,8 +824,7 @@ describe("plugin.openai.ws-pool continuation", () => {
     expect(await first.text()).toContain("data: [DONE]")
 
     expect(received).toHaveLength(1)
-    // The live Codex backend rejects store: true, so continuation must never
-    // touch the store field -- it stays whatever the caller set it to.
+    // Codex rejects store: true, so continuation must leave it untouched.
     expect(received[0].store).toBeUndefined()
     expect(received[0].previous_response_id).toBeUndefined()
     expect(received[0].input).toEqual([userItem])
@@ -866,11 +865,8 @@ describe("plugin.openai.ws-pool continuation", () => {
   })
 
   test("matches when Forge's reconstructed history is a subset of the raw streamed item", async () => {
-    // Confirmed live: the raw item streamed back via response.output_item.done
-    // carries id/type/status and non-empty annotations/logprobs arrays that
-    // Forge's own generic message model doesn't round-trip when it rebuilds
-    // history for the next turn's input. Full deep-equality would never match
-    // this, so eligibility must tolerate it.
+    // Confirmed live: Forge's reconstructed history omits id/type/status and
+    // empty annotations/logprobs the raw streamed item carries.
     const rawStreamedItem = {
       id: "msg_abc123",
       type: "message",
@@ -1065,10 +1061,7 @@ describe("plugin.openai.ws-pool continuation", () => {
   })
 
   test("streamed output_item.done events establish a checkpoint when the terminal output is empty", async () => {
-    // Matches what the real Codex backend actually does: the terminal
-    // response.completed event's `output` comes back empty, so the checkpoint
-    // must be built from the response.output_item.done events streamed during
-    // the turn instead.
+    // Matches the real Codex backend: terminal `output` comes back empty.
     const received: any[] = []
     await using server = await createWebSocketServer((socket) => {
       socket.on("message", (raw) => {
