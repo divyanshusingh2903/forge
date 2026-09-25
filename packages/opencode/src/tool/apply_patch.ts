@@ -203,6 +203,12 @@ export const ApplyPatchTool = Tool.define(
 
       // Check permissions if needed
       const relativePaths = fileChanges.map((c) => path.relative(instance.worktree, c.filePath).replaceAll("\\", "/"))
+      yield* ctx.metadata({
+        metadata: {
+          diff: totalDiff,
+          files,
+        },
+      })
       yield* ctx.ask({
         permission: "edit",
         patterns: relativePaths,

@@ -24,6 +24,7 @@ export interface StreamResponsesWebSocketOptions {
   idleTimeout?: number
   signal?: AbortSignal
   onFirstEvent?: (error?: WrappedError) => void
+  onOutputItem?: (item: Record<string, unknown>) => void
   onComplete?: (event: Record<string, unknown>) => void
   onTerminal?: (event: Record<string, unknown>) => void
   onRetryableTerminal?: (event: Record<string, unknown>) => Promise<WebSocket | undefined>
@@ -251,6 +252,10 @@ export function streamResponsesWebSocket(options: StreamResponsesWebSocketOption
     resetIdleTimeout("idle timeout waiting for websocket")
 
     if (!event) return
+
+    if (event.type === "response.output_item.done" && isRecord(event.item)) {
+      options.onOutputItem?.(event.item)
+    }
 
     if (event.type === "response.completed" || event.type === "response.done") {
       completed = true

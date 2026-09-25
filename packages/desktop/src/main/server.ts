@@ -49,6 +49,12 @@ export function preferAppEnv(userDataPath: string) {
     OPENCODE_EXPERIMENTAL_ICON_DISCOVERY: "true",
     OPENCODE_EXPERIMENTAL_FILEWATCHER: "true",
     OPENCODE_EXPERIMENTAL_PLAN_MODE: "true",
+    // Channel-based auto-enable (packages/script) falls back to the current git
+    // branch name when no explicit channel is set at build time, and Forge's
+    // default branch is "main" rather than "dev" -- so that check never
+    // matches here. Force it on explicitly so the desktop app gets the same
+    // pre-release behavior a "dev" channel build would get automatically.
+    OPENCODE_EXPERIMENTAL_WEBSOCKETS: "true",
     OPENCODE_CLIENT: "desktop",
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })

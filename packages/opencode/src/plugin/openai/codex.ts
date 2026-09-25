@@ -414,6 +414,10 @@ export async function CodexAuthPlugin(input: PluginInput, options: CodexAuthPlug
             if (authWithAccount.accountId) {
               headers.set("ChatGPT-Account-Id", authWithAccount.accountId)
             }
+            // Lets the websocket pool's incremental-continuation logic identify
+            // requests made through this ChatGPT/Codex subscription auth path,
+            // as opposed to a plain API key configured for the same provider.
+            headers.set(OpenAIWebSocketPool.CONTINUATION_HEADER, "true")
 
             const parsed =
               requestInput instanceof URL

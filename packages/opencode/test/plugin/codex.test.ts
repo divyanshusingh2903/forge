@@ -283,6 +283,72 @@ describe("plugin.codex", () => {
     await hooks.dispose?.()
   })
 
+  test("marks continuation requests for OAuth access but not for a plain API key", async () => {
+    const received: Array<{ previous_response_id: unknown }> = []
+    const http = createServer()
+    const sockets = new WebSocketServer({ server: http })
+    sockets.on("connection", (socket) => {
+      socket.on("message", (raw) => {
+        received.push({ previous_response_id: JSON.parse(raw.toString()).previous_response_id })
+        socket.send(
+          JSON.stringify({
+            type: "response.completed",
+            response: { id: "resp_1", output: [{ type: "message", role: "assistant", content: "reply" }] },
+          }),
+        )
+      })
+    })
+    await new Promise<void>((resolve, reject) => {
+      http.once("error", reject)
+      http.listen(0, "127.0.0.1", resolve)
+    })
+    const address = http.address() as AddressInfo
+    const url = `http://127.0.0.1:${address.port}/backend-api/codex/responses`
+    const userItem = { type: "message", role: "user", content: "hi" }
+    const assistantReply = { type: "message", role: "assistant", content: "reply" }
+    const followUpItem = { type: "message", role: "user", content: "more" }
+    const firstRequest = {
+      method: "POST",
+      headers: { "session-id": "session-1" },
+      body: JSON.stringify({ stream: true, model: "gpt-5", input: [userItem] }),
+    }
+    const secondRequest = {
+      method: "POST",
+      headers: { "session-id": "session-1" },
+      body: JSON.stringify({ stream: true, model: "gpt-5", input: [userItem, assistantReply, followUpItem] }),
+    }
+
+    try {
+      const hooks = await CodexAuthPlugin({} as never, { codexApiEndpoint: url, experimentalWebSockets: true })
+
+      const apiKeyLoaded = await hooks.auth!.loader!(async () => ({ type: "api", key: "sk-test" }) as never, {} as never)
+      await apiKeyLoaded.fetch!(url, firstRequest)
+      await apiKeyLoaded.fetch!(url, secondRequest)
+
+      const oauthLoaded = await hooks.auth!.loader!(
+        async () => ({ type: "oauth", refresh: "refresh", access: createTestJwt({}), expires: Date.now() + 60_000 }) as never,
+        {} as never,
+      )
+      await oauthLoaded.fetch!("https://api.openai.com/v1/responses", firstRequest)
+      await oauthLoaded.fetch!("https://api.openai.com/v1/responses", secondRequest)
+
+      // Only the OAuth loader's second turn should carry a previous_response_id
+      // -- the plain API-key path never gets the continuation marker header, so
+      // it never seeds or reads a checkpoint at all.
+      expect(received).toEqual([
+        { previous_response_id: undefined },
+        { previous_response_id: undefined },
+        { previous_response_id: undefined },
+        { previous_response_id: "resp_1" },
+      ])
+      await hooks.dispose?.()
+    } finally {
+      for (const socket of sockets.clients) socket.terminate()
+      sockets.close()
+      http.close()
+    }
+  })
+
   test("filters unsupported modes and uses Codex context limits for OAuth GPT models", async () => {
     const hooks = await CodexAuthPlugin({} as never)
     const limit = { context: 1_050_000, input: 922_000, output: 128_000 }

@@ -117,6 +117,27 @@ describe("session.system", () => {
     }
   })
 
+  test("identifies every active system prompt as Forge built on OpenCode", () => {
+    const models = [
+      { api: { id: "meta/muse-spark-preview" } },
+      { api: { id: "gpt-4o" } },
+      { api: { id: "gpt-6" } },
+      { api: { id: "gpt-codex" } },
+      { api: { id: "gpt-5" } },
+      { api: { id: "gemini-2.5-pro" } },
+      { api: { id: "claude-sonnet" } },
+      { api: { id: "trinity-large" } },
+      { providerID: "kimi-for-coding", api: { id: "k3" } },
+      { api: { id: "unknown-model" } },
+    ]
+
+    for (const model of models) {
+      const prompt = SystemPrompt.provider(model as Provider.Model)[0]
+      expect(prompt).toContain("You are Forge")
+      expect(prompt).toContain("built on top of OpenCode")
+    }
+  })
+
   it.effect("skills output is sorted by name and stable across calls", () =>
     Effect.gen(function* () {
       const prompt = yield* SystemPrompt.Service

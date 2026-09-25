@@ -6,7 +6,7 @@ import WebSocket, { WebSocketServer } from "ws"
 import { APICallError } from "ai"
 import { ProviderError } from "../../src/provider/error"
 import { OpenAIWebSocket } from "../../src/plugin/openai/ws"
-import { OpenAIWebSocketPool, TITLE_HEADER } from "../../src/plugin/openai/ws-pool"
+import { CONTINUATION_HEADER, OpenAIWebSocketPool, TITLE_HEADER } from "../../src/plugin/openai/ws-pool"
 
 describe("plugin.openai.ws", () => {
   test("derives websocket URLs and sends auth plus protocol headers", async () => {
@@ -798,7 +798,396 @@ describe("plugin.openai.ws-pool", () => {
   })
 })
 
-function streamRequest(headers?: Record<string, string>, signal?: AbortSignal): RequestInit {
+describe("plugin.openai.ws-pool continuation", () => {
+  const userItem = { type: "message", role: "user", content: "hello" }
+  const assistantReply = { type: "message", role: "assistant", content: "reply" }
+  const followUpItem = { type: "message", role: "user", content: "more" }
+
+  function completion(id: string, output: unknown[] = [assistantReply]) {
+    return JSON.stringify({ type: "response.completed", response: { id, output } })
+  }
+
+  test("first turn sends the full request with no previous_response_id", async () => {
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(completion("resp_1"))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, model: "gpt-5", input: [userItem] }),
+    )
+    expect(await first.text()).toContain("data: [DONE]")
+
+    expect(received).toHaveLength(1)
+    // The live Codex backend rejects store: true, so continuation must never
+    // touch the store field -- it stays whatever the caller set it to.
+    expect(received[0].store).toBeUndefined()
+    expect(received[0].previous_response_id).toBeUndefined()
+    expect(received[0].input).toEqual([userItem])
+    fetch.close()
+  })
+
+  test("second turn sends only the new items with previous_response_id", async () => {
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(completion(`resp_${received.length}`))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, model: "gpt-5", input: [userItem] }),
+    )
+    await first.text()
+
+    const second = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, {
+        stream: true,
+        model: "gpt-5",
+        input: [userItem, assistantReply, followUpItem],
+      }),
+    )
+    await second.text()
+
+    expect(received).toHaveLength(2)
+    expect(received[1].input).toEqual([followUpItem])
+    expect(received[1].previous_response_id).toBe("resp_1")
+    expect(received[1].store).toBeUndefined()
+    fetch.close()
+  })
+
+  test("matches when Forge's reconstructed history is a subset of the raw streamed item", async () => {
+    // Confirmed live: the raw item streamed back via response.output_item.done
+    // carries id/type/status and non-empty annotations/logprobs arrays that
+    // Forge's own generic message model doesn't round-trip when it rebuilds
+    // history for the next turn's input. Full deep-equality would never match
+    // this, so eligibility must tolerate it.
+    const rawStreamedItem = {
+      id: "msg_abc123",
+      type: "message",
+      status: "completed",
+      content: [{ type: "output_text", annotations: [], logprobs: [], text: "Hi. How can I help?" }],
+      phase: "final_answer",
+      role: "assistant",
+    }
+    const reconstructedItem = {
+      role: "assistant",
+      content: [{ type: "output_text", text: "Hi. How can I help?" }],
+      phase: "final_answer",
+    }
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(JSON.stringify({ type: "response.output_item.done", output_index: 0, item: rawStreamedItem }))
+        socket.send(completion(`resp_${received.length}`, []))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, model: "gpt-5", input: [userItem] }),
+    )
+    await first.text()
+
+    const second = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, {
+        stream: true,
+        model: "gpt-5",
+        input: [userItem, reconstructedItem, followUpItem],
+      }),
+    )
+    await second.text()
+
+    expect(received[1].previous_response_id).toBe("resp_1")
+    expect(received[1].input).toEqual([followUpItem])
+    fetch.close()
+  })
+
+  test("an invariant change (tools/model) forces a full resend", async () => {
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(completion(`resp_${received.length}`))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, {
+        stream: true,
+        model: "gpt-5",
+        tools: [],
+        input: [userItem],
+      }),
+    )
+    await first.text()
+
+    const second = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, {
+        stream: true,
+        model: "gpt-5",
+        tools: [{ type: "function", name: "new_tool" }],
+        input: [userItem, assistantReply, followUpItem],
+      }),
+    )
+    await second.text()
+
+    expect(received[1].previous_response_id).toBeUndefined()
+    expect(received[1].input).toHaveLength(3)
+    fetch.close()
+  })
+
+  test("a history prefix mismatch (revert/compaction) forces a full resend", async () => {
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(completion(`resp_${received.length}`))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, model: "gpt-5", input: [userItem] }),
+    )
+    await first.text()
+
+    const divergentItem = { type: "message", role: "user", content: "a different opening message" }
+    const second = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, {
+        stream: true,
+        model: "gpt-5",
+        input: [divergentItem],
+      }),
+    )
+    await second.text()
+
+    expect(received[1].previous_response_id).toBeUndefined()
+    expect(received[1].input).toEqual([divergentItem])
+    fetch.close()
+  })
+
+  test("non-array input is never treated as continuable", async () => {
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(completion(`resp_${received.length}`, [{ type: "message" }]))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, input: "hi" }),
+    )
+    await first.text()
+    const second = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, input: "hi again" }),
+    )
+    await second.text()
+
+    expect(received[0].previous_response_id).toBeUndefined()
+    expect(received[1].previous_response_id).toBeUndefined()
+    expect(received[1].input).toBe("hi again")
+    fetch.close()
+  })
+
+  test("a missing continuation marker header never triggers continuation", async () => {
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(completion(`resp_${received.length}`))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(server.url, streamRequest({}, undefined, { stream: true, model: "gpt-5", input: [userItem] }))
+    await first.text()
+    const second = await fetch(
+      server.url,
+      streamRequest({}, undefined, { stream: true, model: "gpt-5", input: [userItem, assistantReply, followUpItem] }),
+    )
+    await second.text()
+
+    expect(received[0].store).toBeUndefined()
+    expect(received[1].previous_response_id).toBeUndefined()
+    expect(received[1].input).toHaveLength(3)
+    fetch.close()
+  })
+
+  test("an empty completed output does not establish a usable checkpoint", async () => {
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(completion(`resp_${received.length}`, []))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, model: "gpt-5", input: [userItem] }),
+    )
+    await first.text()
+    const second = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, {
+        stream: true,
+        model: "gpt-5",
+        input: [userItem, followUpItem],
+      }),
+    )
+    await second.text()
+
+    expect(received[1].previous_response_id).toBeUndefined()
+    fetch.close()
+  })
+
+  test("streamed output_item.done events establish a checkpoint when the terminal output is empty", async () => {
+    // Matches what the real Codex backend actually does: the terminal
+    // response.completed event's `output` comes back empty, so the checkpoint
+    // must be built from the response.output_item.done events streamed during
+    // the turn instead.
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(JSON.stringify({ type: "response.output_item.done", output_index: 0, item: assistantReply }))
+        socket.send(completion(`resp_${received.length}`, []))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, model: "gpt-5", input: [userItem] }),
+    )
+    await first.text()
+
+    const second = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, {
+        stream: true,
+        model: "gpt-5",
+        input: [userItem, assistantReply, followUpItem],
+      }),
+    )
+    await second.text()
+
+    expect(received[1].previous_response_id).toBe("resp_1")
+    expect(received[1].input).toEqual([followUpItem])
+    fetch.close()
+  })
+
+  test("a stale previous_response_id triggers one full-resend retry on a fresh connection", async () => {
+    let connections = 0
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      connections += 1
+      socket.on("message", (raw) => {
+        const message = JSON.parse(raw.toString())
+        received.push(message)
+        if (message.previous_response_id) {
+          socket.send(
+            JSON.stringify({
+              type: "error",
+              status: 400,
+              error: { type: "invalid_request_error", message: "Invalid `previous_response_id`." },
+            }),
+          )
+          return
+        }
+        socket.send(completion(`resp_${connections}`))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, model: "gpt-5", input: [userItem] }),
+    )
+    await first.text()
+
+    const second = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, {
+        stream: true,
+        model: "gpt-5",
+        input: [userItem, assistantReply, followUpItem],
+      }),
+    )
+    const text = await second.text()
+
+    expect(text).toContain("data: [DONE]")
+    expect(received).toHaveLength(3)
+    expect(received[1].previous_response_id).toBe("resp_1")
+    expect(received[2].previous_response_id).toBeUndefined()
+    expect(received[2].input).toHaveLength(3)
+    expect(connections).toBe(2)
+    fetch.close()
+  })
+
+  test("connection rotation clears the checkpoint, forcing a full resend", async () => {
+    let connections = 0
+    const received: any[] = []
+    await using server = await createWebSocketServer((socket) => {
+      connections += 1
+      socket.on("message", (raw) => {
+        received.push(JSON.parse(raw.toString()))
+        socket.send(completion(`resp_${connections}`))
+      })
+    })
+    const fetch = OpenAIWebSocketPool.createWebSocketFetch({ url: server.url, maxConnectionAge: 0 })
+
+    const first = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, { stream: true, model: "gpt-5", input: [userItem] }),
+    )
+    await first.text()
+
+    const second = await fetch(
+      server.url,
+      streamRequest({ [CONTINUATION_HEADER]: "true" }, undefined, {
+        stream: true,
+        model: "gpt-5",
+        input: [userItem, assistantReply, followUpItem],
+      }),
+    )
+    await second.text()
+
+    expect(connections).toBe(2)
+    expect(received[1].previous_response_id).toBeUndefined()
+    expect(received[1].input).toHaveLength(3)
+    fetch.close()
+  })
+})
+
+function streamRequest(
+  headers?: Record<string, string>,
+  signal?: AbortSignal,
+  body?: Record<string, unknown>,
+): RequestInit {
   return {
     method: "POST",
     headers: {
@@ -806,7 +1195,7 @@ function streamRequest(headers?: Record<string, string>, signal?: AbortSignal): 
       authorization: "Bearer test",
       ...headers,
     },
-    body: JSON.stringify({ stream: true, input: "hi" }),
+    body: JSON.stringify(body ?? { stream: true, input: "hi" }),
     signal,
   }
 }
