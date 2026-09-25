@@ -1,5 +1,6 @@
 import * as InstanceState from "@/effect/instance-state"
 import { FileSystem } from "@opencode-ai/core/filesystem"
+import { Global } from "@opencode-ai/core/global"
 import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
 import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -96,7 +97,17 @@ export const fileHandlers = HttpApiBuilder.group(InstanceHttpApi, "file", (handl
     const content = Effect.fn("FileHttpApi.content")(function* (ctx: { query: { path: string } }) {
       const directory = (yield* InstanceState.context).directory
       const file = path.resolve(directory, ctx.query.path)
-      if (!FSUtil.contains(directory, file)) return yield* Effect.die(new Error("Path escapes the location"))
+      // Plan files for non-VCS projects are written under Global.Path.data
+      // (see Session.plan), outside the project sandbox, so the plan tab's
+      // content fetch needs this narrow, server-controlled exception.
+      const withinPlans = FSUtil.contains(path.join(Global.Path.data, "plans"), file)
+      if (!FSUtil.contains(directory, file) && !withinPlans)
+        return yield* Effect.die(new Error("Path escapes the location"))
+      if (withinPlans) {
+        const raw = yield* FSUtil.Service
+        const text = yield* raw.readFileStringSafe(file).pipe(Effect.orDie)
+        return { type: "text" as const, content: (text ?? "").trim() }
+      }
       if (!(yield* FSUtil.Service.use((fs) => fs.existsSafe(file)))) return { type: "text" as const, content: "" }
       return yield* filesystem(
         FileSystem.Service.use((fs) => fs.read({ path: RelativePath.make(ctx.query.path) })),

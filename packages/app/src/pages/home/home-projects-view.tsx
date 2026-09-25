@@ -92,7 +92,7 @@ export function HomeProjectsView(props: HomeProjectsViewProps) {
   return (
     <aside
       class={`
-        flex h-full w-[260px] shrink-0 min-h-0 min-w-0 flex-col gap-4 overflow-hidden
+        m-2 flex w-[260px] shrink-0 self-stretch min-h-0 min-w-0 flex-col gap-4 overflow-hidden
         bg-v2-background-bg-deep border-r border-v2-border-border-base py-3 pl-3 pr-2
         rounded-tr-xl rounded-br-xl
       `}

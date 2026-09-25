@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { Context, Effect } from "effect"
+import { Global } from "@opencode-ai/core/global"
 import path from "path"
 import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
 import { FilePaths } from "../../src/server/routes/instance/httpapi/groups/file"
@@ -79,5 +80,34 @@ describe("file HttpApi", () => {
 
     expect(symbols.status).toBe(200)
     expect(await symbols.json()).toEqual([])
+  })
+
+  test("serves plan file content from outside the project directory", async () => {
+    // Non-VCS sessions write plans under Global.Path.data (Session.plan), so
+    // the content endpoint must allow that one path in addition to the project.
+    await using tmp = await tmpdir()
+    const planFile = path.join(Global.Path.data, "plans", `httpapi-file-test-${Date.now()}.md`)
+    await Bun.write(planFile, "# the plan")
+
+    try {
+      const content = await request(FilePaths.content, tmp.path, { path: planFile })
+      expect(content.status).toBe(200)
+      expect(await content.json()).toMatchObject({ type: "text", content: "# the plan" })
+    } finally {
+      await Bun.file(planFile).delete()
+    }
+  })
+
+  test("rejects paths outside both the project and the plans directory", async () => {
+    await using tmp = await tmpdir()
+    const outside = path.join(Global.Path.data, `httpapi-file-test-${Date.now()}.md`)
+    await Bun.write(outside, "not a plan")
+
+    try {
+      const content = await request(FilePaths.content, tmp.path, { path: outside })
+      expect(content.status).toBe(500)
+    } finally {
+      await Bun.file(outside).delete()
+    }
   })
 })
