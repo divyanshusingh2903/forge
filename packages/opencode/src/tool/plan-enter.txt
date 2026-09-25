@@ -1,4 +1,4 @@
-Use this tool to suggest switching to plan agent when the user's request would benefit from planning before implementation.
+Use this tool to suggest switching to plan agent when the right implementation approach itself is genuinely unclear and worth researching before writing code.
 
 If they explicitly mention wanting to create a plan ALWAYS call this tool first.
 
@@ -8,7 +8,13 @@ Call this tool when:
 - The user's request is complex and would benefit from planning first
 - You want to research and design before making changes
 - The task involves multiple files or significant architectural decisions
+- Multiple viable approaches exist and picking wrong means redoing significant work
+- The change reshapes a system boundary, data model, or public API
+
+Touching several files or being a lot of work is not by itself a reason to call this tool -- a mechanical change (rename, consistent edit repeated across files, wiring up a well-specified feature) stays straightforward no matter how many files it spans.
 
 Do NOT call this tool:
-- For simple, straightforward tasks
+- For simple, straightforward tasks, even large or multi-file ones, when the implementation path is already clear
 - When the user explicitly wants immediate implementation
+- For bug fixes with an identifiable root cause
+- When the request is unclear or underspecified -- ask the user a clarifying question instead; plan_enter is for design research, not for resolving ambiguity about what they want

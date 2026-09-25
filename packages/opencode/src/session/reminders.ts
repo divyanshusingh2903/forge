@@ -11,7 +11,6 @@ import { Session } from "./session"
 import PROMPT_PLAN from "./prompt/plan.txt"
 import BUILD_SWITCH from "./prompt/build-switch.txt"
 import PLAN_MODE from "./prompt/plan-mode.txt"
-import PLAN_ENTER_REMINDER from "./prompt/plan-enter-reminder.txt"
 
 export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
   messages: SessionV1.WithParts[]
@@ -70,22 +69,10 @@ export const apply = Effect.fn("SessionReminders.apply")(function* (input: {
     }
 
     // plan_enter is only ever allowed for the build agent (agent.ts denies it by
-    // default for everyone else, including custom agents), so only build turns
-    // should be nudged toward it. Otherwise, calling it is nudged solely by its
-    // own tool description, which weaker/less instruction-following models tend
-    // to miss even when the user explicitly asks to plan first -- put the same
-    // guidance directly on this turn so it's much harder to skip past.
-    if (input.agent.name === "build") {
-      const part = yield* sessions.updatePart({
-        id: PartID.ascending(),
-        messageID: userMessage.info.id,
-        sessionID: userMessage.info.sessionID,
-        type: "text",
-        text: PLAN_ENTER_REMINDER,
-        synthetic: true,
-      })
-      userMessage.parts.push(part)
-    }
+    // default for everyone else, including custom agents). Whether to call it is
+    // guided solely by its own tool description (plan-enter.txt) rather than a
+    // reminder injected on every build turn -- that cost tokens on every message
+    // regardless of whether the request was anywhere near plan-worthy.
     return input.messages
   }
 
