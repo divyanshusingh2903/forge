@@ -37,7 +37,9 @@ export const subjects = createSubjects({
 
 const MY_THEME: Theme = {
   ...THEME_OPENAUTH,
-  logo: "https://opencode.ai/favicon-v3.svg",
+  // Self-contained: the auth worker serves no static assets, so inline the Forge mark
+  // instead of hotlinking a hosted logo.
+  logo: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Crect width='256' height='256' rx='56' fill='%23000000'/%3E%3Cg fill='%23ffffff'%3E%3Crect x='64' y='64' width='128' height='32'/%3E%3Crect x='96' y='112' width='64' height='32'/%3E%3Crect x='64' y='160' width='128' height='32'/%3E%3C/g%3E%3C/svg%3E",
 }
 
 export default {

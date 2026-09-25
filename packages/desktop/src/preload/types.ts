@@ -42,6 +42,12 @@ export type FatalRendererError = {
   os?: string
 }
 
+export type DesktopNotification = {
+  id: string
+  title: string
+  body: string
+}
+
 export type ElectronAPI = {
   killSidecar: () => Promise<void>
   installCli: () => Promise<string>
@@ -71,6 +77,8 @@ export type ElectronAPI = {
   draftBlobGet: (id: string) => Promise<ArrayBuffer | null>
 
   getWindowID: () => Promise<string>
+  showNotification: (notification: DesktopNotification) => Promise<void>
+  onNotificationClick: (cb: (id: string) => void) => () => void
   onMenuCommand: (cb: (id: string) => void) => () => void
   onDeepLink: (cb: (urls: string[]) => void) => () => void
 

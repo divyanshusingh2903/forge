@@ -25,6 +25,12 @@ export function isDirectoryAutoAccepting(autoAccept: Record<string, boolean>, di
   return autoAccept[key] ?? false
 }
 
+export async function isActionablePermission(input: { pending: () => boolean; autoResponds: () => Promise<boolean> }) {
+  if (!input.pending()) return false
+  if (await input.autoResponds()) return false
+  return input.pending()
+}
+
 function sessionLineage(session: { id: string; parentID?: string }[], sessionID: string) {
   const parent = session.reduce((acc, item) => {
     if (item.parentID) acc.set(item.id, item.parentID)

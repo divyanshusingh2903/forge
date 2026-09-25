@@ -1,12 +1,12 @@
 import { execFile } from "node:child_process"
 import { stat } from "node:fs/promises"
 import { basename, join } from "node:path"
-import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from "electron"
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, shell } from "electron"
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron"
 import type { DesktopMenuAction } from "@opencode-ai/app/desktop-menu"
 import { parseDesktopNativeBundle, type DesktopNativeBundle } from "@opencode-ai/app/i18n/desktop-native"
 
-import type { FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
+import type { DesktopNotification, FatalRendererError, ServerReadyData, TitlebarTheme } from "../preload/types"
 import { runDesktopMenuAction } from "./desktop-menu-actions"
 import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
@@ -14,6 +14,7 @@ import { getStore, removeStoreFileIfEmpty } from "./store"
 import {
   getPinchZoomEnabled,
   getWindowID,
+  iconPath,
   openExternalURL,
   openLocalFileURL,
   setPinchZoomEnabled,
@@ -249,6 +250,22 @@ export function registerIpcHandlers(deps: Deps) {
     const id = getWindowID(win)
     if (!id) throw new Error("Window ID not found")
     return id
+  })
+  ipcMain.handle("show-notification", (event: IpcMainInvokeEvent, value: DesktopNotification) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) throw new Error("Window not found")
+    const notification = new Notification({
+      title: value.title,
+      body: value.body,
+      icon: iconPath(),
+    })
+    notification.on("click", () => {
+      if (win.isDestroyed()) return
+      win.show()
+      win.focus()
+      win.webContents.send("notification-click", value.id)
+    })
+    notification.show()
   })
 
   ipcMain.handle("get-window-focused", (event: IpcMainInvokeEvent) => {

@@ -118,6 +118,8 @@ const layer = Layer.effect(
 
         const defaults = Permission.fromConfig({
           "*": "allow",
+          bash: "ask",
+          edit: "ask",
           doom_loop: "ask",
           external_directory: {
             "*": "ask",

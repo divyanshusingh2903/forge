@@ -64,6 +64,13 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 const [updaterState, setUpdaterState] = createSignal<UpdaterState>({ status: "disabled" })
 void window.api.updater.subscribe(setUpdaterState)
 
+const notificationCallbacks = new Map<string, () => void>()
+window.api.onNotificationClick((id) => {
+  const callback = notificationCallbacks.get(id)
+  notificationCallbacks.delete(id)
+  callback?.()
+})
+
 const deepLinkEvent = "forge:deep-link"
 
 type DesktopWindowState = {
@@ -256,16 +263,12 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
       const focused = await window.api.getWindowFocused().catch(() => document.hasFocus())
       if (focused) return
 
-      const notification = new Notification(title, {
-        body: description ?? "",
-        icon: "https://opencode.ai/favicon-96x96-v3.png",
+      const id = crypto.randomUUID()
+      if (onClick) notificationCallbacks.set(id, onClick)
+      await window.api.showNotification({ id, title, body: description ?? "" }).catch((error) => {
+        notificationCallbacks.delete(id)
+        throw error
       })
-      notification.onclick = () => {
-        void window.api.showWindow()
-        void window.api.setWindowFocus()
-        onClick?.()
-        notification.close()
-      }
     },
 
     fetch: (input, init) => {

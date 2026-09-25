@@ -64,8 +64,9 @@ it.instance("build agent has correct default properties", () =>
     expect(build).toBeDefined()
     expect(build?.mode).toBe("primary")
     expect(build?.native).toBe(true)
-    expect(evalPerm(build, "edit")).toBe("allow")
-    expect(evalPerm(build, "bash")).toBe("allow")
+    expect(evalPerm(build, "edit")).toBe("ask")
+    expect(evalPerm(build, "bash")).toBe("ask")
+    expect(evalPerm(build, "read")).toBe("allow")
   }),
 )
 
@@ -263,8 +264,8 @@ it.instance(
       expect(build).toBeDefined()
       // Specific pattern is denied
       expect(Permission.evaluate("bash", "rm -rf *", build!.permission).action).toBe("deny")
-      // Edit still allowed
-      expect(evalPerm(build, "edit")).toBe("allow")
+      // Edit retains its default approval requirement
+      expect(evalPerm(build, "edit")).toBe("ask")
     }),
   {
     config: {
@@ -466,9 +467,11 @@ it.instance("Agent.get returns undefined for non-existent agent", () =>
   }),
 )
 
-it.instance("default permission includes doom_loop and external_directory as ask", () =>
+it.instance("default permission requires approval for bash, edits, and external directories", () =>
   Effect.gen(function* () {
     const build = yield* load((svc) => svc.get("build"))
+    expect(evalPerm(build, "bash")).toBe("ask")
+    expect(evalPerm(build, "edit")).toBe("ask")
     expect(evalPerm(build, "doom_loop")).toBe("ask")
     expect(evalPerm(build, "external_directory")).toBe("ask")
   }),

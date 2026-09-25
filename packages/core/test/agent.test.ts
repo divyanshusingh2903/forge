@@ -3,6 +3,7 @@ import { Effect, Exit, Scope } from "effect"
 import { AgentV2 } from "@opencode-ai/core/agent"
 import { AppNodeBuilder } from "@opencode-ai/core/effect/app-node-builder"
 import { Location } from "@opencode-ai/core/location"
+import { PermissionV2 } from "@opencode-ai/core/permission"
 import { AgentPlugin } from "@opencode-ai/core/plugin/agent"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { location } from "./fixture/location"
@@ -99,7 +100,7 @@ describe("AgentV2", () => {
     }),
   )
 
-  it.effect("does not ambiently opt built-in agents into bash", () =>
+  it.effect("requires approval for built-in build agent bash and edits", () =>
     Effect.gen(function* () {
       const agent = yield* AgentV2.Service
       yield* AgentPlugin.Plugin.effect(
@@ -123,9 +124,11 @@ describe("AgentV2", () => {
         "summary",
         "title",
       ])
-      for (const item of agents) {
-        expect(item.permissions.some((rule) => rule.action === "bash" && rule.effect !== "deny")).toBe(false)
-      }
+      const build = yield* agent.get(AgentV2.ID.make("build"))
+      if (!build) throw new Error("expected build agent")
+      expect(PermissionV2.evaluate("bash", "git status", build.permissions).effect).toBe("ask")
+      expect(PermissionV2.evaluate("edit", "README.md", build.permissions).effect).toBe("ask")
+      expect(PermissionV2.evaluate("read", "README.md", build.permissions).effect).toBe("allow")
     }),
   )
 })

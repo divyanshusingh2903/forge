@@ -107,6 +107,8 @@ export const Plugin = define({
     ]
     const defaults: PermissionV2.Ruleset = [
       { action: "*", resource: "*", effect: "allow" },
+      { action: "bash", resource: "*", effect: "ask" },
+      { action: "edit", resource: "*", effect: "ask" },
       ...readonlyExternalDirectory,
       { action: "question", resource: "*", effect: "deny" },
       { action: "plan_enter", resource: "*", effect: "deny" },

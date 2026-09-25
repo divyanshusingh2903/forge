@@ -21,6 +21,7 @@ import {
   autoRespondsPermission,
   sessionAutoAccept,
   isEditPermission,
+  isActionablePermission,
 } from "./permission-auto-respond"
 
 type PermissionRespondFn = (input: {
@@ -524,6 +525,13 @@ function createServerPermissionState(input: { sdk: ServerSDK; sync: ServerSync }
   const api = {
     ready: () => !meta.disposed && ready(),
     respond,
+    async isActionable(permission: PermissionRequest, directory?: string) {
+      return isActionablePermission({
+        pending: () =>
+          !meta.disposed && (input.sync.session.data.permission[permission.sessionID]?.some((item) => item.id === permission.id) ?? false),
+        autoResponds: () => shouldAutoRespondResolved(permission, directory),
+      })
+    },
     autoResponds(permission: PermissionRequest, directory?: string) {
       if (meta.disposed) return false
       return shouldAutoRespond(permission, directory)

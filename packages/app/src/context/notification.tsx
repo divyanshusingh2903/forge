@@ -10,13 +10,16 @@ import { useSettings } from "@/context/settings"
 import { base64Encode } from "@opencode-ai/core/util/encode"
 import { decode64 } from "@/utils/base64"
 import { EventSessionError } from "@opencode-ai/sdk/v2"
+import type { PermissionRequest } from "@opencode-ai/sdk/v2/client"
+import { getFilename } from "@opencode-ai/core/util/path"
 import { Persist, persisted } from "@/utils/persist"
 import { playSoundById } from "@/utils/sound"
 import { useGlobal } from "./global"
 import { ServerConnection, useServer } from "./server"
 import { type DraftTab, useTabs } from "./tabs"
-import { requireServerKey } from "@/utils/session-route"
+import { legacySessionHref, requireServerKey } from "@/utils/session-route"
 import type { ServerScope } from "@/utils/server-scope"
+import { usePermission } from "./permission"
 
 type NotificationBase = {
   directory?: string
@@ -120,6 +123,7 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
     const tabs = useTabs()
     const navigate = useNavigate()
     const platform = usePlatform()
+    const permission = usePermission()
     const settings = useSettings()
     const language = useLanguage()
     const owner = getOwner()
@@ -148,6 +152,9 @@ export const { use: useNotification, provider: NotificationProvider } = createSi
           state: createServerNotificationState({
             sdk: ctx.sdk,
             sync: ctx.sync,
+            server: key,
+            permission: permission.ensureServerState(key),
+            tabs,
             active: () => server.scope(activeServer()) === ctx.sdk.scope,
             directory: activeDirectory,
             sessionID: activeSession,
@@ -213,6 +220,9 @@ type NotificationState = ReturnType<typeof createServerNotificationState>
 function createServerNotificationState(input: {
   sdk: ServerSDK
   sync: ServerSync
+  server: ServerConnection.Key
+  permission: ReturnType<ReturnType<typeof usePermission>["ensureServerState"]>
+  tabs: ReturnType<typeof useTabs>
   active: Accessor<boolean>
   directory: Accessor<string | undefined>
   sessionID: Accessor<string | undefined>
@@ -226,6 +236,7 @@ function createServerNotificationState(input: {
   const platform = input.platform
   const settings = input.settings
   const language = input.language
+  const notifiedPermissions = new Set<string>()
 
   const empty: Notification[] = []
 
@@ -396,8 +407,47 @@ function createServerNotificationState(input: {
     })
   }
 
+  const permissionKey = (directory: string, permission: Pick<PermissionRequest, "sessionID" | "id">) =>
+    `${directory}:${permission.sessionID}:${permission.id}`
+
+  const handlePermissionAsked = (directory: string, request: PermissionRequest) => {
+    const key = permissionKey(directory, request)
+    if (notifiedPermissions.has(key)) return
+    notifiedPermissions.add(key)
+    void input.permission.isActionable(request, directory).then((actionable) => {
+      if (meta.disposed || !actionable) {
+        notifiedPermissions.delete(key)
+        return
+      }
+      const [store] = serverSync().child(directory, { bootstrap: false })
+      const session = store.session.find((item) => item.id === request.sessionID)
+      const description = language.t("notification.permission.description", {
+        sessionTitle: session?.title ?? language.t("command.session.new"),
+        projectName: getFilename(directory),
+      })
+      if (settings.sounds.permissionsEnabled()) void playSoundById(settings.sounds.permissions())
+      if (!settings.notifications.permissions()) return
+      void platform.notify(language.t("notification.permission.title"), description, () => {
+        if (!settings.general.newLayoutDesigns()) {
+          input.navigate(legacySessionHref(directory, request.sessionID))
+          return
+        }
+        input.tabs.select(input.tabs.addSessionTab({ server: input.server, sessionId: request.sessionID }))
+      })
+    })
+  }
+
   const unsub = serverSDK().event.listen((e) => {
     const event = e.details
+    if (event.type === "permission.asked") {
+      handlePermissionAsked(e.name, event.properties)
+      return
+    }
+    if (event.type === "permission.replied") {
+      const request = event.properties as { sessionID: string; requestID: string }
+      notifiedPermissions.delete(permissionKey(e.name, { sessionID: request.sessionID, id: request.requestID }))
+      return
+    }
     if (event.type !== "session.idle" && event.type !== "session.error") return
 
     const directory = e.name

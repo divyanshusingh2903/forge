@@ -39,7 +39,7 @@ export default function NewSessionPage() {
       {suspendUntilPromptReady()}
       <div class="relative flex-1 min-h-0 flex flex-col bg-v2-background-bg-base rounded-[10px] overflow-hidden shadow-[var(--v2-elevation-raised)]">
         <div class="h-12 w-full shrink-0 flex items-center justify-end gap-2 px-3">
-          <SessionHeaderQuickActions plan={false} review={false} terminal={false} />
+          <SessionHeaderQuickActions plan={false} mcp={false} review={false} terminal={false} />
         </div>
         <div class="flex-1 min-h-0 flex flex-col">
           <NewSessionView input={draft.input} project={project} workspace={workspace} />

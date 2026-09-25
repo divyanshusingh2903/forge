@@ -80,6 +80,12 @@ const api: ElectronAPI = {
   draftBlobGet: (id) => ipcRenderer.invoke("draft-blob-get", id),
 
   getWindowID: () => ipcRenderer.invoke("get-window-id"),
+  showNotification: (notification) => ipcRenderer.invoke("show-notification", notification),
+  onNotificationClick: (cb) => {
+    const handler = (_: unknown, id: string) => cb(id)
+    ipcRenderer.on("notification-click", handler)
+    return () => ipcRenderer.removeListener("notification-click", handler)
+  },
   onMenuCommand: (cb) => {
     const handler = (_: unknown, id: string) => cb(id)
     ipcRenderer.on("menu-command", handler)

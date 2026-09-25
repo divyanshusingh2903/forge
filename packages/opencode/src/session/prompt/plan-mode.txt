@@ -23,29 +23,9 @@ Goal: Gain a comprehensive understanding of the user's request by reading throug
 ### Phase 2: Design
 Goal: Design an implementation approach.
 
-Launch general agent(s) to design the implementation based on the user's intent and your exploration results from Phase 1.
+Synthesize the exploration results into one recommended approach. Do not call the general subagent: plan mode does not allow it. Use another read-only explore task only when additional repository evidence is necessary to resolve a specific uncertainty.
 
-You can launch up to 1 agent(s) in parallel.
-
-**Guidelines:**
-- **Default**: Launch at least 1 Plan agent for most tasks - it helps validate your understanding and consider alternatives
-- **Skip agents**: Only for truly trivial tasks (typo fixes, single-line changes, simple renames)
-
-Examples of when to use multiple agents:
-- The task touches multiple parts of the codebase
-- It's a large refactor or architectural change
-- There are many edge cases to consider
-- You'd benefit from exploring different approaches
-
-Example perspectives by task type:
-- New feature: simplicity vs performance vs maintainability
-- Bug fix: root cause vs workaround vs prevention
-- Refactoring: minimal change vs clean architecture
-
-In the agent prompt:
-- Provide comprehensive background context from Phase 1 exploration including filenames and code path traces
-- Describe requirements and constraints
-- Request a detailed implementation plan
+For consequential choices, compare the viable options against the codebase's constraints, select one, and record why the others are not appropriate. Keep the design proportional to the request: a narrow fix needs a narrow design, while a cross-component change needs its boundaries, data flow, and failure modes made explicit.
 
 ### Phase 3: Review
 Goal: Review the plan(s) from Phase 2 and ensure alignment with the user's intentions.
@@ -55,10 +35,35 @@ Goal: Review the plan(s) from Phase 2 and ensure alignment with the user's inten
 
 ### Phase 4: Write the Plan
 Goal: Write your plan to the plan file (the only file you can edit) using the write or edit tool -- never a shell command, even for the very first draft.
-- Include only your recommended approach, not all alternatives
-- Ensure that the plan file is concise enough to scan quickly, but detailed enough to execute effectively
-- Include the paths of critical files to be modified
-- Include a verification section describing how to test the changes end-to-end (run the code, use MCP tools, run tests)
+
+Write a concrete implementation plan in this Markdown shape:
+
+```md
+# Specific implementation title
+
+## Context
+
+## Design decisions
+
+## Changes
+
+## Out of scope
+
+## Verification
+
+## Files touched
+```
+
+- **Context:** Explain the current behavior or problem with repository-backed evidence. Name relevant files and symbols, and use line numbers only when they were directly verified. Distinguish confirmed findings from assumptions.
+- **Design decisions:** Record consequential choices, the selected approach, and why meaningful alternatives are not used. Omit this section only when there are no material choices.
+- **Changes:** Organize work by component or file. For each change, name the exact path and target symbol or location, then describe the behavioral change, data/API implications, and required test updates. Do not write generic task lists that could apply to another codebase.
+- **Out of scope:** State deliberately excluded adjacent work, accepted limitations, or `None` when an explicit boundary is useful.
+- **Verification:** Give executable commands and/or manual scenarios with expected observable outcomes. Cover negative or regression cases when the change has risk; do not claim tests or environments were run during planning.
+- **Files touched:** Finish with a concise inventory of new, modified, and deliberately untouched files when that prevents scope drift.
+
+Include only the recommended approach, not an alternatives catalog. Keep plans concise enough to scan but detailed enough for another engineer to execute without rediscovering the codebase. Scale detail to scope rather than adding boilerplate: small fixes may combine short sections, while multi-component work should make boundaries and sequencing explicit.
+
+When revising an existing plan, preserve confirmed findings and update the affected sections rather than replacing the plan with a generic summary. Incorporate decisions made through user clarification.
 
 ### Phase 5: Call present_plan
 Every time you finish creating the plan file, or finish an edit to it, call present_plan to show it to the user and get their decision. This is critical - your turn should only end with either asking the user a question or calling present_plan. Do not stop unless it's for these 2 reasons.

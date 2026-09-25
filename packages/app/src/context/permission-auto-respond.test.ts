@@ -1,7 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import type { PermissionRequest, Session } from "@opencode-ai/sdk/v2/client"
 import { base64Encode } from "@opencode-ai/core/util/encode"
-import { autoRespondsPermission, isDirectoryAutoAccepting, sessionAutoAccept } from "./permission-auto-respond"
+import {
+  autoRespondsPermission,
+  isActionablePermission,
+  isDirectoryAutoAccepting,
+  sessionAutoAccept,
+} from "./permission-auto-respond"
 
 const session = (input: { id: string; parentID?: string }) =>
   ({
@@ -121,5 +126,26 @@ describe("isDirectoryAutoAccepting", () => {
     const directory = "/tmp/project"
     const autoAccept = { [`${base64Encode(directory)}/*`]: false }
     expect(isDirectoryAutoAccepting(autoAccept, directory)).toBe(false)
+  })
+})
+
+describe("isActionablePermission", () => {
+  test("requires a pending request that will not be automatically answered", async () => {
+    expect(await isActionablePermission({ pending: () => true, autoResponds: async () => false })).toBe(true)
+    expect(await isActionablePermission({ pending: () => true, autoResponds: async () => true })).toBe(false)
+    expect(await isActionablePermission({ pending: () => false, autoResponds: async () => false })).toBe(false)
+  })
+
+  test("does not alert when a request is replied while auto-response resolves", async () => {
+    let pending = true
+    const actionable = isActionablePermission({
+      pending: () => pending,
+      autoResponds: async () => {
+        pending = false
+        return false
+      },
+    })
+
+    expect(await actionable).toBe(false)
   })
 })

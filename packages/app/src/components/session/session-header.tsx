@@ -512,13 +512,14 @@ export function SessionHeader(props: { diffs?: Accessor<SessionHeaderReviewDiff[
 }
 
 // Self-contained status/review/terminal icon cluster, usable anywhere (e.g. next to the
-// context-usage circle) without needing the titlebar's precomputed state. `plan`/`review`/
+// context-usage circle) without needing the titlebar's precomputed state. `plan`/`mcp`/`review`/
 // `terminal` default to shown but can be turned off where they don't apply yet (e.g. a draft
 // session with no plan file, diffs to review, or -- since the draft route drops
 // TerminalProvider entirely (see app.tsx's DraftProviders) -- no terminal to attach to).
 export function SessionHeaderQuickActions(props: {
   diffs?: Accessor<SessionHeaderReviewDiff[]>
   plan?: boolean
+  mcp?: boolean
   review?: boolean
   terminal?: boolean
 }) {
@@ -570,17 +571,19 @@ export function SessionHeaderQuickActions(props: {
       <Show when={props.plan ?? true}>
         <SessionPlanIndicator />
       </Show>
-      <TooltipV2 value={language.t("command.mcp.toggle")} placement="bottom">
-        <IconButtonV2
-          type="button"
-          variant="ghost-muted"
-          size="large"
-          class="!w-9 shrink-0"
-          aria-label={language.t("command.mcp.toggle")}
-          onClick={openMcpDialog}
-          icon={<IconV2 name="mcp" />}
-        />
-      </TooltipV2>
+      <Show when={props.mcp ?? true}>
+        <TooltipV2 value={language.t("command.mcp.toggle")} placement="bottom">
+          <IconButtonV2
+            type="button"
+            variant="ghost-muted"
+            size="large"
+            class="!w-9 shrink-0"
+            aria-label={language.t("command.mcp.toggle")}
+            onClick={openMcpDialog}
+            icon={<IconV2 name="mcp" />}
+          />
+        </TooltipV2>
+      </Show>
       <Show when={showTerminal}>
         <TooltipV2 value={language.t("command.terminal.toggle")} placement="bottom">
           <IconButtonV2
