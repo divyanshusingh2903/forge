@@ -1,0 +1,216 @@
+name: forge-release
+run-name: "forge release (${{ inputs.bump }})"
+
+# Builds the Forge desktop app for every platform and publishes it as a GitHub release tagged
+# v<opencode>-v<forge> (see script/forge-version.ts). Run it from the Actions tab.
+#
+# Assets keep stable, version-free names (forge-desktop-<os>-<arch>.<ext>), so
+# https://github.com/<repo>/releases/latest/download/<asset> always points at the newest build.
+#
+# Signing is optional: macOS builds are ad-hoc signed unless APPLE_CERTIFICATE is set, and Windows
+# builds are unsigned unless the AZURE_TRUSTED_SIGNING_* secrets are set.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Forge version bump (none releases forge.json as-is, e.g. the first 0.1.0 release)"
+        required: true
+        type: choice
+        default: patch
+        options:
+          - none
+          - patch
+          - minor
+          - major
+
+concurrency:
+  group: forge-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  version:
+    if: github.repository == 'divyanshusingh2903/forge'
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      opencode: ${{ steps.version.outputs.opencode }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - id: version
+        run: ./script/forge-version.ts ${{ inputs.bump != 'none' && inputs.bump || '' }}
+
+      - name: Tag and draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "::error::Tag $TAG already exists. Bump the Forge version or delete the old release and tag."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- forge.json; then
+            git commit -m "release: $TAG" -- forge.json
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
+          git tag "$TAG"
+          git push origin "refs/tags/$TAG"
+          gh release create "$TAG" --draft --verify-tag --title "Forge $TAG" --generate-notes
+
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-15
+            target: aarch64-apple-darwin
+            platform_flag: --mac --arm64
+            bun_install_flags: --os=darwin --cpu=arm64
+          - host: macos-15-intel
+            target: x86_64-apple-darwin
+            platform_flag: --mac --x64
+            bun_install_flags: --os=darwin --cpu=x64
+          - host: windows-2025
+            target: x86_64-pc-windows-msvc
+            platform_flag: --win --x64
+          - host: windows-2025
+            target: aarch64-pc-windows-msvc
+            platform_flag: --win --arm64
+          - host: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            platform_flag: --linux --x64
+          - host: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            platform_flag: --linux --arm64
+    runs-on: ${{ matrix.settings.host }}
+    env:
+      OPENCODE_CHANNEL: prod
+      # The bundled server reports the plain OpenCode version; only the app carries the Forge version.
+      OPENCODE_VERSION: ${{ needs.version.outputs.opencode }}
+      FORGE_VERSION: ${{ needs.version.outputs.version }}
+      TAG: ${{ needs.version.outputs.tag }}
+      AZURE_TRUSTED_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
+      AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE: ${{ secrets.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE }}
+      AZURE_TRUSTED_SIGNING_ENDPOINT: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - uses: ./.github/actions/setup-bun
+        with:
+          install-flags: ${{ matrix.settings.bun_install_flags }}
+
+      - name: Install rpm tooling
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends rpm
+
+      - name: Azure login
+        if: runner.os == 'Windows' && env.AZURE_TRUSTED_SIGNING_ENDPOINT != ''
+        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Prepare
+        run: bun ./scripts/prepare.ts
+        working-directory: packages/desktop
+        env:
+          RUST_TARGET: ${{ matrix.settings.target }}
+
+      - name: Build
+        run: bun run build
+        working-directory: packages/desktop
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Package
+        working-directory: packages/desktop
+        shell: bash
+        timeout-minutes: 60
+        env:
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_KEY_CONTENT: ${{ runner.os == 'macOS' && secrets.APPLE_API_KEY_PATH || '' }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        run: |
+          args=()
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            if [ -z "$CSC_LINK" ]; then
+              # No Developer ID certificate: ad-hoc sign so the app launches on Apple Silicon.
+              args+=(-c.mac.identity=- -c.mac.notarize=false)
+            elif [ -n "$APPLE_API_KEY_CONTENT" ]; then
+              echo "$APPLE_API_KEY_CONTENT" > "$RUNNER_TEMP/apple-api-key.p8"
+              export APPLE_API_KEY="$RUNNER_TEMP/apple-api-key.p8"
+            fi
+          fi
+          npx electron-builder ${{ matrix.settings.platform_flag }} --publish never --config electron-builder.config.ts "${args[@]}"
+
+      - name: Upload release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          files=(packages/desktop/dist/*.{exe,blockmap,dmg,zip,AppImage,deb,rpm})
+          if (( ${#files[@]} == 0 )); then
+            echo "::error::No desktop release assets found"
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: latest-yml-${{ matrix.settings.target }}
+          path: packages/desktop/dist/latest*.yml
+
+  publish:
+    needs:
+      - version
+      - build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        with:
+          ref: ${{ needs.version.outputs.tag }}
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version-file: package.json
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: latest-yml-*
+          path: ${{ runner.temp }}/latest-yml
+
+      # Merges the per-arch auto-update manifests (latest.yml, latest-mac.yml, ...) and uploads them.
+      - name: Upload update manifests
+        run: bun ./packages/desktop/scripts/finalize-latest-yml.ts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          LATEST_YML_DIR: ${{ runner.temp }}/latest-yml
+          OPENCODE_VERSION: ${{ needs.version.outputs.version }}
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "${{ needs.version.outputs.tag }}" --draft=false --latest --repo "$GITHUB_REPOSITORY"
