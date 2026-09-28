@@ -59,7 +59,14 @@ runs:
         # e.g. ./patches/ for standard-openapi
         # https://github.com/oven-sh/bun/issues/28147
         if [ "$RUNNER_OS" = "Windows" ]; then
-          bun install --linker hoisted ${{ inputs.install-flags }}
+          # Bun can apply the same patch concurrently for several copies of a package and fail with
+          # ENOTEMPTY/EPERM when both move into the shared cache dir (oven-sh/bun#28147). The patched
+          # copy is cached after a failed attempt, so a retry skips the race.
+          for attempt in 1 2 3; do
+            bun install --linker hoisted ${{ inputs.install-flags }} && break
+            if [ "$attempt" = 3 ]; then exit 1; fi
+            echo "bun install failed on attempt $attempt, retrying"
+          done
         else
           bun install ${{ inputs.install-flags }}
         fi

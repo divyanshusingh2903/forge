@@ -1735,7 +1735,9 @@ unixNoLLMServer(
   30_000,
 )
 
-it.instance(
+// Skipped on Windows: the shell child never reports exit under Bun 1.4.2.
+// See https://github.com/divyanshusingh2903/forge/issues/18
+unix(
   "loop waits while shell runs and starts after shell exits",
   () =>
     Effect.gen(function* () {

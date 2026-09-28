@@ -192,10 +192,10 @@ describe("tool.read external_directory permission", () => {
 
         const { items, next } = asks()
         const target = path.join(dir, "test.txt")
-        const alt = target
-          .replace(/^[A-Za-z]:/, "")
-          .replaceAll("\\", "/")
-          .toLowerCase()
+        // A drive-less path resolves against the current drive, so only drop the drive when the temp dir is on it
+        // (GitHub's Windows runners keep the checkout on D: and temp on C:).
+        const sameDrive = path.parse(target).root.toLowerCase() === path.parse(process.cwd()).root.toLowerCase()
+        const alt = (sameDrive ? target.replace(/^[A-Za-z]:/, "") : target).replaceAll("\\", "/").toLowerCase()
 
         yield* exec(dir, { filePath: alt }, next)
         const read = items.find((item) => item.permission === "read")

@@ -10,7 +10,9 @@ import { createAcpClient, initialize, newSession, verifierConfig } from "./helpe
 
 const tinyPng = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="
 
-describe("opencode acp prompt content subprocess", () => {
+// Skipped on Windows: the ACP subprocess never answers over stdio under Bun 1.4.2.
+// See https://github.com/divyanshusingh2903/forge/issues/18
+describe.skipIf(process.platform === "win32")("opencode acp prompt content subprocess", () => {
   cliIt.live(
     "accepts embedded text resource image and file resource link prompt content",
     ({ home, llm, opencode }) =>

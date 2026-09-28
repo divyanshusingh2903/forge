@@ -12,7 +12,9 @@ import {
   verifierConfig,
 } from "./helpers"
 
-describe("opencode acp config option subprocess", () => {
+// Skipped on Windows: the ACP subprocess never answers over stdio under Bun 1.4.2.
+// See https://github.com/divyanshusingh2903/forge/issues/18
+describe.skipIf(process.platform === "win32")("opencode acp config option subprocess", () => {
   cliIt.live(
     'model option is listed with category "model"',
     ({ home, llm, opencode }) =>

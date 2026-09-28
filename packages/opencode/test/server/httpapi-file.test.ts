@@ -53,7 +53,9 @@ describe("file HttpApi", () => {
     expect(await status.json()).toEqual([])
   })
 
-  test("serves search endpoints", async () => {
+  // Skipped on Windows: search depends on ripgrep, which hangs there under Bun 1.4.2.
+  // See https://github.com/divyanshusingh2903/forge/issues/18
+  test.skipIf(process.platform === "win32")("serves search endpoints", async () => {
     await using tmp = await tmpdir({ git: true })
     await Bun.write(path.join(tmp.path, "hello.txt"), "needle")
 
