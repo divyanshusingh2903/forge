@@ -1,7 +1,7 @@
 import { FileIcon } from "@opencode-ai/ui/file-icon"
 import "@opencode-ai/ui/v2/file-tree-v2.css"
 import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js"
+import { createEffect, createMemo, createSignal, For, Show, type JSX } from "solid-js"
 import { kindChange, kindLabel, type Kind } from "@/components/file-tree-v2"
 import { normalizePath } from "@/pages/session/v2/review-diff-kinds"
 import { createVirtualizer, defaultRangeExtractor } from "@tanstack/solid-virtual"
@@ -48,6 +48,7 @@ export function SessionFileListV2(props: {
   optionID?: (path: string) => string
   onFileClick: (path: string) => void
   onFileDoubleClick?: (path: string) => void
+  fileAccessory?: (path: string) => JSX.Element
 }) {
   const active = () => normalizePath(props.active ?? "")
   const highlighted = () => normalizePath(props.highlighted ?? "")
@@ -111,10 +112,15 @@ export function SessionFileListV2(props: {
             <Show when={virtualItemByKey().get(key)}>
               {(item) => (
                 <div
+                  class="group/git-row"
+                  onFocusIn={() => setFocused(path)}
+                  onFocusOut={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(undefined)
+                  }}
                   style={{
                     position: "absolute",
                     top: "0",
-                    left: "0",
+                    "inset-inline-start": "0",
                     width: "100%",
                     height: `${item().size}px`,
                     transform: `translateY(${item().start}px)`,
@@ -129,9 +135,10 @@ export function SessionFileListV2(props: {
                     data-path={path}
                     data-selected={selected() ? "" : undefined}
                     data-highlighted={highlightedRow() ? "" : undefined}
-                    style="padding-left: 8px"
-                    onFocus={() => setFocused(path)}
-                    onBlur={() => setFocused(undefined)}
+                    style={{
+                      "padding-inline-start": "8px",
+                      "padding-inline-end": props.fileAccessory ? "52px" : undefined,
+                    }}
                     onClick={() => props.onFileClick(path)}
                     onDblClick={() => props.onFileDoubleClick?.(path)}
                   >
@@ -142,10 +149,14 @@ export function SessionFileListV2(props: {
                     <span class="flex min-w-0 flex-1 items-center overflow-hidden whitespace-nowrap">
                       <Show when={directory()}>
                         {(value) => (
-                          <span class="text-12-medium text-text-muted truncate min-w-0 shrink">{value()}</span>
+                          <bdi dir="ltr" class="text-12-medium text-text-muted truncate min-w-0 shrink">
+                            {value()}
+                          </bdi>
                         )}
                       </Show>
-                      <span class="text-12-medium text-text-base truncate min-w-0 shrink-0">{filename()}</span>
+                      <bdi dir="auto" class="text-12-medium text-text-base truncate min-w-0 shrink-0">
+                        {filename()}
+                      </bdi>
                     </span>
                     <Show when={kind()}>
                       {(value) => (
@@ -155,6 +166,13 @@ export function SessionFileListV2(props: {
                       )}
                     </Show>
                   </button>
+                  <Show when={props.fileAccessory}>
+                    {(accessory) => (
+                      <div class="absolute inset-y-0 end-2 flex items-center gap-1">
+                        {accessory()(path)}
+                      </div>
+                    )}
+                  </Show>
                 </div>
               )}
             </Show>

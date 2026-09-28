@@ -269,6 +269,69 @@ export const FileStatus = Schema.Struct({
 }).annotate({ identifier: "VcsFileStatus" })
 export type FileStatus = Schema.Schema.Type<typeof FileStatus>
 
+export const ChangeStatus = Schema.Struct({
+  file: Schema.String,
+  staged: Schema.Boolean,
+  unstaged: Schema.Boolean,
+  untracked: Schema.Boolean,
+}).annotate({ identifier: "VcsChangeStatus" })
+export type ChangeStatus = Schema.Schema.Type<typeof ChangeStatus>
+
+export const FileInput = Schema.Struct({ file: Schema.String })
+export type FileInput = Schema.Schema.Type<typeof FileInput>
+export const CommitInput = Schema.Struct({ message: Schema.String })
+export type CommitInput = Schema.Schema.Type<typeof CommitInput>
+export const CommitMessageInput = Schema.Struct({ sessionID: Schema.String })
+export const CommitMessage = Schema.Struct({ message: Schema.String })
+export const OperationResult = Schema.Struct({ success: Schema.Boolean, output: Schema.String })
+export type OperationResult = Schema.Schema.Type<typeof OperationResult>
+
+export class OperationError extends Schema.TaggedErrorClass<OperationError>()("VcsOperationError", {
+  message: Schema.String,
+  operation: Schema.Literals(["stage", "unstage", "discard", "commit", "fetch", "push", "pull", "message"]),
+}) {}
+
+const safeFile = (file: string) =>
+  file.length > 0 &&
+  file !== "." &&
+  !file.includes("\0") &&
+  !file.startsWith("/") &&
+  !file.startsWith("\\") &&
+  !file.split(/[\\/]/).includes("..")
+
+const STAGED_PATCH_BUDGET = 60_000
+const STAGED_PATCH_MIN_SHARE = 400
+
+// Keeps commit-message prompts bounded for any commit size: the stat always lists every staged
+// file, and the patch budget is shared fairly so small files stay whole while huge ones
+// (lockfiles, generated code) are cut down instead of crowding everything else out.
+function summarizeStagedDiff(stat: string, patch: Git.Patch) {
+  const chunks = splitGitPatch(patch)
+  const bySize = chunks.map((chunk, index) => ({ chunk, index })).toSorted((a, b) => a.chunk.length - b.chunk.length)
+  const kept = bySize.reduce(
+    (acc, item, position) => {
+      const share = Math.floor(acc.left / (bySize.length - position))
+      if (share < STAGED_PATCH_MIN_SHARE) return acc
+      const text = item.chunk.length <= share ? item.chunk : `${item.chunk.slice(0, share)}\n[... diff truncated]\n`
+      acc.parts[item.index] = text
+      acc.left -= text.length
+      return acc
+    },
+    { left: STAGED_PATCH_BUDGET, parts: [] as string[] },
+  ).parts
+  const omitted = chunks.length - kept.filter(Boolean).length
+  return [
+    "Staged files:",
+    stat.trim(),
+    "",
+    "Staged patch (large files truncated):",
+    kept.filter(Boolean).join(""),
+    omitted > 0 || patch.truncated ? "[Some file diffs were omitted; rely on the staged file list above.]" : "",
+  ]
+    .filter(Boolean)
+    .join("\n")
+}
+
 export const ApplyInput = Schema.Struct({
   patch: Schema.String,
 })
@@ -292,6 +355,17 @@ export interface Interface {
   readonly diff: (mode: Mode, options?: DiffOptions) => Effect.Effect<FileDiff[]>
   readonly diffRaw: () => Effect.Effect<string>
   readonly apply: (input: ApplyInput) => Effect.Effect<ApplyResult, PatchApplyError>
+  readonly changes: () => Effect.Effect<ChangeStatus[]>
+  readonly stage: (input: FileInput) => Effect.Effect<OperationResult, OperationError>
+  readonly unstage: (input: FileInput) => Effect.Effect<OperationResult, OperationError>
+  readonly stageAll: () => Effect.Effect<OperationResult, OperationError>
+  readonly unstageAll: () => Effect.Effect<OperationResult, OperationError>
+  readonly discard: (input: FileInput) => Effect.Effect<OperationResult, OperationError>
+  readonly commit: (input: CommitInput) => Effect.Effect<OperationResult, OperationError>
+  readonly fetch: () => Effect.Effect<OperationResult, OperationError>
+  readonly push: () => Effect.Effect<OperationResult, OperationError>
+  readonly pull: () => Effect.Effect<OperationResult, OperationError>
+  readonly stagedDiff: () => Effect.Effect<string, OperationError>
 }
 
 interface State {
@@ -307,6 +381,40 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
     const git = yield* Git.Service
     const events = yield* EventV2Bridge.Service
     const scope = yield* Scope.Scope
+    const checkResult = Effect.fnUntraced(function* (operation: OperationError["operation"], result: Git.Result) {
+      if (result.exitCode !== 0)
+        return yield* new OperationError({
+          message: result.stderr.toString("utf8").trim() || result.text().trim() || `Git ${operation} failed`,
+          operation,
+        })
+      return { success: true, output: result.text().trim() }
+    })
+    const runFileOperation = Effect.fnUntraced(function* (operation: "stage" | "unstage", file: string) {
+      const ctx = yield* InstanceState.context
+      if (!safeFile(file)) return yield* new OperationError({ message: "Invalid file path", operation })
+      if (ctx.project.vcs !== "git") return yield* new OperationError({ message: "Not a Git repository", operation })
+      const item = (yield* git.status(ctx.directory)).find((entry) => entry.file === file)
+      if (!item || (operation === "stage" ? item.code[1] === " " : item.code[0] === " " || item.code[0] === "?"))
+        return yield* new OperationError({ message: "File has no changes for this action", operation })
+      const result =
+        operation === "stage" ? yield* git.stage(ctx.directory, file) : yield* git.unstage(ctx.directory, file)
+      return yield* checkResult(operation, result)
+    })
+    const runAllOperation = Effect.fnUntraced(function* (operation: "stage" | "unstage") {
+      const ctx = yield* InstanceState.context
+      if (ctx.project.vcs !== "git") return yield* new OperationError({ message: "Not a Git repository", operation })
+      const files = (yield* git.status(ctx.directory))
+        .filter(
+          (item) =>
+            !isPlanFile(item.file) &&
+            (operation === "stage" ? item.code[1] !== " " : item.code[0] !== " " && item.code[0] !== "?"),
+        )
+        .map((item) => item.file)
+      if (files.length === 0) return { success: true, output: "" }
+      const result =
+        operation === "stage" ? yield* git.stageAll(ctx.directory, files) : yield* git.unstageAll(ctx.directory, files)
+      return yield* checkResult(operation, result)
+    })
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Vcs.state")(function* (ctx) {
@@ -375,6 +483,86 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
               } satisfies FileStatus
             }),
         )
+      }),
+      changes: Effect.fn("Vcs.changes")(function* () {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git") return []
+        return (yield* git.status(ctx.directory))
+          .filter((item) => !isPlanFile(item.file))
+          .map((item) => ({
+            file: item.file,
+            staged: item.code[0] !== " " && item.code[0] !== "?",
+            unstaged: item.code[1] !== " ",
+            untracked: item.code === "??",
+          }))
+      }),
+      stage: Effect.fn("Vcs.stage")(function* (input: FileInput) {
+        return yield* runFileOperation("stage", input.file)
+      }),
+      unstage: Effect.fn("Vcs.unstage")(function* (input: FileInput) {
+        return yield* runFileOperation("unstage", input.file)
+      }),
+      stageAll: Effect.fn("Vcs.stageAll")(function* () {
+        return yield* runAllOperation("stage")
+      }),
+      unstageAll: Effect.fn("Vcs.unstageAll")(function* () {
+        return yield* runAllOperation("unstage")
+      }),
+      discard: Effect.fn("Vcs.discard")(function* (input: FileInput) {
+        const ctx = yield* InstanceState.context
+        if (!safeFile(input.file))
+          return yield* new OperationError({ message: "Invalid file path", operation: "discard" })
+        if (ctx.project.vcs !== "git")
+          return yield* new OperationError({ message: "Not a Git repository", operation: "discard" })
+        const item = (yield* git.status(ctx.directory)).find((entry) => entry.file === input.file)
+        if (!item || item.code[1] === " ")
+          return yield* new OperationError({ message: "File has no unstaged changes", operation: "discard" })
+        return yield* checkResult("discard", yield* git.discard(ctx.directory, input.file, item.code === "??"))
+      }),
+      commit: Effect.fn("Vcs.commit")(function* (input: CommitInput) {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git")
+          return yield* new OperationError({ message: "Not a Git repository", operation: "commit" })
+        if (!input.message.trim())
+          return yield* new OperationError({ message: "Commit message cannot be empty", operation: "commit" })
+        if (!(yield* git.status(ctx.directory)).some((item) => item.code[0] !== " " && item.code[0] !== "?"))
+          return yield* new OperationError({ message: "No staged changes to commit", operation: "commit" })
+        return yield* checkResult("commit", yield* git.commit(ctx.directory, input.message))
+      }),
+      fetch: Effect.fn("Vcs.fetch")(function* () {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git")
+          return yield* new OperationError({ message: "Not a Git repository", operation: "fetch" })
+        return yield* checkResult("fetch", yield* git.fetch(ctx.directory))
+      }),
+      push: Effect.fn("Vcs.push")(function* () {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git")
+          return yield* new OperationError({ message: "Not a Git repository", operation: "push" })
+        return yield* checkResult("push", yield* git.push(ctx.directory))
+      }),
+      pull: Effect.fn("Vcs.pull")(function* () {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git")
+          return yield* new OperationError({ message: "Not a Git repository", operation: "pull" })
+        return yield* checkResult("pull", yield* git.pull(ctx.directory))
+      }),
+      stagedDiff: Effect.fn("Vcs.stagedDiff")(function* () {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git")
+          return yield* new OperationError({ message: "Not a Git repository", operation: "message" })
+        const [stat, patch] = yield* Effect.all([git.stagedStat(ctx.directory), git.stagedDiff(ctx.directory)], {
+          concurrency: 2,
+        })
+        const failed = [stat, patch].find((result) => result.exitCode !== 0)
+        if (failed)
+          return yield* new OperationError({
+            message: failed.stderr.toString("utf8").trim() || "Could not read staged changes",
+            operation: "message",
+          })
+        if (!stat.text().trim())
+          return yield* new OperationError({ message: "No staged changes to summarize", operation: "message" })
+        return summarizeStagedDiff(stat.text(), { text: patch.text(), truncated: patch.truncated })
       }),
       diff: Effect.fn("Vcs.diff")(function* (mode: Mode, options?: DiffOptions) {
         const value = yield* InstanceState.get(state)

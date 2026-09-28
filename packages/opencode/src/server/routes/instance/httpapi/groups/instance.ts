@@ -40,6 +40,17 @@ export class ApiVcsApplyError extends Schema.ErrorClass<ApiVcsApplyError>("VcsAp
   { httpApiStatus: 400 },
 ) {}
 
+export class ApiVcsOperationError extends Schema.ErrorClass<ApiVcsOperationError>("VcsOperationError")(
+  {
+    name: Schema.Literal("VcsOperationError"),
+    data: Schema.Struct({
+      message: Schema.String,
+      operation: Schema.Literals(["stage", "unstage", "discard", "commit", "fetch", "push", "pull", "message"]),
+    }),
+  },
+  { httpApiStatus: 400 },
+) {}
+
 export const InstancePaths = {
   dispose: "/instance/dispose",
   path: "/path",
@@ -48,6 +59,18 @@ export const InstancePaths = {
   vcsDiff: "/vcs/diff",
   vcsDiffRaw: "/vcs/diff/raw",
   vcsApply: "/vcs/apply",
+  vcsChanges: "/vcs/changes",
+  vcsStage: "/vcs/stage",
+  vcsUnstage: "/vcs/unstage",
+  vcsStageAll: "/vcs/stage-all",
+  vcsUnstageAll: "/vcs/unstage-all",
+  vcsDiscard: "/vcs/discard",
+  vcsCommit: "/vcs/commit",
+  vcsFetch: "/vcs/fetch",
+  vcsPush: "/vcs/push",
+  vcsPull: "/vcs/pull",
+  vcsStagedDiff: "/vcs/staged-diff",
+  vcsGenerateMessage: "/vcs/commit-message",
   command: "/command",
   agent: "/agent",
   skill: "/skill",
@@ -136,6 +159,70 @@ export const InstanceApi = HttpApi.make("instance")
             description: "Apply a raw patch to the current working tree.",
           }),
         ),
+        HttpApiEndpoint.get("vcsChanges", InstancePaths.vcsChanges, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Array(Vcs.ChangeStatus), "Staged and unstaged VCS changes"),
+        }),
+        HttpApiEndpoint.post("vcsStage", InstancePaths.vcsStage, {
+          query: WorkspaceRoutingQuery,
+          payload: Vcs.FileInput,
+          success: described(Vcs.OperationResult, "VCS stage completed"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsUnstage", InstancePaths.vcsUnstage, {
+          query: WorkspaceRoutingQuery,
+          payload: Vcs.FileInput,
+          success: described(Vcs.OperationResult, "VCS unstage completed"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsStageAll", InstancePaths.vcsStageAll, {
+          query: WorkspaceRoutingQuery,
+          success: described(Vcs.OperationResult, "All VCS changes staged"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsUnstageAll", InstancePaths.vcsUnstageAll, {
+          query: WorkspaceRoutingQuery,
+          success: described(Vcs.OperationResult, "All VCS changes unstaged"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsDiscard", InstancePaths.vcsDiscard, {
+          query: WorkspaceRoutingQuery,
+          payload: Vcs.FileInput,
+          success: described(Vcs.OperationResult, "VCS discard completed"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsCommit", InstancePaths.vcsCommit, {
+          query: WorkspaceRoutingQuery,
+          payload: Vcs.CommitInput,
+          success: described(Vcs.OperationResult, "VCS commit completed"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsFetch", InstancePaths.vcsFetch, {
+          query: WorkspaceRoutingQuery,
+          success: described(Vcs.OperationResult, "VCS fetch completed"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsPush", InstancePaths.vcsPush, {
+          query: WorkspaceRoutingQuery,
+          success: described(Vcs.OperationResult, "VCS push completed"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsPull", InstancePaths.vcsPull, {
+          query: WorkspaceRoutingQuery,
+          success: described(Vcs.OperationResult, "VCS pull completed"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.get("vcsStagedDiff", InstancePaths.vcsStagedDiff, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.String, "Staged changes diff"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsGenerateMessage", InstancePaths.vcsGenerateMessage, {
+          query: WorkspaceRoutingQuery,
+          payload: Vcs.CommitMessageInput,
+          success: described(Vcs.CommitMessage, "Generated commit message"),
+          error: ApiVcsOperationError,
+        }),
         HttpApiEndpoint.get("command", InstancePaths.command, {
           query: WorkspaceRoutingQuery,
           success: described(Schema.Array(Command.Info), "List of commands"),

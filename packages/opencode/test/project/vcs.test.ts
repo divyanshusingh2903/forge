@@ -332,4 +332,119 @@ describe("Vcs diff", () => {
       }),
     { git: true },
   )
+
+  it.instance(
+    "tracks staged and unstaged file changes separately and discard preserves the index",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        yield* write(path.join(test.directory, "file.txt"), "base\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "base"])
+        yield* write(path.join(test.directory, "file.txt"), "staged\n")
+        const vcs = yield* init()
+        expect((yield* vcs.stage({ file: "file.txt" })).success).toBe(true)
+        yield* write(path.join(test.directory, "file.txt"), "unstaged\n")
+
+        expect(yield* vcs.changes()).toEqual([{ file: "file.txt", staged: true, unstaged: true, untracked: false }])
+        expect(yield* vcs.stagedDiff()).toContain("+staged")
+        expect(yield* vcs.stagedDiff()).not.toContain("+unstaged")
+        expect((yield* vcs.discard({ file: "file.txt" })).success).toBe(true)
+        expect(yield* Effect.promise(() => Bun.file(path.join(test.directory, "file.txt")).text())).toBe("staged\n")
+        expect(yield* vcs.changes()).toEqual([{ file: "file.txt", staged: true, unstaged: false, untracked: false }])
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "stages literal filenames, unstages them, and rejects committing without staged changes",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const vcs = yield* init()
+        yield* write(path.join(test.directory, "[draft].txt"), "draft\n")
+        yield* write(path.join(test.directory, "d.txt"), "other\n")
+
+        expect((yield* vcs.stage({ file: "[draft].txt" })).success).toBe(true)
+        expect(yield* vcs.changes()).toEqual(
+          expect.arrayContaining([
+            { file: "[draft].txt", staged: true, unstaged: false, untracked: false },
+            { file: "d.txt", staged: false, unstaged: true, untracked: true },
+          ]),
+        )
+        expect((yield* vcs.stagedDiff()).includes("draft")).toBe(true)
+        expect((yield* vcs.unstage({ file: "[draft].txt" })).success).toBe(true)
+        expect((yield* Effect.exit(vcs.commit({ message: "not yet" })))._tag).toBe("Failure")
+        expect((yield* Effect.exit(vcs.stage({ file: "../outside" })))._tag).toBe("Failure")
+        expect((yield* vcs.discard({ file: "[draft].txt" })).success).toBe(true)
+        expect(yield* Effect.promise(() => Bun.file(path.join(test.directory, "[draft].txt")).exists())).toBe(false)
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "commits staged changes and reports remote failures without an upstream",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const vcs = yield* init()
+        yield* write(path.join(test.directory, "commit.txt"), "saved\n")
+        yield* vcs.stage({ file: "commit.txt" })
+        expect((yield* vcs.commit({ message: "Save changes" })).success).toBe(true)
+        expect(yield* vcs.changes()).toEqual([])
+        expect((yield* Effect.exit(vcs.push()))._tag).toBe("Failure")
+        expect((yield* Effect.exit(vcs.pull()))._tag).toBe("Failure")
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "bulk staging ignores plans and keeps mixed worktree changes when unstaging",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const vcs = yield* init()
+        yield* write(path.join(test.directory, "a [literal].txt"), "first\n")
+        yield* write(path.join(test.directory, "b.txt"), "second\n")
+        yield* write(path.join(test.directory, ".opencode/plans/draft.md"), "not included\n")
+        expect((yield* vcs.stageAll()).success).toBe(true)
+        expect(yield* vcs.changes()).toEqual(
+          expect.arrayContaining([
+            { file: "a [literal].txt", staged: true, unstaged: false, untracked: false },
+            { file: "b.txt", staged: true, unstaged: false, untracked: false },
+          ]),
+        )
+        const staged = yield* Git.Service.use((git) =>
+          git.run(["diff", "--cached", "--name-only"], { cwd: test.directory }),
+        )
+        expect(staged.text()).toContain("a [literal].txt")
+        expect(staged.text()).not.toContain("draft.md")
+        yield* write(path.join(test.directory, "b.txt"), "worktree only\n")
+        expect((yield* vcs.unstageAll()).success).toBe(true)
+        expect((yield* vcs.stagedDiff().pipe(Effect.exit))._tag).toBe("Failure")
+        expect(yield* Effect.promise(() => Bun.file(path.join(test.directory, "b.txt")).text())).toBe("worktree only\n")
+        expect((yield* vcs.stageAll()).success).toBe(true)
+        expect((yield* vcs.unstageAll()).success).toBe(true)
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "summarizes very large staged diffs instead of rejecting them",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const vcs = yield* init()
+        yield* write(path.join(test.directory, "huge.lock"), "entry\n".repeat(200_000))
+        yield* write(path.join(test.directory, "small.ts"), "export const small = 1\n")
+        expect((yield* vcs.stageAll()).success).toBe(true)
+
+        const summary = yield* vcs.stagedDiff()
+        expect(summary).toContain("huge.lock")
+        expect(summary).toContain("+export const small = 1")
+        expect(summary).toContain("[... diff truncated]")
+        expect(summary.length).toBeLessThan(80_000)
+      }),
+    { git: true },
+  )
 })

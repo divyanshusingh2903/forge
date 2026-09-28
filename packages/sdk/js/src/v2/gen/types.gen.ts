@@ -2339,6 +2339,21 @@ export type VcsApplyError = {
   }
 }
 
+export type VcsChangeStatus = {
+  file: string
+  staged: boolean
+  unstaged: boolean
+  untracked: boolean
+}
+
+export type VcsOperationError = {
+  name: "VcsOperationError"
+  data: {
+    message: string
+    operation: "stage" | "unstage" | "discard" | "commit" | "fetch" | "push" | "pull" | "message"
+  }
+}
+
 export type Command = {
   name: string
   description?: string
@@ -8285,6 +8300,382 @@ export type VcsApplyResponses = {
 }
 
 export type VcsApplyResponse = VcsApplyResponses[keyof VcsApplyResponses]
+
+export type InstanceVcsChangesData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/changes"
+}
+
+export type InstanceVcsChangesErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type InstanceVcsChangesError = InstanceVcsChangesErrors[keyof InstanceVcsChangesErrors]
+
+export type InstanceVcsChangesResponses = {
+  /**
+   * Staged and unstaged VCS changes
+   */
+  200: Array<VcsChangeStatus>
+}
+
+export type InstanceVcsChangesResponse = InstanceVcsChangesResponses[keyof InstanceVcsChangesResponses]
+
+export type InstanceVcsStageData = {
+  body?: {
+    file: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/stage"
+}
+
+export type InstanceVcsStageErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsStageError = InstanceVcsStageErrors[keyof InstanceVcsStageErrors]
+
+export type InstanceVcsStageResponses = {
+  /**
+   * VCS stage completed
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsStageResponse = InstanceVcsStageResponses[keyof InstanceVcsStageResponses]
+
+export type InstanceVcsUnstageData = {
+  body?: {
+    file: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/unstage"
+}
+
+export type InstanceVcsUnstageErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsUnstageError = InstanceVcsUnstageErrors[keyof InstanceVcsUnstageErrors]
+
+export type InstanceVcsUnstageResponses = {
+  /**
+   * VCS unstage completed
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsUnstageResponse = InstanceVcsUnstageResponses[keyof InstanceVcsUnstageResponses]
+
+export type InstanceVcsStageAllData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/stage-all"
+}
+
+export type InstanceVcsStageAllErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsStageAllError = InstanceVcsStageAllErrors[keyof InstanceVcsStageAllErrors]
+
+export type InstanceVcsStageAllResponses = {
+  /**
+   * All VCS changes staged
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsStageAllResponse = InstanceVcsStageAllResponses[keyof InstanceVcsStageAllResponses]
+
+export type InstanceVcsUnstageAllData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/unstage-all"
+}
+
+export type InstanceVcsUnstageAllErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsUnstageAllError = InstanceVcsUnstageAllErrors[keyof InstanceVcsUnstageAllErrors]
+
+export type InstanceVcsUnstageAllResponses = {
+  /**
+   * All VCS changes unstaged
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsUnstageAllResponse = InstanceVcsUnstageAllResponses[keyof InstanceVcsUnstageAllResponses]
+
+export type InstanceVcsDiscardData = {
+  body?: {
+    file: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/discard"
+}
+
+export type InstanceVcsDiscardErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsDiscardError = InstanceVcsDiscardErrors[keyof InstanceVcsDiscardErrors]
+
+export type InstanceVcsDiscardResponses = {
+  /**
+   * VCS discard completed
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsDiscardResponse = InstanceVcsDiscardResponses[keyof InstanceVcsDiscardResponses]
+
+export type InstanceVcsCommitData = {
+  body?: {
+    message: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/commit"
+}
+
+export type InstanceVcsCommitErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsCommitError = InstanceVcsCommitErrors[keyof InstanceVcsCommitErrors]
+
+export type InstanceVcsCommitResponses = {
+  /**
+   * VCS commit completed
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsCommitResponse = InstanceVcsCommitResponses[keyof InstanceVcsCommitResponses]
+
+export type InstanceVcsFetchData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/fetch"
+}
+
+export type InstanceVcsFetchErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsFetchError = InstanceVcsFetchErrors[keyof InstanceVcsFetchErrors]
+
+export type InstanceVcsFetchResponses = {
+  /**
+   * VCS fetch completed
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsFetchResponse = InstanceVcsFetchResponses[keyof InstanceVcsFetchResponses]
+
+export type InstanceVcsPushData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/push"
+}
+
+export type InstanceVcsPushErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsPushError = InstanceVcsPushErrors[keyof InstanceVcsPushErrors]
+
+export type InstanceVcsPushResponses = {
+  /**
+   * VCS push completed
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsPushResponse = InstanceVcsPushResponses[keyof InstanceVcsPushResponses]
+
+export type InstanceVcsPullData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/pull"
+}
+
+export type InstanceVcsPullErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsPullError = InstanceVcsPullErrors[keyof InstanceVcsPullErrors]
+
+export type InstanceVcsPullResponses = {
+  /**
+   * VCS pull completed
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsPullResponse = InstanceVcsPullResponses[keyof InstanceVcsPullResponses]
+
+export type InstanceVcsStagedDiffData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/staged-diff"
+}
+
+export type InstanceVcsStagedDiffErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsStagedDiffError = InstanceVcsStagedDiffErrors[keyof InstanceVcsStagedDiffErrors]
+
+export type InstanceVcsStagedDiffResponses = {
+  /**
+   * Staged changes diff
+   */
+  200: string
+}
+
+export type InstanceVcsStagedDiffResponse = InstanceVcsStagedDiffResponses[keyof InstanceVcsStagedDiffResponses]
+
+export type InstanceVcsGenerateMessageData = {
+  body?: {
+    sessionID: string
+  }
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/commit-message"
+}
+
+export type InstanceVcsGenerateMessageErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsGenerateMessageError = InstanceVcsGenerateMessageErrors[keyof InstanceVcsGenerateMessageErrors]
+
+export type InstanceVcsGenerateMessageResponses = {
+  /**
+   * Generated commit message
+   */
+  200: {
+    message: string
+  }
+}
+
+export type InstanceVcsGenerateMessageResponse =
+  InstanceVcsGenerateMessageResponses[keyof InstanceVcsGenerateMessageResponses]
 
 export type CommandListData = {
   body?: never

@@ -1399,6 +1399,14 @@ export default function Page() {
   // the side panel's Show children and remounted the whole review panel on unrelated
   // updates such as session switches.
   const reviewPanelV2Props = () => ({
+    get gitChangesEnabled() {
+      return reviewMode() === "git" && sync().project?.vcs === "git"
+    },
+    get branch() {
+      return sync().data.vcs?.branch
+    },
+    sessionID: () => params.id,
+    onGitChange: refreshVcs,
     get title() {
       return changesTitleV2()
     },
