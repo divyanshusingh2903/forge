@@ -35,7 +35,7 @@ import { coverageResult, parseOptions, routeKey, routeKeys, selectedScenarios } 
 import { runScenario } from "./runner"
 import { disposeApps } from "./backend"
 import { runtime } from "./runtime"
-import { type Scenario } from "./types"
+import { type Scenario, type ScenarioContext } from "./types"
 
 function cursor(input: Record<string, unknown>) {
   return Buffer.from(JSON.stringify(input)).toString("base64url")
@@ -46,6 +46,35 @@ function data(validate: (value: any) => void) {
     object(body)
     validate(body.data)
   }
+}
+
+// Runs git in the scenario project, which the default fixture initializes with one empty commit.
+function git(ctx: { directory: string | undefined }, ...args: string[]) {
+  return Effect.promise(() => Bun.$`git ${args}`.cwd(ctx.directory ?? "").quiet()).pipe(Effect.asVoid)
+}
+
+// A new untracked file, optionally staged.
+function dirtyFile(ctx: ScenarioContext, staged = false) {
+  return Effect.gen(function* () {
+    yield* ctx.file("exercise.txt", "exercise\n")
+    if (staged) yield* git(ctx, "add", "exercise.txt")
+  })
+}
+
+// A local bare repository as origin with the current branch tracking it, kept inside .git so fixture cleanup removes it.
+function trackedRemote(ctx: ScenarioContext) {
+  return Effect.gen(function* () {
+    const remote = path.join(ctx.directory ?? "", ".git", "exercise-remote.git")
+    yield* git(ctx, "init", "--bare", "--quiet", remote)
+    yield* git(ctx, "remote", "add", "origin", remote)
+    yield* git(ctx, "push", "--quiet", "-u", "origin", "HEAD")
+  })
+}
+
+function operationResult(body: unknown) {
+  object(body)
+  check(body.success === true, "VCS operation should succeed")
+  check(typeof body.output === "string", "VCS operation should return output text")
 }
 
 function locationData(validate: (value: any) => void) {
@@ -139,6 +168,136 @@ const scenarios: Scenario[] = [
     .inProject({ git: false })
     .at((ctx) => ({ path: "/vcs/apply", headers: ctx.headers(), body: { patch: "" } }))
     .status(400, undefined, "status"),
+  http.protected
+    .get("/vcs/changes", "vcs.changes")
+    .seeded((ctx) => dirtyFile(ctx))
+    .at((ctx) => ({ path: "/vcs/changes", headers: ctx.headers() }))
+    .json(200, (body) => {
+      array(body)
+      check(
+        body.some(
+          (item) =>
+            isRecord(item) &&
+            item.file === "exercise.txt" &&
+            item.untracked === true &&
+            item.unstaged === true &&
+            item.staged === false,
+        ),
+        "changes should list the untracked file",
+      )
+    }),
+  http.protected
+    .get("/vcs/remote", "vcs.remote")
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        yield* trackedRemote(ctx)
+        yield* git(ctx, "commit", "--quiet", "--allow-empty", "-m", "ahead of origin")
+      }),
+    )
+    .at((ctx) => ({ path: "/vcs/remote", headers: ctx.headers() }))
+    .json(200, (body) => {
+      check(stable(body) === stable({ upstream: true, ahead: 1, behind: 0 }), "remote should report one commit ahead")
+    }),
+  http.protected
+    .post("/vcs/stage", "vcs.stage")
+    .mutating()
+    .seeded((ctx) => dirtyFile(ctx))
+    .at((ctx) => ({ path: "/vcs/stage", headers: ctx.headers(), body: { file: "exercise.txt" } }))
+    .json(200, operationResult, "status"),
+  http.protected
+    .post("/vcs/unstage", "vcs.unstage")
+    .mutating()
+    .seeded((ctx) => dirtyFile(ctx, true))
+    .at((ctx) => ({ path: "/vcs/unstage", headers: ctx.headers(), body: { file: "exercise.txt" } }))
+    .json(200, operationResult, "status"),
+  http.protected
+    .post("/vcs/stage-all", "vcs.stageAll")
+    .mutating()
+    .seeded((ctx) => dirtyFile(ctx))
+    .at((ctx) => ({ path: "/vcs/stage-all", headers: ctx.headers() }))
+    .json(200, operationResult, "status"),
+  http.protected
+    .post("/vcs/unstage-all", "vcs.unstageAll")
+    .mutating()
+    .seeded((ctx) => dirtyFile(ctx, true))
+    .at((ctx) => ({ path: "/vcs/unstage-all", headers: ctx.headers() }))
+    .json(200, operationResult, "status"),
+  http.protected
+    .post("/vcs/discard", "vcs.discard")
+    .mutating()
+    .seeded((ctx) => dirtyFile(ctx))
+    .at((ctx) => ({ path: "/vcs/discard", headers: ctx.headers(), body: { file: "exercise.txt" } }))
+    .jsonEffect(
+      200,
+      (body, ctx) =>
+        Effect.gen(function* () {
+          operationResult(body)
+          const exists = yield* Effect.promise(() => Bun.file(path.join(ctx.directory ?? "", "exercise.txt")).exists())
+          check(!exists, "discard should remove the untracked file")
+        }),
+      "status",
+    ),
+  http.protected
+    .post("/vcs/commit", "vcs.commit")
+    .mutating()
+    .seeded((ctx) => dirtyFile(ctx, true))
+    .at((ctx) => ({ path: "/vcs/commit", headers: ctx.headers(), body: { message: "exercise commit" } }))
+    .json(200, operationResult, "status"),
+  http.protected
+    .post("/vcs/fetch", "vcs.fetch")
+    .mutating()
+    .seeded((ctx) => trackedRemote(ctx))
+    .at((ctx) => ({ path: "/vcs/fetch", headers: ctx.headers() }))
+    .json(200, operationResult, "status"),
+  http.protected
+    .post("/vcs/push", "vcs.push")
+    .mutating()
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        yield* trackedRemote(ctx)
+        yield* git(ctx, "commit", "--quiet", "--allow-empty", "-m", "push me")
+      }),
+    )
+    .at((ctx) => ({ path: "/vcs/push", headers: ctx.headers() }))
+    .json(200, operationResult, "status"),
+  http.protected
+    .post("/vcs/pull", "vcs.pull")
+    .mutating()
+    .seeded((ctx) => trackedRemote(ctx))
+    .at((ctx) => ({ path: "/vcs/pull", headers: ctx.headers() }))
+    .json(200, operationResult, "status"),
+  http.protected
+    .get("/vcs/staged-diff", "vcs.stagedDiff")
+    .seeded((ctx) => dirtyFile(ctx, true))
+    .at((ctx) => ({ path: "/vcs/staged-diff", headers: ctx.headers() }))
+    .json(200, (body) => {
+      check(typeof body === "string" && body.includes("exercise.txt"), "staged diff should mention the staged file")
+    }),
+  http.protected
+    .post("/vcs/commit-message", "vcs.commitMessage")
+    .preserveDatabase()
+    .withLlm()
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        yield* dirtyFile(ctx, true)
+        const session = yield* ctx.session({
+          title: "Commit message session",
+          model: { providerID: "test", id: "test-model" },
+        })
+        yield* ctx.message(session.id, { text: "add the exercise file" })
+        yield* ctx.llmText("feat: add exercise file")
+        return session
+      }),
+    )
+    .at((ctx) => ({ path: "/vcs/commit-message", headers: ctx.headers(), body: { sessionID: ctx.state.id } }))
+    .json(
+      200,
+      (body) => {
+        object(body)
+        check(body.message === "feat: add exercise file", "commit message should come from the model")
+      },
+      "status",
+    ),
   http.protected.get("/command", "command.list").json(200, array, "status"),
   http.protected.get("/agent", "app.agents").json(200, array, "status"),
   http.protected.get("/skill", "app.skills").json(200, array, "status"),
@@ -1268,6 +1427,33 @@ const scenarios: Scenario[] = [
       check(stable(body) === stable(ctx.state.todos), "todos should match seeded state")
     }),
   http.protected
+    .get("/session/{sessionID}/plan", "session.plan")
+    .seeded((ctx) => ctx.session({ title: "Plan session" }))
+    .at((ctx) => ({ path: route("/session/{sessionID}/plan", { sessionID: ctx.state.id }), headers: ctx.headers() }))
+    .json(200, (body) => {
+      object(body)
+      check(typeof body.path === "string" && body.path.length > 0, "plan should report its file path")
+      check(body.exists === false, "a new session should have no plan file")
+    }),
+  http.protected
+    .post("/session/{sessionID}/plan/recover", "session.planRecover")
+    .mutating()
+    .seeded((ctx) => ctx.session({ title: "Plan recover session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/plan/recover", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: {},
+    }))
+    .json(
+      200,
+      (body) => {
+        object(body)
+        check(body.recovered === false, "nothing should be recovered without an interrupted plan")
+        check(body.resumed === false, "discard should not resume the agent")
+      },
+      "status",
+    ),
+  http.protected
     .get("/session/{sessionID}/diff", "session.diff")
     .seeded((ctx) => ctx.session({ title: "Diff session" }))
     .at((ctx) => ({ path: route("/session/{sessionID}/diff", { sessionID: ctx.state.id }), headers: ctx.headers() }))
@@ -1748,6 +1934,7 @@ const llmScenarios = new Set([
   "session.prompt_async",
   "session.command",
   "session.summarize",
+  "vcs.commitMessage",
 ])
 
 const main = Effect.gen(function* () {
