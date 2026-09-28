@@ -173,7 +173,10 @@ describe("AppProcess", () => {
         5_000,
       )
 
-      it.live(
+      // Skipped on macOS: Bun 1.4.x can lose the child's exit notification there, so cleanup never finishes.
+      // See https://github.com/divyanshusingh2903/forge/issues/18
+      const liveUnlessDarwin = process.platform === "darwin" ? it.live.skip : it.live
+      liveUnlessDarwin(
         "fiber interruption cleans up the scoped child process after readiness",
         Effect.acquireUseRelease(
           Effect.promise(() => fs.mkdtemp(path.join(tmpdir(), "opencode-process-interrupt-"))),
