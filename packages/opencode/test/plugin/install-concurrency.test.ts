@@ -63,28 +63,34 @@ function expectPlugins(list: unknown[] | undefined, expectMods: string[]) {
 }
 
 describe("plugin.install.concurrent", () => {
-  test("serializes concurrent server config updates across processes", async () => {
-    await using tmp = await tmpdir()
-    const target = await plugin(tmp.path, ["server"])
-    const all = mods("mod-server", 6)
+  // Skipped on Windows: the six worker processes intermittently all exit with code 1 there under Bun 1.4.2.
+  // See https://github.com/divyanshusingh2903/forge/issues/18
+  test.skipIf(process.platform === "win32")(
+    "serializes concurrent server config updates across processes",
+    async () => {
+      await using tmp = await tmpdir()
+      const target = await plugin(tmp.path, ["server"])
+      const all = mods("mod-server", 6)
 
-    const out = await Promise.all(
-      all.map((mod) =>
-        run({
-          dir: tmp.path,
-          target,
-          mod,
-          holdMs: 30,
-        }),
-      ),
-    )
+      const out = await Promise.all(
+        all.map((mod) =>
+          run({
+            dir: tmp.path,
+            target,
+            mod,
+            holdMs: 30,
+          }),
+        ),
+      )
 
-    expect(out.map((x) => x.code)).toEqual(Array.from({ length: all.length }, () => 0))
-    expect(out.map((x) => x.stderr.toString()).filter(Boolean)).toEqual([])
+      expect(out.map((x) => x.code)).toEqual(Array.from({ length: all.length }, () => 0))
+      expect(out.map((x) => x.stderr.toString()).filter(Boolean)).toEqual([])
 
-    const cfg = await read(path.join(tmp.path, ".opencode", "opencode.jsonc"))
-    expectPlugins(cfg.plugin, all)
-  }, 25_000)
+      const cfg = await read(path.join(tmp.path, ".opencode", "opencode.jsonc"))
+      expectPlugins(cfg.plugin, all)
+    },
+    25_000,
+  )
 
   test("serializes concurrent server+tui config updates across processes", async () => {
     await using tmp = await tmpdir()

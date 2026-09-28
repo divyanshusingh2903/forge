@@ -1774,7 +1774,9 @@ unix(
   10_000,
 )
 
-it.instance(
+// Skipped on Windows: the shell child intermittently never reports exit under Bun 1.4.2.
+// See https://github.com/divyanshusingh2903/forge/issues/18
+unix(
   "shell completion resumes queued loop callers",
   () =>
     Effect.gen(function* () {
