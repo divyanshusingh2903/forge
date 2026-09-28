@@ -500,11 +500,14 @@ export const Terminal = (props: TerminalProps) => {
         handleFocusOut,
       })
 
-      if (local.autoFocus === true) {
+      // Read once: onAutoFocus consumes the focus request, which flips the
+      // reactive autoFocus prop to false before the restore branch runs.
+      const autoFocus = local.autoFocus === true
+      if (autoFocus) {
         focusTerminal()
         local.onAutoFocus?.()
       }
-      if (local.autoFocus !== true) {
+      if (!autoFocus) {
         const restoreFocus = () => {
           const current = document.activeElement
           if (current !== container && !container.contains(current)) return

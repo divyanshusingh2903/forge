@@ -76,9 +76,17 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
   // Terminals are session-scoped now, so a session switch swaps to a
   // different (initially disconnected) terminal set without this page
   // remounting -- reset the recovery-in-flight map so a stale key from the
-  // previous session can't block the new session's own recovery.
+  // previous session can't block the new session's own recovery, and let the
+  // new session auto-create its own first terminal.
   createEffect(
-    on(sessionKey, () => setStore("recovered", {}), { defer: true }),
+    on(
+      sessionKey,
+      () => {
+        setStore("recovered", {})
+        setStore("autoCreated", false)
+      },
+      { defer: true },
+    ),
   )
 
   createEffect(() => {
@@ -94,9 +102,10 @@ export function TerminalPanelV2(props: { stacked?: boolean } = {}) {
 
   createEffect(
     on(
-      () => terminal.all().length,
-      (count, prevCount) => {
-        if (prevCount === undefined || prevCount <= 0 || count !== 0) return
+      () => [sessionKey(), terminal.all().length] as const,
+      ([key, count], prev) => {
+        // Switching to a session with no terminals is not the user closing the last one.
+        if (!prev || prev[0] !== key || prev[1] <= 0 || count !== 0) return
         if (!opened()) return
         close()
       },

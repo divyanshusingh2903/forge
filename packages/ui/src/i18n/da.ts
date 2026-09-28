@@ -213,4 +213,14 @@ export const dict = {
   "ui.promptInput.stop": "Stop",
 
   "ui.tabs.close": "Luk fane",
+  "ui.sessionReviewV2.empty": "Ingen ændringer endnu",
+  "ui.sessionReviewV2.openFull": "Åbn fuld gennemgang",
+  "ui.promptInput.chooseMode": "Vælg tilstand",
+  "ui.promptInput.mode.manual": "Manuel",
+  "ui.promptInput.mode.acceptEdits": "Accepter redigeringer",
+  "ui.promptInput.mode.auto": "Automatisk",
+  "ui.promptInput.mode.plan": "Plan",
+  "ui.tool.presentPlan": "Præsenterer plan",
+  "ui.tool.planEnter": "Går i Plan-tilstand",
+  "ui.message.tokens": "{{input}} ind / {{output}} ud",
 }

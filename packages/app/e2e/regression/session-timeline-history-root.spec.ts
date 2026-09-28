@@ -45,7 +45,8 @@ const scenarios = [
   },
 ] as const
 
-test.use({ viewport: { width: 646, height: 1385 } })
+// Tall enough that completion content added at the bottom does not scroll the tracked parts out of view.
+test.use({ viewport: { width: 646, height: 1700 } })
 
 for (const scenario of scenarios) {
   test(`keeps visible timeline content visible through ${scenario.name}`, async ({ page }) => {
@@ -102,6 +103,16 @@ for (const scenario of scenarios) {
           cursor: start > 0 ? messages[start]!.info.id : undefined,
         }
       },
+    })
+    await page.addInitScript(() => {
+      // Keep the collapsed layout this test was sized for; skip the verbose-defaults migration.
+      localStorage.setItem(
+        "settings.v3",
+        JSON.stringify({
+          general: { showReasoningSummaries: false, shellToolPartsExpanded: false, editToolPartsExpanded: false },
+          verboseDefaultsMigratedV1: true,
+        }),
+      )
     })
     await page.addInitScript(() => {
       const visibleParts = () => {

@@ -136,6 +136,8 @@ export async function setupTimeline(
           showSessionProgressBar: true,
           ...settings,
         },
+        // Skip the one-time verbose-defaults migration so these explicit values apply.
+        verboseDefaultsMigratedV1: true,
       }),
     )
     if (settings.newLayoutDesigns === false) {
