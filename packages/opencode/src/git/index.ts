@@ -95,6 +95,7 @@ export interface Interface {
   readonly discard: (cwd: string, file: string, untracked: boolean) => Effect.Effect<Result>
   readonly commit: (cwd: string, message: string) => Effect.Effect<Result>
   readonly fetch: (cwd: string) => Effect.Effect<Result>
+  readonly aheadBehind: (cwd: string) => Effect.Effect<{ ahead: number; behind: number } | undefined>
   readonly push: (cwd: string) => Effect.Effect<Result>
   readonly pull: (cwd: string) => Effect.Effect<Result>
   readonly stagedDiff: (cwd: string) => Effect.Effect<Result>
@@ -365,6 +366,14 @@ const layer = Layer.effect(
     const fetch = Effect.fn("Git.fetch")(function* (cwd: string) {
       return yield* run(["fetch"], { cwd, env: { GIT_TERMINAL_PROMPT: "0" } })
     })
+    // Undefined when the branch has no upstream (or no commits), since there is nothing to compare against.
+    const aheadBehind = Effect.fn("Git.aheadBehind")(function* (cwd: string) {
+      const result = yield* run(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], { cwd })
+      if (result.exitCode !== 0) return undefined
+      const [behind, ahead] = result.text().trim().split(/\s+/).map((value) => Number.parseInt(value, 10))
+      if (!Number.isFinite(behind) || !Number.isFinite(ahead)) return undefined
+      return { ahead, behind }
+    })
     const push = Effect.fn("Git.push")(function* (cwd: string) {
       return yield* run(["push"], { cwd, env: { GIT_TERMINAL_PROMPT: "0" } })
     })
@@ -408,6 +417,7 @@ const layer = Layer.effect(
       discard,
       commit,
       fetch,
+      aheadBehind,
       push,
       pull,
       stagedDiff,

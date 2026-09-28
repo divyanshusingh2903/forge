@@ -60,6 +60,7 @@ export const InstancePaths = {
   vcsDiffRaw: "/vcs/diff/raw",
   vcsApply: "/vcs/apply",
   vcsChanges: "/vcs/changes",
+  vcsRemote: "/vcs/remote",
   vcsStage: "/vcs/stage",
   vcsUnstage: "/vcs/unstage",
   vcsStageAll: "/vcs/stage-all",
@@ -162,6 +163,10 @@ export const InstanceApi = HttpApi.make("instance")
         HttpApiEndpoint.get("vcsChanges", InstancePaths.vcsChanges, {
           query: WorkspaceRoutingQuery,
           success: described(Schema.Array(Vcs.ChangeStatus), "Staged and unstaged VCS changes"),
+        }),
+        HttpApiEndpoint.get("vcsRemote", InstancePaths.vcsRemote, {
+          query: WorkspaceRoutingQuery,
+          success: described(Vcs.RemoteStatus, "Commits ahead of and behind the upstream branch"),
         }),
         HttpApiEndpoint.post("vcsStage", InstancePaths.vcsStage, {
           query: WorkspaceRoutingQuery,

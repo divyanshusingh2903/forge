@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, on, Show, type JSX } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
-import type { SnapshotFileDiff, VcsChangeStatus, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import type { SnapshotFileDiff, VcsChangeStatus, VcsFileDiff, VcsRemoteStatus } from "@opencode-ai/sdk/v2"
 import type { FileDiffInfo } from "@opencode-ai/client/promise"
 import {
   SESSION_REVIEW_V2_SIDEBAR_WIDTH_MAX,
@@ -77,11 +77,19 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
     error: "",
     loadError: "",
     changes: [] as VcsChangeStatus[],
+    remote: { upstream: false, ahead: 0, behind: 0 } as VcsRemoteStatus,
   })
   createEffect(
     on(
       [() => sdk().directory, () => props.sessionID?.()],
-      () => setGit({ message: "", error: "", loadError: "", changes: [] }),
+      () =>
+        setGit({
+          message: "",
+          error: "",
+          loadError: "",
+          changes: [],
+          remote: { upstream: false, ahead: 0, behind: 0 },
+        }),
       { defer: true },
     ),
   )
@@ -89,11 +97,14 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
   // Suspense, so reading a refetching resource blanked the whole file list after every action.
   const loadChanges = () => {
     const directory = sdk().directory
-    return sdk()
-      .client.instance.vcsChanges({ directory }, { throwOnError: true })
-      .then((response) => {
+    return Promise.all([
+      sdk().client.instance.vcsChanges({ directory }, { throwOnError: true }),
+      sdk().client.instance.vcsRemote({ directory }, { throwOnError: true }),
+    ])
+      .then(([changes, remote]) => {
         if (sdk().directory !== directory) return
-        setGit("changes", reconcile(response.data ?? [], { key: "file" }))
+        setGit("changes", reconcile(changes.data ?? [], { key: "file" }))
+        if (remote.data) setGit("remote", remote.data)
         setGit("loadError", "")
       })
       .catch((error) => setGit("loadError", error instanceof Error ? error.message : String(error)))
@@ -216,6 +227,8 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
     sdk()
       .client.instance.vcsCommit({ directory: sdk().directory, message: git.message }, { throwOnError: true })
       .then(() => setGit("message", ""))
+  // Nothing left to commit but local commits exist: the remote button's primary action becomes Push.
+  const pushReady = () => git.changes.length === 0 && git.remote.ahead > 0
   const remote = {
     fetch: () => sdk().client.instance.vcsFetch({ directory: sdk().directory }, { throwOnError: true }),
     pull: () => sdk().client.instance.vcsPull({ directory: sdk().directory }, { throwOnError: true }),
@@ -280,9 +293,23 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
             </bdi>
           </span>
           <SplitButtonV2 data-variant="outline">
-            <SplitButtonV2Action disabled={git.busy} onClick={() => void runGit(remote.fetch)}>
-              <Icon name="sync" size="small" />
-              {language.t("session.review.git.fetch")}
+            <SplitButtonV2Action
+              disabled={git.busy}
+              onClick={() => void runGit(pushReady() ? remote.push : remote.fetch)}
+            >
+              <Show
+                when={pushReady()}
+                fallback={
+                  <>
+                    <Icon name="sync" size="small" />
+                    {language.t("session.review.git.fetch")}
+                  </>
+                }
+              >
+                <Icon name="arrow-up" size="small" />
+                {language.t("session.review.git.push")}
+                <span class="tabular-nums text-v2-text-text-muted">{git.remote.ahead}</span>
+              </Show>
             </SplitButtonV2Action>
             <MenuV2 gutter={4} modal={false} placement="bottom-end">
               <MenuV2.Trigger
@@ -301,7 +328,10 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
                     {language.t("session.review.git.pull")}
                   </MenuV2.Item>
                   <MenuV2.Separator />
-                  <MenuV2.Item onSelect={() => void runGit(remote.push)}>
+                  <MenuV2.Item
+                    badge={git.remote.ahead > 0 ? `↑${git.remote.ahead}` : undefined}
+                    onSelect={() => void runGit(remote.push)}
+                  >
                     {language.t("session.review.git.push")}
                   </MenuV2.Item>
                 </MenuV2.Content>
@@ -365,9 +395,7 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
                       {language.t("session.review.git.commit")}
                     </MenuV2.Item>
                     <MenuV2.Item
-                      onSelect={() =>
-                        void runGit(() => stageAll().then(commit), { optimistic: () => setStaged(true) })
-                      }
+                      onSelect={() => void runGit(() => stageAll().then(commit), { optimistic: () => setStaged(true) })}
                     >
                       {language.t("session.review.git.commitAll")}
                     </MenuV2.Item>

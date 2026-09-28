@@ -277,6 +277,13 @@ export const ChangeStatus = Schema.Struct({
 }).annotate({ identifier: "VcsChangeStatus" })
 export type ChangeStatus = Schema.Schema.Type<typeof ChangeStatus>
 
+export const RemoteStatus = Schema.Struct({
+  upstream: Schema.Boolean,
+  ahead: Schema.Finite,
+  behind: Schema.Finite,
+}).annotate({ identifier: "VcsRemoteStatus" })
+export type RemoteStatus = Schema.Schema.Type<typeof RemoteStatus>
+
 export const FileInput = Schema.Struct({ file: Schema.String })
 export type FileInput = Schema.Schema.Type<typeof FileInput>
 export const CommitInput = Schema.Struct({ message: Schema.String })
@@ -356,6 +363,7 @@ export interface Interface {
   readonly diffRaw: () => Effect.Effect<string>
   readonly apply: (input: ApplyInput) => Effect.Effect<ApplyResult, PatchApplyError>
   readonly changes: () => Effect.Effect<ChangeStatus[]>
+  readonly remote: () => Effect.Effect<RemoteStatus>
   readonly stage: (input: FileInput) => Effect.Effect<OperationResult, OperationError>
   readonly unstage: (input: FileInput) => Effect.Effect<OperationResult, OperationError>
   readonly stageAll: () => Effect.Effect<OperationResult, OperationError>
@@ -495,6 +503,12 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
             unstaged: item.code[1] !== " ",
             untracked: item.code === "??",
           }))
+      }),
+      remote: Effect.fn("Vcs.remote")(function* () {
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git") return { upstream: false, ahead: 0, behind: 0 }
+        const counts = yield* git.aheadBehind(ctx.directory)
+        return { upstream: counts !== undefined, ahead: counts?.ahead ?? 0, behind: counts?.behind ?? 0 }
       }),
       stage: Effect.fn("Vcs.stage")(function* (input: FileInput) {
         return yield* runFileOperation("stage", input.file)

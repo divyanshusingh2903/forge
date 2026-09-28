@@ -447,4 +447,34 @@ describe("Vcs diff", () => {
       }),
     { git: true },
   )
+
+  it.instance(
+    "reports commits ahead of the upstream and none without one",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const vcs = yield* init()
+        yield* write(path.join(test.directory, "a.txt"), "a\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "base"])
+        expect(yield* vcs.remote()).toEqual({ upstream: false, ahead: 0, behind: 0 })
+
+        const remote = `${test.directory}-remote.git`
+        yield* git(test.directory, ["init", "--bare", remote])
+        yield* git(test.directory, ["remote", "add", "origin", remote])
+        yield* git(test.directory, ["push", "-u", "origin", "HEAD"])
+        yield* write(path.join(test.directory, "b.txt"), "b\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "one"])
+        yield* write(path.join(test.directory, "c.txt"), "c\n")
+        yield* git(test.directory, ["add", "."])
+        yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "two"])
+        expect(yield* vcs.remote()).toEqual({ upstream: true, ahead: 2, behind: 0 })
+
+        expect((yield* vcs.push()).success).toBe(true)
+        expect(yield* vcs.remote()).toEqual({ upstream: true, ahead: 0, behind: 0 })
+        yield* Effect.promise(() => fs.rm(remote, { recursive: true, force: true }))
+      }),
+    { git: true },
+  )
 })

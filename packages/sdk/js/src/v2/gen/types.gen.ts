@@ -2346,6 +2346,12 @@ export type VcsChangeStatus = {
   untracked: boolean
 }
 
+export type VcsRemoteStatus = {
+  upstream: boolean
+  ahead: number
+  behind: number
+}
+
 export type VcsOperationError = {
   name: "VcsOperationError"
   data: {
@@ -8328,6 +8334,34 @@ export type InstanceVcsChangesResponses = {
 }
 
 export type InstanceVcsChangesResponse = InstanceVcsChangesResponses[keyof InstanceVcsChangesResponses]
+
+export type InstanceVcsRemoteData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/remote"
+}
+
+export type InstanceVcsRemoteErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type InstanceVcsRemoteError = InstanceVcsRemoteErrors[keyof InstanceVcsRemoteErrors]
+
+export type InstanceVcsRemoteResponses = {
+  /**
+   * Commits ahead of and behind the upstream branch
+   */
+  200: VcsRemoteStatus
+}
+
+export type InstanceVcsRemoteResponse = InstanceVcsRemoteResponses[keyof InstanceVcsRemoteResponses]
 
 export type InstanceVcsStageData = {
   body?: {

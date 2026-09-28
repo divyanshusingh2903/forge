@@ -104,6 +104,8 @@ import type {
   InstanceVcsPullResponses,
   InstanceVcsPushErrors,
   InstanceVcsPushResponses,
+  InstanceVcsRemoteErrors,
+  InstanceVcsRemoteResponses,
   InstanceVcsStageAllErrors,
   InstanceVcsStageAllResponses,
   InstanceVcsStagedDiffErrors,
@@ -2001,6 +2003,31 @@ export class Instance extends HeyApiClient {
     )
     return (options?.client ?? this.client).get<InstanceVcsChangesResponses, InstanceVcsChangesErrors, ThrowOnError>({
       url: "/vcs/changes",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsRemote<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<InstanceVcsRemoteResponses, InstanceVcsRemoteErrors, ThrowOnError>({
+      url: "/vcs/remote",
       ...options,
       ...params,
     })

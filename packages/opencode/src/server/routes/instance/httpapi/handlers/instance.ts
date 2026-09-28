@@ -98,6 +98,9 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     const getVcsChanges = Effect.fn("InstanceHttpApi.vcsChanges")(function* () {
       return yield* vcs.changes()
     })
+    const getVcsRemote = Effect.fn("InstanceHttpApi.vcsRemote")(function* () {
+      return yield* vcs.remote()
+    })
 
     const stageVcs = Effect.fn("InstanceHttpApi.vcsStage")(function* (ctx: {
       payload: Schema.Schema.Type<typeof Vcs.FileInput>
@@ -269,6 +272,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       .handle("vcsDiffRaw", getVcsDiffRaw)
       .handle("vcsApply", applyVcs)
       .handle("vcsChanges", getVcsChanges)
+      .handle("vcsRemote", getVcsRemote)
       .handle("vcsStage", stageVcs)
       .handle("vcsUnstage", unstageVcs)
       .handle("vcsStageAll", stageAllVcs)
