@@ -152,6 +152,11 @@ jobs:
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         run: |
+          # electron-builder resolves an empty CSC_LINK to the working directory ("not a file"),
+          # so drop signing vars that the missing secrets left empty.
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_API_KEY_ID APPLE_API_ISSUER; do
+            if [ -z "${!name}" ]; then unset "$name"; fi
+          done
           args=()
           if [ "$RUNNER_OS" = "macOS" ]; then
             if [ -z "$CSC_LINK" ]; then
