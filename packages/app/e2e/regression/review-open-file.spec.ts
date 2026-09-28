@@ -93,13 +93,18 @@ test("opens and searches project files inline", async ({ page }) => {
   const sidebar = panel.locator('[data-slot="session-review-v2-sidebar"]')
   const sidebarToggle = panel.getByRole("button", { name: "Toggle file tree" })
   const contextButton = page.getByRole("button", { name: "View context usage" })
-  await contextButton.click()
+  // The context button opens a usage popover; its details action opens the Context tab.
+  const openContextTab = async () => {
+    await contextButton.click()
+    await page.getByRole("button", { name: "Open detailed breakdown" }).click()
+  }
+  await openContextTab()
   await expect(panel.getByRole("tab", { name: "Context" })).toHaveAttribute("data-selected", "")
   await panel.getByRole("button", { name: "Open file" }).click()
   await expect(panel.getByRole("tab", { name: "Open file" })).toHaveAttribute("data-selected", "")
   await expect(sidebarToggle).toBeDisabled()
   await expect(sidebar).toBeVisible()
-  await contextButton.click()
+  await openContextTab()
   await expect(panel.getByRole("tab", { name: "Context" })).toHaveAttribute("data-selected", "")
   await expect(sidebar).toBeHidden()
   await panel.getByRole("button", { name: "Open file" }).click()

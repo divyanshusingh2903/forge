@@ -56,6 +56,8 @@ export type SessionReviewV2SidebarProps = {
   minWidth?: number
   maxWidth?: number
   viewportRef?: (element: HTMLDivElement) => void
+  controls?: JSX.Element
+  footer?: JSX.Element
   children?: JSX.Element
 }
 
@@ -122,6 +124,7 @@ export function SessionReviewV2Sidebar(props: SessionReviewV2SidebarProps) {
               }
             />
           </div>
+          {props.controls}
           <ScrollView
             data-slot="session-review-v2-sidebar-tree"
             class="group/file-tree-v2"
@@ -130,6 +133,7 @@ export function SessionReviewV2Sidebar(props: SessionReviewV2SidebarProps) {
           >
             {props.children}
           </ScrollView>
+          {props.footer}
         </aside>
       </Show>
       <Show when={props.open && props.onWidthChange}>

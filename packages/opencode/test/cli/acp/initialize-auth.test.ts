@@ -4,7 +4,9 @@ import { Effect } from "effect"
 import { cliIt } from "../../lib/cli-process"
 import { createAcpClient, expectErrorCode, initialize } from "./helpers"
 
-describe("opencode acp initialize/auth subprocess", () => {
+// Skipped on Windows: the ACP subprocess never answers over stdio under Bun 1.4.2.
+// See https://github.com/divyanshusingh2903/forge/issues/18
+describe.skipIf(process.platform === "win32")("opencode acp initialize/auth subprocess", () => {
   cliIt.live(
     "initialize responds with capabilities",
     ({ opencode }) =>

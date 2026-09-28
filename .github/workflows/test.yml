@@ -28,9 +28,11 @@ jobs:
       matrix:
         settings:
           - name: linux
-            host: blacksmith-4vcpu-ubuntu-2404
+            host: ubuntu-24.04
           - name: windows
-            host: blacksmith-4vcpu-windows-2025
+            host: windows-2025
+          - name: macos
+            host: macos-15
     runs-on: ${{ matrix.settings.host }}
     defaults:
       run:
@@ -64,8 +66,10 @@ jobs:
             turbo-${{ runner.os }}-
 
       - name: Run unit tests
-        timeout-minutes: 20
-        run: GITHUB_ACTIONS=false bun turbo test
+        # GitHub's Windows runners need well over 20 minutes for the opencode suite.
+        timeout-minutes: ${{ runner.os == 'Windows' && 45 || 20 }}
+        # Stream output so a stalled package shows its last test file instead of nothing.
+        run: GITHUB_ACTIONS=false bun turbo test --log-order=stream
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 
@@ -86,9 +90,11 @@ jobs:
       matrix:
         settings:
           - name: linux
-            host: blacksmith-4vcpu-ubuntu-2404
+            host: ubuntu-24.04
           - name: windows
-            host: blacksmith-4vcpu-windows-2025
+            host: windows-2025
+          - name: macos
+            host: macos-15
     runs-on: ${{ matrix.settings.host }}
     env:
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers

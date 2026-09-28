@@ -102,7 +102,9 @@ test("renames and closes the session tab from its context menu", async ({ page }
   await page.keyboard.press("Escape")
   await expect(page.getByRole("menuitem", { name: "Rename", exact: true })).toBeHidden()
   await expect(tab).toBeFocused()
-  await tab.press("Shift+F10")
+  // Chromium fires contextmenu for Shift+F10 on Windows and Linux only; macOS has no keyboard equivalent.
+  if (process.platform === "darwin") await tab.click({ button: "right" })
+  if (process.platform !== "darwin") await tab.press("Shift+F10")
   await page.getByRole("menuitem", { name: "Rename", exact: true }).click()
   const input = page.locator('[data-slot="tab-title"][contenteditable="true"]')
   await expect(input).toBeFocused()

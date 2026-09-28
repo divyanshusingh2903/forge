@@ -92,7 +92,6 @@ import { SessionReviewV2SidebarToggle } from "@opencode-ai/session-ui/v2/session
 import { ReviewPanelV2 } from "@/pages/session/v2/review-panel-v2"
 import { createReviewPanelV2State } from "@/pages/session/v2/review-panel-v2-state"
 import { reviewDiffDirectory, reviewDiffNeedsLoad, reviewRootDirectory } from "@/pages/session/v2/review-diff-kinds"
-import { TerminalPanel } from "@/pages/session/terminal-panel"
 import { TerminalPanelV2 } from "@/pages/session/terminal-panel-v2"
 import { useComposerCommands } from "@/pages/session/use-composer-commands"
 import { useSessionCommands } from "@/pages/session/use-session-commands"
@@ -1399,6 +1398,14 @@ export default function Page() {
   // the side panel's Show children and remounted the whole review panel on unrelated
   // updates such as session switches.
   const reviewPanelV2Props = () => ({
+    get gitChangesEnabled() {
+      return reviewMode() === "git" && sync().project?.vcs === "git"
+    },
+    get branch() {
+      return sync().data.vcs?.branch
+    },
+    sessionID: () => params.id,
+    onGitChange: refreshVcs,
     get title() {
       return changesTitleV2()
     },
@@ -2492,10 +2499,6 @@ export default function Page() {
           </Show>
         </Show>
       </div>
-
-      <Show when={!newSessionDesign()}>
-        <TerminalPanel />
-      </Show>
     </SessionRouteFrame>
   )
 }

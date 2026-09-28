@@ -1,5 +1,6 @@
-import { createMemo, createResource, createSignal, Show, type JSX } from "solid-js"
-import type { SnapshotFileDiff, VcsFileDiff } from "@opencode-ai/sdk/v2"
+import { createEffect, createMemo, createResource, createSignal, on, Show, type JSX } from "solid-js"
+import { createStore, reconcile } from "solid-js/store"
+import type { SnapshotFileDiff, VcsChangeStatus, VcsFileDiff, VcsRemoteStatus } from "@opencode-ai/sdk/v2"
 import type { FileDiffInfo } from "@opencode-ai/client/promise"
 import {
   SESSION_REVIEW_V2_SIDEBAR_WIDTH_MAX,
@@ -9,6 +10,14 @@ import {
 } from "@opencode-ai/session-ui/v2/session-review-v2"
 import { SessionReviewFilePreviewV2 } from "@opencode-ai/session-ui/v2/session-review-file-preview-v2"
 import { DiffChanges } from "@opencode-ai/ui/v2/diff-changes-v2"
+import { ButtonV2 } from "@opencode-ai/ui/v2/button-v2"
+import { CheckboxV2 } from "@opencode-ai/ui/v2/checkbox-v2"
+import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
+import { Icon } from "@opencode-ai/ui/v2/icon"
+import { MenuV2 } from "@opencode-ai/ui/v2/menu-v2"
+import { SplitButtonV2, SplitButtonV2Action, SplitButtonV2MenuTrigger } from "@opencode-ai/ui/v2/split-button-v2"
+import { DialogV2, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode-ai/ui/v2/dialog-v2"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import type {
   SessionReviewComment,
   SessionReviewCommentActions,
@@ -45,6 +54,10 @@ export type ReviewPanelV2Props = {
   diffStyle: SessionReviewDiffStyle
   onDiffStyleChange?: (style: SessionReviewDiffStyle) => void
   state: ReviewPanelV2State
+  gitChangesEnabled?: boolean
+  branch?: string
+  sessionID?: () => string | undefined
+  onGitChange?: () => void
   onLineComment?: (comment: SessionReviewLineComment) => void
   onLineCommentUpdate?: (comment: SessionReviewCommentUpdate) => void
   onLineCommentDelete?: (comment: SessionReviewCommentDelete) => void
@@ -56,11 +69,359 @@ export type ReviewPanelV2Props = {
 
 export function ReviewPanelV2(props: ReviewPanelV2Props) {
   const sdk = useSDK()
+  const language = useLanguage()
+  const dialog = useDialog()
+  const [git, setGit] = createStore({
+    message: "",
+    busy: false,
+    error: "",
+    loadError: "",
+    changes: [] as VcsChangeStatus[],
+    remote: { upstream: false, ahead: 0, behind: 0 } as VcsRemoteStatus,
+  })
+  createEffect(
+    on(
+      [() => sdk().directory, () => props.sessionID?.()],
+      () =>
+        setGit({
+          message: "",
+          error: "",
+          loadError: "",
+          changes: [],
+          remote: { upstream: false, ahead: 0, behind: 0 },
+        }),
+      { defer: true },
+    ),
+  )
+  // A plain store instead of createResource: the side panel sits inside a fallback-less
+  // Suspense, so reading a refetching resource blanked the whole file list after every action.
+  const loadChanges = () => {
+    const directory = sdk().directory
+    return Promise.all([
+      sdk().client.instance.vcsChanges({ directory }, { throwOnError: true }),
+      sdk().client.instance.vcsRemote({ directory }, { throwOnError: true }),
+    ])
+      .then(([changes, remote]) => {
+        if (sdk().directory !== directory) return
+        setGit("changes", reconcile(changes.data ?? [], { key: "file" }))
+        if (remote.data) setGit("remote", remote.data)
+        setGit("loadError", "")
+      })
+      .catch((error) => setGit("loadError", error instanceof Error ? error.message : String(error)))
+  }
+  createEffect(
+    on(
+      () => (props.gitChangesEnabled ? ([sdk().directory, props.diffVersion] as const) : undefined),
+      (source) => {
+        if (source) void loadChanges()
+      },
+    ),
+  )
+  const runGit = async (run: () => Promise<unknown>, input?: { optimistic?: () => void; refresh?: boolean }) => {
+    if (git.busy) return false
+    setGit({ busy: true, error: "" })
+    input?.optimistic?.()
+    const success = await run().then(
+      () => true,
+      (error) => {
+        setGit("error", error instanceof Error ? error.message : String(error))
+        return false
+      },
+    )
+    // Reload even on failure so an optimistic update snaps back to the real index state.
+    if (input?.refresh !== false) {
+      props.onGitChange?.()
+      await loadChanges()
+    }
+    setGit("busy", false)
+    return success
+  }
+  const setStaged = (staged: boolean, file?: string) =>
+    setGit("changes", (change) => file === undefined || change.file === file, { staged, unstaged: !staged })
+  const changesByFile = createMemo(() => new Map(git.changes.map((change) => [change.file, change] as const)))
+  const stagedCount = () => git.changes.filter((change) => change.staged).length
+  const allStaged = () => git.changes.length > 0 && git.changes.every((change) => change.staged && !change.unstaged)
+  const fileAccessory = (path: string) => (
+    <Show when={changesByFile().get(path)}>
+      {(change) => (
+        <>
+          <IconButtonV2
+            size="small"
+            variant="ghost-muted"
+            icon={<Icon name="outline-reset" />}
+            class="opacity-0 group-hover/git-row:opacity-100 group-focus-within/git-row:opacity-100"
+            classList={{ invisible: !change().unstaged }}
+            title={language.t("session.review.git.discard")}
+            aria-label={language.t("session.review.git.discardFile", { file: path })}
+            onClick={() => dialog.show(() => <DiscardDialog file={path} />)}
+          />
+          <CheckboxV2
+            label={language.t(
+              change().staged && !change().unstaged ? "session.review.git.unstageFile" : "session.review.git.stageFile",
+              { file: path },
+            )}
+            hideLabel
+            checked={change().staged && !change().unstaged}
+            indeterminate={change().staged && change().unstaged}
+            onChange={() => {
+              // Partially staged files stage their remaining changes, matching the tri-state checkbox.
+              const stage = !change().staged || change().unstaged
+              void runGit(
+                () =>
+                  stage
+                    ? sdk().client.instance.vcsStage({ directory: sdk().directory, file: path }, { throwOnError: true })
+                    : sdk().client.instance.vcsUnstage(
+                        { directory: sdk().directory, file: path },
+                        { throwOnError: true },
+                      ),
+                { optimistic: () => setStaged(stage, path) },
+              )
+            }}
+          />
+        </>
+      )}
+    </Show>
+  )
+
+  function DiscardDialog(input: { file: string }) {
+    return (
+      <DialogV2 fit>
+        <DialogHeader hideClose>
+          <DialogTitleGroup
+            title={language.t("session.review.git.discard")}
+            description={language.t("session.review.git.discard.confirm", { file: input.file })}
+          />
+        </DialogHeader>
+        <Show when={git.error}>
+          <div role="alert" class="px-4 text-12-regular text-text-danger">
+            {git.error}
+          </div>
+        </Show>
+        <DialogFooter>
+          <ButtonV2 variant="ghost" onClick={() => dialog.close()}>
+            {language.t("common.cancel")}
+          </ButtonV2>
+          <ButtonV2
+            variant="danger"
+            disabled={git.busy}
+            onClick={async () => {
+              const success = await runGit(() =>
+                sdk().client.instance.vcsDiscard(
+                  { directory: sdk().directory, file: input.file },
+                  { throwOnError: true },
+                ),
+              )
+              if (success) dialog.close()
+            }}
+          >
+            {language.t("session.review.git.discard")}
+          </ButtonV2>
+        </DialogFooter>
+      </DialogV2>
+    )
+  }
+
+  const stageAll = () => sdk().client.instance.vcsStageAll({ directory: sdk().directory }, { throwOnError: true })
+  const unstageAll = () => sdk().client.instance.vcsUnstageAll({ directory: sdk().directory }, { throwOnError: true })
+  const commit = () =>
+    sdk()
+      .client.instance.vcsCommit({ directory: sdk().directory, message: git.message }, { throwOnError: true })
+      .then(() => setGit("message", ""))
+  // Nothing left to commit but local commits exist: the remote button's primary action becomes Push.
+  const pushReady = () => git.changes.length === 0 && git.remote.ahead > 0
+  const remote = {
+    fetch: () => sdk().client.instance.vcsFetch({ directory: sdk().directory }, { throwOnError: true }),
+    pull: () => sdk().client.instance.vcsPull({ directory: sdk().directory }, { throwOnError: true }),
+    push: () => sdk().client.instance.vcsPush({ directory: sdk().directory }, { throwOnError: true }),
+  }
+
+  // Sits directly above the file list, aligned with the per-file checkboxes.
+  const gitControls = () => (
+    <Show when={props.gitChangesEnabled && git.changes.length > 0}>
+      <div class="flex h-8 items-center gap-2 px-4">
+        <span class="min-w-0 flex-1 truncate text-12-regular text-text-weak">
+          {language.t("session.review.git.stagedOf", { staged: stagedCount(), total: git.changes.length })}
+        </span>
+        <SplitButtonV2 data-variant="outline">
+          <SplitButtonV2Action
+            disabled={git.busy}
+            onClick={() => {
+              const stage = !allStaged()
+              void runGit(stage ? stageAll : unstageAll, { optimistic: () => setStaged(stage) })
+            }}
+          >
+            {language.t(allStaged() ? "session.review.git.unstageAll" : "session.review.git.stageAll")}
+          </SplitButtonV2Action>
+          <MenuV2 gutter={4} modal={false} placement="bottom-end">
+            <MenuV2.Trigger
+              as={SplitButtonV2MenuTrigger}
+              disabled={git.busy}
+              aria-label={language.t("session.review.git.stagingMenu")}
+            >
+              <Icon name="chevron-down" size="small" />
+            </MenuV2.Trigger>
+            <MenuV2.Portal>
+              <MenuV2.Content>
+                <MenuV2.Item
+                  disabled={allStaged()}
+                  onSelect={() => void runGit(stageAll, { optimistic: () => setStaged(true) })}
+                >
+                  {language.t("session.review.git.stageAll")}
+                </MenuV2.Item>
+                <MenuV2.Item
+                  disabled={stagedCount() === 0}
+                  onSelect={() => void runGit(unstageAll, { optimistic: () => setStaged(false) })}
+                >
+                  {language.t("session.review.git.unstageAll")}
+                </MenuV2.Item>
+              </MenuV2.Content>
+            </MenuV2.Portal>
+          </MenuV2>
+        </SplitButtonV2>
+      </div>
+    </Show>
+  )
+
+  const gitFooter = () => (
+    <Show when={props.gitChangesEnabled}>
+      <div class="flex shrink-0 flex-col gap-2 border-t border-border-weak-base p-2">
+        <div class="flex items-center justify-between gap-2 ps-1">
+          <span class="flex min-w-0 items-center gap-1.5 text-12-medium text-text-base">
+            <Icon name="branch" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+            <bdi dir="ltr" class="min-w-0 truncate">
+              {props.branch}
+            </bdi>
+          </span>
+          <SplitButtonV2 data-variant="outline">
+            <SplitButtonV2Action
+              disabled={git.busy}
+              onClick={() => void runGit(pushReady() ? remote.push : remote.fetch)}
+            >
+              <Show
+                when={pushReady()}
+                fallback={
+                  <>
+                    <Icon name="sync" size="small" />
+                    {language.t("session.review.git.fetch")}
+                  </>
+                }
+              >
+                <Icon name="arrow-up" size="small" />
+                {language.t("session.review.git.push")}
+                <span class="tabular-nums text-v2-text-text-muted">{git.remote.ahead}</span>
+              </Show>
+            </SplitButtonV2Action>
+            <MenuV2 gutter={4} modal={false} placement="bottom-end">
+              <MenuV2.Trigger
+                as={SplitButtonV2MenuTrigger}
+                disabled={git.busy}
+                aria-label={language.t("session.review.git.remoteMenu")}
+              >
+                <Icon name="chevron-down" size="small" />
+              </MenuV2.Trigger>
+              <MenuV2.Portal>
+                <MenuV2.Content>
+                  <MenuV2.Item onSelect={() => void runGit(remote.fetch)}>
+                    {language.t("session.review.git.fetch")}
+                  </MenuV2.Item>
+                  <MenuV2.Item onSelect={() => void runGit(remote.pull)}>
+                    {language.t("session.review.git.pull")}
+                  </MenuV2.Item>
+                  <MenuV2.Separator />
+                  <MenuV2.Item
+                    badge={git.remote.ahead > 0 ? `↑${git.remote.ahead}` : undefined}
+                    onSelect={() => void runGit(remote.push)}
+                  >
+                    {language.t("session.review.git.push")}
+                  </MenuV2.Item>
+                </MenuV2.Content>
+              </MenuV2.Portal>
+            </MenuV2>
+          </SplitButtonV2>
+        </div>
+        <div class="flex h-36 shrink-0 flex-col overflow-hidden rounded-lg border border-v2-border-border-muted bg-v2-background-bg-base transition-colors focus-within:border-v2-border-border-focus">
+          <textarea
+            class="min-h-0 flex-1 resize-none bg-transparent px-2.5 py-2 text-12-regular text-text-base outline-none placeholder:text-v2-text-text-faint"
+            aria-label={language.t("session.review.git.message.placeholder")}
+            placeholder={language.t("session.review.git.message.placeholder")}
+            value={git.message}
+            onInput={(event) => setGit("message", event.currentTarget.value)}
+          />
+          <div class="flex shrink-0 items-center justify-between gap-2 px-1.5 pb-1.5">
+            <IconButtonV2
+              size="small"
+              variant="ghost-muted"
+              icon={<Icon name="sparkle" />}
+              title={language.t("session.review.git.generate")}
+              aria-label={language.t("session.review.git.generate")}
+              disabled={git.busy || git.changes.length === 0 || !props.sessionID?.()}
+              onClick={() =>
+                void runGit(
+                  async () => {
+                    const response = await sdk().client.instance.vcsGenerateMessage(
+                      { directory: sdk().directory, sessionID: props.sessionID?.() ?? "" },
+                      { throwOnError: true },
+                    )
+                    setGit("message", response.data?.message ?? "")
+                  },
+                  { refresh: false },
+                )
+              }
+            />
+            <SplitButtonV2 data-variant="outline">
+              {/* With nothing staged the primary action commits every change, like Zed's "Commit Tracked". */}
+              <SplitButtonV2Action
+                disabled={git.busy || git.changes.length === 0 || !git.message.trim()}
+                onClick={() =>
+                  void runGit(
+                    stagedCount() > 0 ? commit : () => stageAll().then(commit),
+                    stagedCount() > 0 ? undefined : { optimistic: () => setStaged(true) },
+                  )
+                }
+              >
+                {language.t(stagedCount() > 0 ? "session.review.git.commit" : "session.review.git.commitAll")}
+              </SplitButtonV2Action>
+              <MenuV2 gutter={4} modal={false} placement="top-end">
+                <MenuV2.Trigger
+                  as={SplitButtonV2MenuTrigger}
+                  disabled={git.busy || git.changes.length === 0 || !git.message.trim()}
+                  aria-label={language.t("session.review.git.commitMenu")}
+                >
+                  <Icon name="chevron-down" size="small" />
+                </MenuV2.Trigger>
+                <MenuV2.Portal>
+                  <MenuV2.Content>
+                    <MenuV2.Item disabled={stagedCount() === 0} onSelect={() => void runGit(commit)}>
+                      {language.t("session.review.git.commit")}
+                    </MenuV2.Item>
+                    <MenuV2.Item
+                      onSelect={() => void runGit(() => stageAll().then(commit), { optimistic: () => setStaged(true) })}
+                    >
+                      {language.t("session.review.git.commitAll")}
+                    </MenuV2.Item>
+                  </MenuV2.Content>
+                </MenuV2.Portal>
+              </MenuV2>
+            </SplitButtonV2>
+          </div>
+        </div>
+        <Show when={git.error || git.loadError}>
+          {(error) => (
+            <div role="alert" class="text-12-regular text-text-danger">
+              {error()}
+            </div>
+          )}
+        </Show>
+      </div>
+    </Show>
+  )
 
   const diffs = createMemo(() => props.diffs().filter(filterRenderableDiff))
   const filteredFiles = createMemo(() =>
     filterReviewFiles(
-      diffs().map((diff) => diff.file),
+      props.gitChangesEnabled
+        ? [...new Set([...diffs().map((diff) => diff.file), ...git.changes.map((change) => change.file)])]
+        : diffs().map((diff) => diff.file),
       props.state.filter(),
     ),
   )
@@ -128,6 +489,9 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
           searching={searching}
           kinds={treeKinds}
           activeDiff={activeDiff}
+          controls={gitControls}
+          footer={gitFooter}
+          fileAccessory={props.gitChangesEnabled ? fileAccessory : undefined}
         />
       }
       activeFile={activeDiff()}
@@ -178,6 +542,9 @@ function ReviewPanelV2Sidebar(props: {
   searching: () => boolean
   kinds: () => ReturnType<typeof reviewDiffKinds>
   activeDiff: () => string | undefined
+  controls: () => JSX.Element
+  footer: () => JSX.Element
+  fileAccessory?: (path: string) => JSX.Element
 }) {
   const language = useLanguage()
   const [explicitHighlight, setExplicitHighlight] = createSignal<string | undefined>()
@@ -204,6 +571,8 @@ function ReviewPanelV2Sidebar(props: {
       transition={props.state.sidebarTransition()}
       title={props.title}
       stats={<DiffChanges changes={props.diffs()} />}
+      controls={props.controls()}
+      footer={props.footer()}
       filter={props.state.filter()}
       onFilterChange={props.state.setFilter}
       onFilterKeyDown={onFilterKeyDown}
@@ -230,6 +599,7 @@ function ReviewPanelV2Sidebar(props: {
               draggable={false}
               active={props.activeDiff()}
               onFileClick={(node) => props.onSelectFile(node.path)}
+              fileAccessory={props.fileAccessory}
             />
           }
         >
@@ -242,6 +612,7 @@ function ReviewPanelV2Sidebar(props: {
               kinds={props.kinds()}
               active={props.activeDiff()}
               highlighted={highlightedPath()}
+              fileAccessory={props.fileAccessory}
               onFileClick={(path) => {
                 setExplicitHighlight(path)
                 props.onSelectFile(path)

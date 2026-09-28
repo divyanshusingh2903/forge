@@ -17,6 +17,22 @@ const icons = {
     viewBox: "0 0 16 16",
     body: `<path d="M5.118 5.686V10.314M5.118 5.686C5.97 5.686 6.661 4.995 6.661 4.143C6.661 3.291 5.97 2.6 5.118 2.6C4.266 2.6 3.575 3.291 3.575 4.143C3.575 4.995 4.266 5.686 5.118 5.686ZM5.118 10.314C4.266 10.314 3.575 11.005 3.575 11.857C3.575 12.709 4.266 13.4 5.118 13.4C5.97 13.4 6.661 12.709 6.661 11.857M5.118 10.314C5.97 10.314 6.661 11.005 6.661 11.857M10.882 5.686C11.734 5.686 12.425 4.995 12.425 4.143C12.425 3.291 11.734 2.6 10.882 2.6C10.03 2.6 9.339 3.291 9.339 4.143C9.339 4.995 10.03 5.686 10.882 5.686ZM10.882 5.686V9.457C10.882 10.783 9.807 11.857 8.482 11.857H6.661" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>`,
   },
+  sparkle: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M6.5 2.5L7.6 5.9L11 7L7.6 8.1L6.5 11.5L5.4 8.1L2 7L5.4 5.9L6.5 2.5Z" stroke="currentColor" stroke-linejoin="round"/><path d="M12 10V14M10 12H14" stroke="currentColor" stroke-linecap="square"/>`,
+  },
+  sync: {
+    viewBox: "0 0 16 16",
+    body: `<path d="M13 6.5C12.4 4.2 10.4 2.5 8 2.5C5.8 2.5 4 3.9 3.3 5.8M3 9.5C3.6 11.8 5.6 13.5 8 13.5C10.2 13.5 12 12.1 12.7 10.2M13.5 2.5V6.5H9.5M2.5 13.5V9.5H6.5" stroke="currentColor" stroke-linecap="square"/>`,
+  },
+  "arrow-up": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M8 13.5V3M3.5 7.5L8 3L12.5 7.5" stroke="currentColor" stroke-linecap="square"/>`,
+  },
+  "arrow-down": {
+    viewBox: "0 0 16 16",
+    body: `<path d="M8 2.5V13M3.5 8.5L8 13L12.5 8.5" stroke="currentColor" stroke-linecap="square"/>`,
+  },
   "grid-plus": {
     viewBox: "0 0 16 16",
     body: `<path d="M13.9948 11.668H9.32812M11.6641 9.33203V13.9987M6.66667 9.33203V13.9987H2V9.33203H6.66667ZM6.66667 2V6.66667H2V2H6.66667ZM13.9948 2V6.66667H9.32812V2H13.9948Z" stroke="currentColor" stroke-miterlimit="10" stroke-linecap="square"/>`,

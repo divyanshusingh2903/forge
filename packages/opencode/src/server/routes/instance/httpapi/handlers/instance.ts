@@ -5,11 +5,17 @@ import { Format } from "@/format"
 import { Global } from "@opencode-ai/core/global"
 import { LSP } from "@/lsp/lsp"
 import { Vcs } from "@/project/vcs"
+import { Session } from "@/session/session"
+import { Provider } from "@/provider/provider"
+import { LLM } from "@/session/llm"
+import { LLMEvent } from "@opencode-ai/llm"
+import { SessionID } from "@/session/schema"
 import { Skill } from "@/skill"
-import { Effect } from "effect"
+import { Effect, Schema } from "effect"
+import * as Stream from "effect/Stream"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { ApiVcsApplyError } from "../groups/instance"
+import { ApiVcsApplyError, ApiVcsOperationError } from "../groups/instance"
 import { markInstanceForDisposal } from "../lifecycle"
 
 export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance", (handlers) =>
@@ -20,6 +26,9 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     const lsp = yield* LSP.Service
     const skill = yield* Skill.Service
     const vcs = yield* Vcs.Service
+    const sessions = yield* Session.Service
+    const provider = yield* Provider.Service
+    const llm = yield* LLM.Service
 
     const dispose = Effect.fn("InstanceHttpApi.dispose")(function* () {
       yield* markInstanceForDisposal(yield* InstanceState.context)
@@ -73,6 +82,167 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       )
     })
 
+    const runVcsOperation = (
+      effect: Effect.Effect<Schema.Schema.Type<typeof Vcs.OperationResult>, Vcs.OperationError>,
+    ) =>
+      effect.pipe(
+        Effect.mapError(
+          (error) =>
+            new ApiVcsOperationError({
+              name: "VcsOperationError",
+              data: { message: error.message, operation: error.operation },
+            }),
+        ),
+      )
+
+    const getVcsChanges = Effect.fn("InstanceHttpApi.vcsChanges")(function* () {
+      return yield* vcs.changes()
+    })
+    const getVcsRemote = Effect.fn("InstanceHttpApi.vcsRemote")(function* () {
+      return yield* vcs.remote()
+    })
+
+    const stageVcs = Effect.fn("InstanceHttpApi.vcsStage")(function* (ctx: {
+      payload: Schema.Schema.Type<typeof Vcs.FileInput>
+    }) {
+      return yield* runVcsOperation(vcs.stage(ctx.payload))
+    })
+    const unstageVcs = Effect.fn("InstanceHttpApi.vcsUnstage")(function* (ctx: {
+      payload: Schema.Schema.Type<typeof Vcs.FileInput>
+    }) {
+      return yield* runVcsOperation(vcs.unstage(ctx.payload))
+    })
+    const stageAllVcs = Effect.fn("InstanceHttpApi.vcsStageAll")(function* () {
+      return yield* runVcsOperation(vcs.stageAll())
+    })
+    const unstageAllVcs = Effect.fn("InstanceHttpApi.vcsUnstageAll")(function* () {
+      return yield* runVcsOperation(vcs.unstageAll())
+    })
+    const discardVcs = Effect.fn("InstanceHttpApi.vcsDiscard")(function* (ctx: {
+      payload: Schema.Schema.Type<typeof Vcs.FileInput>
+    }) {
+      return yield* runVcsOperation(vcs.discard(ctx.payload))
+    })
+    const commitVcs = Effect.fn("InstanceHttpApi.vcsCommit")(function* (ctx: {
+      payload: Schema.Schema.Type<typeof Vcs.CommitInput>
+    }) {
+      return yield* runVcsOperation(vcs.commit(ctx.payload))
+    })
+    const fetchVcs = Effect.fn("InstanceHttpApi.vcsFetch")(function* () {
+      return yield* runVcsOperation(vcs.fetch())
+    })
+    const pushVcs = Effect.fn("InstanceHttpApi.vcsPush")(function* () {
+      return yield* runVcsOperation(vcs.push())
+    })
+    const pullVcs = Effect.fn("InstanceHttpApi.vcsPull")(function* () {
+      return yield* runVcsOperation(vcs.pull())
+    })
+    const stagedDiffVcs = Effect.fn("InstanceHttpApi.vcsStagedDiff")(function* () {
+      return yield* vcs.stagedDiff().pipe(
+        Effect.mapError(
+          (error) =>
+            new ApiVcsOperationError({
+              name: "VcsOperationError",
+              data: { message: error.message, operation: error.operation },
+            }),
+        ),
+      )
+    })
+
+    const generateCommitMessage = Effect.fn("InstanceHttpApi.vcsGenerateMessage")(function* (ctx: {
+      payload: Schema.Schema.Type<typeof Vcs.CommitMessageInput>
+    }) {
+      const [diff, sessionInfo] = yield* Effect.all(
+        [
+          vcs.stagedDiff().pipe(
+            Effect.mapError(
+              (error) =>
+                new ApiVcsOperationError({
+                  name: "VcsOperationError",
+                  data: { message: error.message, operation: error.operation },
+                }),
+            ),
+          ),
+          sessions.get(Schema.decodeUnknownSync(SessionID)(ctx.payload.sessionID)).pipe(
+            Effect.mapError(
+              (error) =>
+                new ApiVcsOperationError({
+                  name: "VcsOperationError",
+                  data: { message: error.message, operation: "message" },
+                }),
+            ),
+          ),
+        ],
+        { concurrency: 2 },
+      )
+      if (!sessionInfo.model)
+        return yield* new ApiVcsOperationError({
+          name: "VcsOperationError",
+          data: { message: "The session has no selected model", operation: "message" },
+        })
+      const selectedAgent = yield* agent.get(sessionInfo.agent ?? "build")
+      const model = yield* provider.getModel(sessionInfo.model.providerID, sessionInfo.model.id).pipe(
+        Effect.mapError(
+          (error) =>
+            new ApiVcsOperationError({
+              name: "VcsOperationError",
+              data: { message: error.message, operation: "message" },
+            }),
+        ),
+      )
+      const history = yield* sessions.messages({ sessionID: sessionInfo.id }).pipe(
+        Effect.mapError(
+          (error) =>
+            new ApiVcsOperationError({
+              name: "VcsOperationError",
+              data: { message: error.message, operation: "message" },
+            }),
+        ),
+      )
+      const user = history.toReversed().find((message) => message.info.role === "user")
+      if (!user || user.info.role !== "user")
+        return yield* new ApiVcsOperationError({
+          name: "VcsOperationError",
+          data: { message: "The session has no user message to anchor generation", operation: "message" },
+        })
+      const message = yield* llm
+        .stream({
+          agent: selectedAgent,
+          user: user.info,
+          sessionID: sessionInfo.id,
+          model,
+          system: [],
+          small: true,
+          tools: {},
+          retries: 1,
+          messages: [
+            {
+              role: "user",
+              content: `${COMMIT_MESSAGE_PROMPT}\n\n${diff}`,
+            },
+          ],
+        })
+        .pipe(
+          Stream.filter(LLMEvent.is.textDelta),
+          Stream.map((event) => event.text),
+          Stream.mkString,
+          Effect.mapError(
+            (error) =>
+              new ApiVcsOperationError({
+                name: "VcsOperationError",
+                data: { message: error instanceof Error ? error.message : String(error), operation: "message" },
+              }),
+          ),
+        )
+      const cleaned = conventionalCommit(message)
+      if (!cleaned)
+        return yield* new ApiVcsOperationError({
+          name: "VcsOperationError",
+          data: { message: "The model did not return a commit message", operation: "message" },
+        })
+      return { message: cleaned }
+    })
+
     const getCommand = Effect.fn("InstanceHttpApi.command")(function* () {
       return yield* command.list()
     })
@@ -101,6 +271,19 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       .handle("vcsDiff", getVcsDiff)
       .handle("vcsDiffRaw", getVcsDiffRaw)
       .handle("vcsApply", applyVcs)
+      .handle("vcsChanges", getVcsChanges)
+      .handle("vcsRemote", getVcsRemote)
+      .handle("vcsStage", stageVcs)
+      .handle("vcsUnstage", unstageVcs)
+      .handle("vcsStageAll", stageAllVcs)
+      .handle("vcsUnstageAll", unstageAllVcs)
+      .handle("vcsDiscard", discardVcs)
+      .handle("vcsCommit", commitVcs)
+      .handle("vcsFetch", fetchVcs)
+      .handle("vcsPush", pushVcs)
+      .handle("vcsPull", pullVcs)
+      .handle("vcsStagedDiff", stagedDiffVcs)
+      .handle("vcsGenerateMessage", generateCommitMessage)
       .handle("command", getCommand)
       .handle("agent", getAgent)
       .handle("skill", getSkill)
@@ -108,3 +291,54 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       .handle("formatter", getFormatter)
   }),
 )
+
+const COMMIT_TYPES = ["feat", "fix", "docs", "chore", "refactor", "test"]
+const COMMIT_TYPE_ALIASES: Record<string, string> = {
+  feature: "feat",
+  bugfix: "fix",
+  hotfix: "fix",
+  doc: "docs",
+  tests: "test",
+  refactoring: "refactor",
+  build: "chore",
+  ci: "chore",
+  style: "chore",
+  perf: "refactor",
+}
+const COMMIT_MESSAGE_PROMPT = `Write a single-line commit message for these staged changes using Conventional Commits.
+
+Format: \`type: summary\` or \`type(scope): summary\`
+Allowed types:
+- feat: new feature
+- fix: bug fix
+- docs: documentation changes
+- chore: maintenance tasks
+- refactor: code refactoring
+- test: adding or updating tests
+
+Rules:
+- The scope is optional; when used, make it the lowercase name of the main affected package or area.
+- The summary is imperative, starts lowercase, has no trailing period, and keeps the whole line under 72 characters.
+- Describe the overall intent of the change, not a list of files.
+- Return only the commit message line, with no quotes, code fences, or explanation.`
+
+const CONVENTIONAL = new RegExp(`^(${COMMIT_TYPES.join("|")})(\\([a-z0-9._/-]+\\))?!?: \\S`)
+
+// Models occasionally wrap the answer in fences or prose, so pick the first conforming line and
+// only coerce a bare summary into `chore:` when nothing in the output matches the format.
+function conventionalCommit(output: string) {
+  const lines = output
+    .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("```"))
+    .map((line) => line.trim().replace(/^[`"'*]+|[`"'*]+$/g, "").trim())
+    .filter(Boolean)
+  const line = lines.find((item) => CONVENTIONAL.test(item.toLowerCase())) ?? lines[0]
+  if (!line) return
+  const match = /^([a-zA-Z]+)(\([^)]*\))?(!?):\s*(.+)$/.exec(line)
+  const raw = match?.[1]?.toLowerCase() ?? ""
+  const type = COMMIT_TYPE_ALIASES[raw] ?? raw
+  if (match && COMMIT_TYPES.includes(type))
+    return `${type}${match[2]?.toLowerCase() ?? ""}${match[3]}: ${match[4].replace(/\.$/, "")}`.slice(0, 200)
+  return `chore: ${line.charAt(0).toLowerCase()}${line.slice(1).replace(/\.$/, "")}`.slice(0, 200)
+}

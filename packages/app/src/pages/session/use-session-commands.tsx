@@ -545,21 +545,6 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
 
   const viewCmds = () => [
     viewCommand({
-      id: "terminal.toggle",
-      title: language.t("command.terminal.toggle"),
-      keybind: "ctrl+`",
-      slash: "terminal",
-      onSelect: () => {
-        if (view().terminal.opened()) {
-          terminal.cancelFocus()
-          view().terminal.close()
-          return
-        }
-        terminal.requestFocus(terminal.active())
-        view().terminal.open()
-      },
-    }),
-    viewCommand({
       id: "review.toggle",
       title: language.t("command.review.toggle"),
       keybind: "mod+shift+r",
@@ -583,23 +568,42 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     }),
   ]
 
-  const terminalCmds = () => [
-    terminalCommand({
-      id: "terminal.close",
-      title: language.t("terminal.close"),
-      keybind: "mod+w",
-      hidden: true,
-      when: (event) => event.target instanceof Element && !!event.target.closest('[data-component="terminal"]'),
-      onSelect: closeTerminal,
-    }),
-    terminalCommand({
-      id: "terminal.new",
-      title: language.t("command.terminal.new"),
-      description: language.t("command.terminal.new.description"),
-      keybind: "ctrl+alt+t",
-      onSelect: openTerminal,
-    }),
-  ]
+  // The terminal panel only exists in the new layout.
+  const terminalCmds = () => {
+    if (!settings.general.newLayoutDesigns()) return []
+    return [
+      viewCommand({
+        id: "terminal.toggle",
+        title: language.t("command.terminal.toggle"),
+        keybind: "ctrl+`",
+        slash: "terminal",
+        onSelect: () => {
+          if (view().terminal.opened()) {
+            terminal.cancelFocus()
+            view().terminal.close()
+            return
+          }
+          terminal.requestFocus(terminal.active())
+          view().terminal.open()
+        },
+      }),
+      terminalCommand({
+        id: "terminal.close",
+        title: language.t("terminal.close"),
+        keybind: "mod+w",
+        hidden: true,
+        when: (event) => event.target instanceof Element && !!event.target.closest('[data-component="terminal"]'),
+        onSelect: closeTerminal,
+      }),
+      terminalCommand({
+        id: "terminal.new",
+        title: language.t("command.terminal.new"),
+        description: language.t("command.terminal.new.description"),
+        keybind: "ctrl+alt+t",
+        onSelect: openTerminal,
+      }),
+    ]
+  }
 
   const messageCmds = () => [
     sessionCommand({

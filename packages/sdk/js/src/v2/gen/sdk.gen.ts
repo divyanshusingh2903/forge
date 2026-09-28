@@ -90,6 +90,32 @@ import type {
   GlobalUpgradeResponses,
   InstanceDisposeErrors,
   InstanceDisposeResponses,
+  InstanceVcsChangesErrors,
+  InstanceVcsChangesResponses,
+  InstanceVcsCommitErrors,
+  InstanceVcsCommitResponses,
+  InstanceVcsDiscardErrors,
+  InstanceVcsDiscardResponses,
+  InstanceVcsFetchErrors,
+  InstanceVcsFetchResponses,
+  InstanceVcsGenerateMessageErrors,
+  InstanceVcsGenerateMessageResponses,
+  InstanceVcsPullErrors,
+  InstanceVcsPullResponses,
+  InstanceVcsPushErrors,
+  InstanceVcsPushResponses,
+  InstanceVcsRemoteErrors,
+  InstanceVcsRemoteResponses,
+  InstanceVcsStageAllErrors,
+  InstanceVcsStageAllResponses,
+  InstanceVcsStagedDiffErrors,
+  InstanceVcsStagedDiffResponses,
+  InstanceVcsStageErrors,
+  InstanceVcsStageResponses,
+  InstanceVcsUnstageAllErrors,
+  InstanceVcsUnstageAllResponses,
+  InstanceVcsUnstageErrors,
+  InstanceVcsUnstageResponses,
   LocationRef,
   LspStatusErrors,
   LspStatusResponses,
@@ -1954,6 +1980,380 @@ export class Instance extends HeyApiClient {
       url: "/instance/dispose",
       ...options,
       ...params,
+    })
+  }
+
+  public vcsChanges<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<InstanceVcsChangesResponses, InstanceVcsChangesErrors, ThrowOnError>({
+      url: "/vcs/changes",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsRemote<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<InstanceVcsRemoteResponses, InstanceVcsRemoteErrors, ThrowOnError>({
+      url: "/vcs/remote",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsStage<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      file?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "file" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsStageResponses, InstanceVcsStageErrors, ThrowOnError>({
+      url: "/vcs/stage",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public vcsUnstage<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      file?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "file" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsUnstageResponses, InstanceVcsUnstageErrors, ThrowOnError>({
+      url: "/vcs/unstage",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public vcsStageAll<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsStageAllResponses, InstanceVcsStageAllErrors, ThrowOnError>(
+      {
+        url: "/vcs/stage-all",
+        ...options,
+        ...params,
+      },
+    )
+  }
+
+  public vcsUnstageAll<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      InstanceVcsUnstageAllResponses,
+      InstanceVcsUnstageAllErrors,
+      ThrowOnError
+    >({
+      url: "/vcs/unstage-all",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsDiscard<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      file?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "file" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsDiscardResponses, InstanceVcsDiscardErrors, ThrowOnError>({
+      url: "/vcs/discard",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public vcsCommit<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      message?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "message" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsCommitResponses, InstanceVcsCommitErrors, ThrowOnError>({
+      url: "/vcs/commit",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public vcsFetch<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsFetchResponses, InstanceVcsFetchErrors, ThrowOnError>({
+      url: "/vcs/fetch",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsPush<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsPushResponses, InstanceVcsPushErrors, ThrowOnError>({
+      url: "/vcs/push",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsPull<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsPullResponses, InstanceVcsPullErrors, ThrowOnError>({
+      url: "/vcs/pull",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsStagedDiff<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<
+      InstanceVcsStagedDiffResponses,
+      InstanceVcsStagedDiffErrors,
+      ThrowOnError
+    >({
+      url: "/vcs/staged-diff",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsGenerateMessage<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      sessionID?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "sessionID" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      InstanceVcsGenerateMessageResponses,
+      InstanceVcsGenerateMessageErrors,
+      ThrowOnError
+    >({
+      url: "/vcs/commit-message",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 }

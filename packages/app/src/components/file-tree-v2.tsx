@@ -9,6 +9,7 @@ import {
   Show,
   splitProps,
   type ComponentProps,
+  type JSX,
   type ParentProps,
 } from "solid-js"
 import { Dynamic } from "solid-js/web"
@@ -60,6 +61,7 @@ const FileTreeNodeV2 = (
       active?: string
       draggable: boolean
       kinds?: ReadonlyMap<string, Kind>
+      accessory?: boolean
       as?: "div" | "button"
     },
 ) => {
@@ -69,6 +71,7 @@ const FileTreeNodeV2 = (
     "active",
     "draggable",
     "kinds",
+    "accessory",
     "as",
     "children",
     "class",
@@ -87,7 +90,7 @@ const FileTreeNodeV2 = (
         ...local.classList,
         [local.class ?? ""]: !!local.class,
       }}
-      style={`padding-inline-start: ${rowPaddingStart(local.level, local.node.type)}px`}
+      style={`padding-inline-start: ${rowPaddingStart(local.level, local.node.type)}px;${local.accessory ? "padding-inline-end: 52px" : ""}`}
       draggable={local.draggable}
       onDragStart={(event: DragEvent) => {
         if (!local.draggable) return
@@ -130,6 +133,7 @@ export default function FileTreeV2(props: {
   draggable?: boolean
   onFileClick?: (file: FileNode) => void
   onFileDoubleClick?: (file: FileNode) => void
+  fileAccessory?: (path: string) => JSX.Element
 }) {
   const file = useFile()
   const live = () => props.allowed === undefined
@@ -240,29 +244,43 @@ export default function FileTreeV2(props: {
                     <Show
                       when={row().node.type === "directory"}
                       fallback={
-                        <FileTreeNodeV2
-                          node={row().node}
-                          level={row().level}
-                          active={active()}
-                          draggable={draggable()}
-                          kinds={props.kinds}
-                          as="button"
-                          type="button"
-                          class="relative"
-                          onFocus={() => setFocused(row().node.path)}
-                          onBlur={() => setFocused(undefined)}
-                          onClick={() => selectFile(row().node, props.onFileClick)}
-                          onDblClick={() => selectFile(row().node, props.onFileDoubleClick)}
+                        <div
+                          class="group/git-row relative w-full"
+                          onFocusIn={() => setFocused(row().node.path)}
+                          onFocusOut={(event) => {
+                            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(undefined)
+                          }}
                         >
-                          <GuideLines level={row().level} />
-                          <Show when={row().level > 0}>
-                            <div class="w-4 shrink-0" />
+                          <FileTreeNodeV2
+                            node={row().node}
+                            level={row().level}
+                            active={active()}
+                            draggable={draggable()}
+                            kinds={props.kinds}
+                            accessory={!!props.fileAccessory}
+                            as="button"
+                            type="button"
+                            class="relative"
+                            onClick={() => selectFile(row().node, props.onFileClick)}
+                            onDblClick={() => selectFile(row().node, props.onFileDoubleClick)}
+                          >
+                            <GuideLines level={row().level} />
+                            <Show when={row().level > 0}>
+                              <div class="w-4 shrink-0" />
+                            </Show>
+                            <span class="filetree-iconpair size-4">
+                              <FileIcon node={row().node} class="size-4 filetree-icon filetree-icon--color" />
+                              <FileIcon node={row().node} class="size-4 filetree-icon filetree-icon--mono" mono />
+                            </span>
+                          </FileTreeNodeV2>
+                          <Show when={props.fileAccessory}>
+                            {(accessory) => (
+                              <div class="absolute inset-y-0 end-2 flex items-center gap-1">
+                                {accessory()(row().node.originalPath)}
+                              </div>
+                            )}
                           </Show>
-                          <span class="filetree-iconpair size-4">
-                            <FileIcon node={row().node} class="size-4 filetree-icon filetree-icon--color" />
-                            <FileIcon node={row().node} class="size-4 filetree-icon filetree-icon--mono" mono />
-                          </span>
-                        </FileTreeNodeV2>
+                        </div>
                       }
                     >
                       <FileTreeNodeV2

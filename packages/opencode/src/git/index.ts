@@ -88,6 +88,18 @@ export interface Interface {
   readonly patchUntracked: (cwd: string, file: string, options?: PatchOptions) => Effect.Effect<Patch>
   readonly statUntracked: (cwd: string, file: string) => Effect.Effect<Stat | undefined>
   readonly applyPatch: (cwd: string, patch: string) => Effect.Effect<Result>
+  readonly stage: (cwd: string, file: string) => Effect.Effect<Result>
+  readonly unstage: (cwd: string, file: string) => Effect.Effect<Result>
+  readonly stageAll: (cwd: string, files: string[]) => Effect.Effect<Result>
+  readonly unstageAll: (cwd: string, files: string[]) => Effect.Effect<Result>
+  readonly discard: (cwd: string, file: string, untracked: boolean) => Effect.Effect<Result>
+  readonly commit: (cwd: string, message: string) => Effect.Effect<Result>
+  readonly fetch: (cwd: string) => Effect.Effect<Result>
+  readonly aheadBehind: (cwd: string) => Effect.Effect<{ ahead: number; behind: number } | undefined>
+  readonly push: (cwd: string) => Effect.Effect<Result>
+  readonly pull: (cwd: string) => Effect.Effect<Result>
+  readonly stagedDiff: (cwd: string) => Effect.Effect<Result>
+  readonly stagedStat: (cwd: string) => Effect.Effect<Result>
 }
 
 const kind = (code: string): Kind => {
@@ -323,6 +335,65 @@ const layer = Layer.effect(
       return yield* run(["apply", "-"], { cwd, stdin: stdin(patch) })
     })
 
+    const pathspec = (file: string) => `:(literal)${file}`
+    const stage = Effect.fn("Git.stage")(function* (cwd: string, file: string) {
+      return yield* run(["add", "--", pathspec(file)], { cwd })
+    })
+    const unstage = Effect.fn("Git.unstage")(function* (cwd: string, file: string) {
+      if (!(yield* hasHead(cwd))) return yield* run(["rm", "--cached", "--", pathspec(file)], { cwd })
+      return yield* run(["restore", "--staged", "--", pathspec(file)], { cwd })
+    })
+    const stageAll = Effect.fn("Git.stageAll")(function* (cwd: string, files: string[]) {
+      return yield* run(["add", "--all", "--pathspec-from-file=-", "--pathspec-file-nul"], {
+        cwd,
+        stdin: stdin(files.map(pathspec).join("\0") + "\0"),
+      })
+    })
+    const unstageAll = Effect.fn("Git.unstageAll")(function* (cwd: string, files: string[]) {
+      const args = (yield* hasHead(cwd)) ? ["restore", "--staged"] : ["rm", "--cached"]
+      return yield* run([...args, "--pathspec-from-file=-", "--pathspec-file-nul"], {
+        cwd,
+        stdin: stdin(files.map(pathspec).join("\0") + "\0"),
+      })
+    })
+    const discard = Effect.fn("Git.discard")(function* (cwd: string, file: string, untracked: boolean) {
+      if (untracked) return yield* run(["clean", "-f", "--", pathspec(file)], { cwd })
+      return yield* run(["restore", "--worktree", "--", pathspec(file)], { cwd })
+    })
+    const commit = Effect.fn("Git.commit")(function* (cwd: string, message: string) {
+      return yield* run(["commit", "-m", message], { cwd })
+    })
+    const fetch = Effect.fn("Git.fetch")(function* (cwd: string) {
+      return yield* run(["fetch"], { cwd, env: { GIT_TERMINAL_PROMPT: "0" } })
+    })
+    // Undefined when the branch has no upstream (or no commits), since there is nothing to compare against.
+    const aheadBehind = Effect.fn("Git.aheadBehind")(function* (cwd: string) {
+      const result = yield* run(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"], { cwd })
+      if (result.exitCode !== 0) return undefined
+      const [behind, ahead] = result.text().trim().split(/\s+/).map((value) => Number.parseInt(value, 10))
+      if (!Number.isFinite(behind) || !Number.isFinite(ahead)) return undefined
+      return { ahead, behind }
+    })
+    const push = Effect.fn("Git.push")(function* (cwd: string) {
+      return yield* run(["push"], { cwd, env: { GIT_TERMINAL_PROMPT: "0" } })
+    })
+    const pull = Effect.fn("Git.pull")(function* (cwd: string) {
+      return yield* run(["pull"], { cwd, env: { GIT_TERMINAL_PROMPT: "0" } })
+    })
+    const stagedDiff = Effect.fn("Git.stagedDiff")(function* (cwd: string) {
+      // Callers budget the patch per file; the cap only bounds memory for enormous commits.
+      return yield* run(["diff", "--cached", "--patch", "--no-ext-diff", "--no-renames", "--", "."], {
+        cwd,
+        maxOutputBytes: 4_000_000,
+      })
+    })
+    const stagedStat = Effect.fn("Git.stagedStat")(function* (cwd: string) {
+      return yield* run(["diff", "--cached", "--stat=200,160", "--no-ext-diff", "--no-renames", "--", "."], {
+        cwd,
+        maxOutputBytes: 256_000,
+      })
+    })
+
     return Service.of({
       run,
       branch,
@@ -339,6 +410,18 @@ const layer = Layer.effect(
       patchUntracked,
       statUntracked,
       applyPatch,
+      stage,
+      unstage,
+      stageAll,
+      unstageAll,
+      discard,
+      commit,
+      fetch,
+      aheadBehind,
+      push,
+      pull,
+      stagedDiff,
+      stagedStat,
     })
   }),
 )

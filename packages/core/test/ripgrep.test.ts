@@ -10,7 +10,8 @@ import { testEffect } from "./lib/effect"
 
 const it = testEffect(LayerNode.compile(Ripgrep.node))
 
-describe("Ripgrep", () => {
+// Skipped on Windows: ripgrep runs hang under Bun 1.4.2. See https://github.com/divyanshusingh2903/forge/issues/18
+describe.skipIf(process.platform === "win32")("Ripgrep", () => {
   it.live("keeps ignored files out of catch-all find results", () =>
     Effect.acquireUseRelease(
       Effect.promise(() => tmpdir()),

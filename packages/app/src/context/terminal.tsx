@@ -5,6 +5,7 @@ import { useParams } from "@solidjs/router"
 import { useSDK, type DirectorySDK } from "./sdk"
 import type { Platform } from "./platform"
 import { useServerSDK } from "./server-sdk"
+import { base64Encode } from "@opencode-ai/core/util/encode"
 import { defaultTitle, titleNumber } from "./terminal-title"
 import { Persist, persisted, removePersisted } from "@/utils/persist"
 import { ScopedKey, ServerScope, type ServerScope as ServerScopeValue } from "@/utils/server-scope"
@@ -570,7 +571,14 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
       }
 
       const entry = createRoot((dispose) => ({
-        value: createSessionTerminalSession(sdk(), dir, id, serverScope, getLegacyTerminalStorageKeys(dir, id)),
+        // Pre-session-scoping terminal state was keyed by the base64-encoded directory.
+        value: createSessionTerminalSession(
+          sdk(),
+          dir,
+          id,
+          serverScope,
+          getLegacyTerminalStorageKeys(base64Encode(dir), id),
+        ),
         dispose,
       }))
 

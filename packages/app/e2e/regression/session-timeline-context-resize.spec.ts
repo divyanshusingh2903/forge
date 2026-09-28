@@ -34,6 +34,13 @@ test.describe("regression: session timeline context group resize", () => {
     await expectSessionTitle(page, title)
     await expectAppVisible(page.locator(`[data-timeline-part-ids="${contextIDs.join(",")}"]`).first())
     await expectAppVisible(page.locator(`[data-timeline-part-id="${followingTextID}"]`).first())
+    // Context groups default to expanded; collapse first so the sample measures an expansion.
+    const trigger = page
+      .locator(`[data-timeline-part-ids="${contextIDs.join(",")}"]`)
+      .first()
+      .locator('[data-slot="collapsible-trigger"]')
+    await trigger.click()
+    await expect(trigger).toHaveAttribute("aria-expanded", "false")
     await settle(page)
 
     const samples = await sampleExpansion(page)

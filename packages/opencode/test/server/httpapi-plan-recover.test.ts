@@ -1,4 +1,5 @@
 import { afterEach, describe, expect } from "bun:test"
+import path from "path"
 import { NodeHttpServer, NodeServices } from "@effect/platform-node"
 import { Effect, Layer } from "effect"
 import { Config } from "effect"
@@ -129,10 +130,9 @@ describe("plan recover HttpApi", () => {
         expect(first.exists).toBe(false)
         expect(typeof first.path).toBe("string")
 
-        const messages = yield* Session.use.messages({ sessionID: session.id }).pipe(
-          provideInstanceEffect(test.directory),
-          Effect.orDie,
-        )
+        const messages = yield* Session.use
+          .messages({ sessionID: session.id })
+          .pipe(provideInstanceEffect(test.directory), Effect.orDie)
         const parts = messages.flatMap((msg) => msg.parts)
         const tool = parts.find(
           (part): part is SessionV1.ToolPart => part.type === "tool" && part.tool === "present_plan",
@@ -212,10 +212,9 @@ describe("plan recover HttpApi", () => {
         expect(first.recovered).toBe(true)
         expect(first.resumed).toBe(true)
 
-        const messages = yield* Session.use.messages({ sessionID: session.id }).pipe(
-          provideInstanceEffect(test.directory),
-          Effect.orDie,
-        )
+        const messages = yield* Session.use
+          .messages({ sessionID: session.id })
+          .pipe(provideInstanceEffect(test.directory), Effect.orDie)
         const parts = messages.flatMap((msg) => msg.parts)
         const tool = parts.find(
           (part): part is SessionV1.ToolPart => part.type === "tool" && part.tool === "present_plan",
@@ -263,9 +262,9 @@ describe("plan recover HttpApi", () => {
           text: "do something unrelated to planning",
         })
 
-        const dir = `${test.directory}/.opencode/plans`
+        const dir = path.join(test.directory, ".opencode", "plans")
         yield* Effect.promise(() => import("node:fs/promises").then((fs) => fs.mkdir(dir, { recursive: true })))
-        const file = `${dir}/${Date.now() + 60_000}-${session.slug}.md`
+        const file = path.join(dir, `${Date.now() + 60_000}-${session.slug}.md`)
         yield* Effect.promise(() => Bun.write(file, "# Plan\n\nSome plan content."))
 
         const info = yield* requestJson<{ path: string; exists: boolean }>(

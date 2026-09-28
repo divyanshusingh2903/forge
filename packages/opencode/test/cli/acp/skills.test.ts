@@ -6,7 +6,9 @@ import path from "node:path"
 import { cliIt } from "../../lib/cli-process"
 import { createAcpClient, initialize, newSession, verifierConfig, verifierSkill } from "./helpers"
 
-describe("opencode acp skills subprocess", () => {
+// Skipped on Windows: the ACP subprocess never answers over stdio under Bun 1.4.2.
+// See https://github.com/divyanshusingh2903/forge/issues/18
+describe.skipIf(process.platform === "win32")("opencode acp skills subprocess", () => {
   cliIt.live(
     "skill slash command appears through available_commands_update",
     ({ home, llm, opencode }) =>
