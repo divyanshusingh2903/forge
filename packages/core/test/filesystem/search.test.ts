@@ -16,7 +16,8 @@ const withTmp = <A, E, R>(f: (directory: AbsolutePath) => Effect.Effect<A, E, R>
     (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
   ).pipe(Effect.flatMap((tmp) => f(AbsolutePath.make(tmp.path))))
 
-describe("Ripgrep", () => {
+// Skipped on Windows: ripgrep runs hang under Bun 1.4.2. See https://github.com/divyanshusingh2903/forge/issues/18
+describe.skipIf(process.platform === "win32")("Ripgrep", () => {
   it.live("globs files as an array", () =>
     withTmp((cwd) =>
       Effect.gen(function* () {

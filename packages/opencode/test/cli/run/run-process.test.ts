@@ -8,7 +8,9 @@ import { Effect } from "effect"
 import { reply } from "../../lib/llm-server"
 import { cliIt } from "../../lib/cli-process"
 
-describe("opencode run (non-interactive subprocess)", () => {
+// Skipped on macOS: Bun 1.4.x can lose subprocess exit notifications there, hanging every test.
+// See https://github.com/divyanshusingh2903/forge/issues/18
+describe.skipIf(process.platform === "darwin")("opencode run (non-interactive subprocess)", () => {
   // Happy path: prompt completes, output reaches stdout, process exits 0.
   // If this fails, all the others likely will too — debug here first.
   cliIt.concurrent(
