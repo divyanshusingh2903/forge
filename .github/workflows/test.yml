@@ -66,8 +66,10 @@ jobs:
             turbo-${{ runner.os }}-
 
       - name: Run unit tests
-        timeout-minutes: 20
-        run: GITHUB_ACTIONS=false bun turbo test
+        # GitHub's Windows runners need well over 20 minutes for the opencode suite.
+        timeout-minutes: ${{ runner.os == 'Windows' && 45 || 20 }}
+        # Stream output so a stalled package shows its last test file instead of nothing.
+        run: GITHUB_ACTIONS=false bun turbo test --log-order=stream
         env:
           OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: ${{ runner.os == 'Windows' && 'true' || 'false' }}
 

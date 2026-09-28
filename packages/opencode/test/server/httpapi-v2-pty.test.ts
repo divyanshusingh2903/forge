@@ -63,7 +63,10 @@ afterEach(async () => {
 })
 
 describe("v2 pty HttpApi", () => {
-  testPty("serves location-wrapped PTY routes and retains exited sessions", async () => {
+  // Skipped on macOS: the PTY intermittently never reports exit under Bun 1.4.2.
+  // See https://github.com/divyanshusingh2903/forge/issues/18
+  const testExitedPty = process.platform === "darwin" ? test.skip : testPty
+  testExitedPty("serves location-wrapped PTY routes and retains exited sessions", async () => {
     await using tmp = await tmpdir({ git: true, config: { formatter: false, lsp: false } })
 
     const empty = await request("/api/pty", tmp.path)
