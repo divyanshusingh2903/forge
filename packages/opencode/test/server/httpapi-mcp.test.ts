@@ -65,7 +65,13 @@ describe("mcp HttpApi", () => {
         const response = yield* request(handler, McpPaths.status, tmp.directory)
 
         expect(response.status).toBe(200)
-        expect(yield* json(response)).toEqual({ demo: { status: "disabled" } })
+        // Built-in remote servers are always listed, disabled until opted in.
+        expect(yield* json(response)).toEqual({
+          demo: { status: "disabled" },
+          github: { status: "disabled" },
+          linear: { status: "disabled" },
+          notion: { status: "disabled" },
+        })
       }),
     {
       config: {
