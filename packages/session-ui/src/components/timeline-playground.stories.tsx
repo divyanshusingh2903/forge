@@ -397,9 +397,51 @@ const TOOL_SAMPLES = {
   websearch: {
     tool: "websearch",
     input: { query: "SolidJS createStore performance" },
-    output:
-      "https://solidjs.com/docs/latest/api#createstore\nhttps://dev.to/solidjs/understanding-solid-reactivity\nhttps://github.com/solidjs/solid/discussions/1234",
+    output: [
+      "Title: createStore | SolidJS Docs",
+      "URL: https://solidjs.com/docs/latest/api#createstore",
+      "Text: Stores are proxy objects that support fine-grained updates. Use produce or reconcile to batch changes without re-rendering unrelated subscribers.",
+      "",
+      "Title: Understanding Solid's reactivity",
+      "URL: https://dev.to/solidjs/understanding-solid-reactivity",
+      "Text: Signals track their subscribers directly, so updates skip the virtual DOM diff entirely.",
+      "",
+      "Title: Store performance with large lists",
+      "URL: https://github.com/solidjs/solid/discussions/1234",
+      "Text: Keying lists with reconcile keeps row identity stable and avoids recreating DOM nodes.",
+    ].join("\n"),
     title: "Search: SolidJS createStore performance",
+    metadata: { provider: "exa" },
+  },
+  mcp_json: {
+    tool: "github_search_issues",
+    input: { query: "tool response viewer", state: "open", per_page: 2 },
+    output: JSON.stringify({
+      total_count: 2,
+      items: [
+        { number: 10, title: "MCP: let users inspect tool call responses", labels: ["enhancement"] },
+        { number: 9, title: "Web search: let users inspect search responses", labels: ["enhancement"] },
+      ],
+    }),
+    title: "github_search_issues",
+    metadata: {},
+  },
+  mcp_text: {
+    tool: "docs_get_page",
+    input: { path: "/guides/getting-started" },
+    output:
+      "# Getting started\n\nInstall the package and import the client.\n\nRun the dev server to see changes live.",
+    title: "docs_get_page",
+    metadata: {},
+  },
+  mcp_long: {
+    tool: "logs_tail",
+    input: { service: "api", lines: 800 },
+    output: Array.from(
+      { length: 800 },
+      (_, i) => `2026-10-03T10:${String(i % 60).padStart(2, "0")}:00Z INFO request ${i} handled in ${i % 97}ms`,
+    ).join("\n"),
+    title: "logs_tail",
     metadata: {},
   },
   question: {

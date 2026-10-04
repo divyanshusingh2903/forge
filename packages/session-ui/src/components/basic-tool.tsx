@@ -18,6 +18,7 @@ import { Collapsible } from "@opencode-ai/ui/collapsible"
 import type { IconProps } from "@opencode-ai/ui/icon"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
 import { formatElapsed, useElapsed } from "@opencode-ai/ui/hooks"
+import { ToolResponse } from "./tool-response"
 
 export type TriggerTitle = {
   title: string
@@ -351,11 +352,17 @@ function args(input: Record<string, unknown> | undefined) {
     .slice(0, 3)
 }
 
+// Fallback for tools without a registered renderer, which in practice are MCP tools.
 export function GenericTool(props: {
   tool: string
   status?: string
   hideDetails?: boolean
   input?: Record<string, unknown>
+  output?: string
+  time?: { start: number; end?: number }
+  defaultOpen?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
   const i18n = useI18n()
 
@@ -363,12 +370,20 @@ export function GenericTool(props: {
     <BasicTool
       icon="mcp"
       status={props.status}
+      time={props.time}
+      defaultOpen={props.defaultOpen ?? true}
+      open={props.open}
+      onOpenChange={props.onOpenChange}
       trigger={{
         title: i18n.t("ui.basicTool.called", { tool: props.tool }),
         subtitle: label(props.input),
         args: args(props.input),
       }}
       hideDetails={props.hideDetails}
-    />
+    >
+      <Show when={props.output}>
+        <ToolResponse output={props.output} />
+      </Show>
+    </BasicTool>
   )
 }
