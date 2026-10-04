@@ -7,7 +7,7 @@ import {
   userMessage,
 } from "../performance/timeline-stability/fixture"
 
-test("updates expanded web search links without resetting expansion", async ({ page }) => {
+test("updates web search links without resetting expansion", async ({ page }) => {
   const searchID = "prt_websearch_mutation"
   const input = { query: "timeline stability" }
   const timeline = await setupTimeline(page, {
@@ -18,7 +18,6 @@ test("updates expanded web search links without resetting expansion", async ({ p
   })
   const wrapper = page.locator(`[data-timeline-part-id="${searchID}"]`)
   const trigger = wrapper.locator('[data-slot="collapsible-trigger"]')
-  await trigger.click()
   await expect(trigger).toHaveAttribute("aria-expanded", "true")
   await timeline.send(
     partUpdated(
@@ -30,6 +29,17 @@ test("updates expanded web search links without resetting expansion", async ({ p
   )
   await expect(trigger).toHaveAttribute("aria-expanded", "true")
   await expect(wrapper.locator('a[href="https://example.com/two"]')).toBeVisible()
+  await trigger.click()
+  await expect(trigger).toHaveAttribute("aria-expanded", "false")
+  await timeline.send(
+    partUpdated(
+      toolPart(searchID, "websearch", "completed", input, {
+        output: "https://example.com/one\nhttps://example.com/two\nhttps://example.com/three",
+      }),
+    ),
+    300,
+  )
+  await expect(trigger).toHaveAttribute("aria-expanded", "false")
 })
 
 test("preserves an expanded tool error card across duplicate delivery", async ({ page }) => {
