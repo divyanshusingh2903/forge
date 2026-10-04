@@ -190,9 +190,18 @@ export namespace Timeline {
       assistantGroupIndex += 1
     })
 
-    if (isActive && status === "busy" && !error && (showReasoning ? assistantPartRefs.length === 0 : true)) {
-      const heading = assistantMessages
-        .flatMap((message) => getMessageParts(message.id))
+    // Keep a working indicator up for the whole busy turn, including quiet gaps between parts. A visible running tool
+    // shows its own indicator, and an unanswered question means the session is waiting on the user, so neither needs
+    // this row. Hidden tools (e.g. todowrite) draw nothing, so they must not suppress it.
+    const assistantParts = assistantMessages.flatMap((message) => getMessageParts(message.id))
+    const toolActive = assistantParts.some(
+      (part) =>
+        part.type === "tool" &&
+        (part.state.status === "pending" || part.state.status === "running") &&
+        (part.tool === "question" || renderable(part, showReasoning)),
+    )
+    if (isActive && status === "busy" && !error && !toolActive) {
+      const heading = assistantParts
         .map((part) => (part.type === "reasoning" && part.text ? reasoningHeading(part.text) : undefined))
         .find((value): value is string => !!value)
 

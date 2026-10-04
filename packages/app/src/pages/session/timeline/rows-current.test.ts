@@ -3,7 +3,7 @@ import type { SessionMessageInfo } from "@opencode-ai/client/promise"
 import { normalizeSessionMessages } from "@/utils/session-message"
 
 mock.module("@opencode-ai/session-ui/message-part", () => ({
-  renderable: () => true,
+  renderable: (part: { type: string; tool?: string }) => part.tool !== "todowrite",
   groupParts: (refs: Array<{ messageID: string; part: { id: string } }>) =>
     refs.map((ref) => ({
       type: "part" as const,
@@ -56,6 +56,7 @@ describe("current session timeline rows", () => {
       "turn-gap:msg_3",
       "user-message:msg_3",
       "assistant-part:msg_3:msg_4:reasoning:0",
+      "thinking:msg_3",
     ])
   })
 
@@ -202,6 +203,113 @@ describe("current session timeline rows", () => {
       normalized.messages.filter((message) => message.role === "user"),
     )
 
-    expect(result.rows.map((row) => row._tag)).toEqual(["UserMessage", "AssistantPart"])
+    expect(result.rows.map((row) => row._tag)).toEqual(["UserMessage", "AssistantPart", "Thinking"])
+  })
+
+  describe("thinking row while the session is busy", () => {
+    const tool = (state: Record<string, unknown>) => ({
+      type: "tool" as const,
+      id: "call_1",
+      name: "shell",
+      state,
+      time: { created: 2, ran: 3 },
+    })
+
+    function rowTags(
+      content: unknown[],
+      status: "busy" | "idle",
+      options: { completed?: number; error?: { type: string; message: string }; showReasoning?: boolean } = {},
+    ) {
+      const source = [
+        { id: "msg_user", type: "user", text: "go", time: { created: 1 } },
+        {
+          id: "msg_assistant",
+          type: "assistant",
+          agent: "build",
+          model: { id: "model", providerID: "provider" },
+          content,
+          error: options.error,
+          time: { created: 2, completed: options.completed },
+        },
+      ] as SessionMessageInfo[]
+      const normalized = normalizeSessionMessages("ses_1", source)
+      const messages = new Map(normalized.messages.map((message) => [message.id, message]))
+      return Timeline.constructSessionMessageRows(
+        source,
+        (messageID) => messages.get(messageID),
+        (messageID) => normalized.parts.get(messageID) ?? [],
+        options.showReasoning ?? true,
+        status,
+        true,
+        normalized.messages.filter((message) => message.role === "user"),
+      ).rows.map((row) => row._tag)
+    }
+
+    const finished = tool({ status: "completed", input: { command: "ls" }, content: [{ type: "text", text: "ok" }] })
+
+    test("stays up between parts when every tool has finished", () => {
+      expect(rowTags([{ type: "text", text: "looking" }, finished], "busy")).toEqual([
+        "UserMessage",
+        "AssistantPart",
+        "AssistantPart",
+        "Thinking",
+      ])
+    })
+
+    test("stays up after streamed text", () => {
+      expect(rowTags([{ type: "text", text: "Here is what I found" }], "busy").at(-1)).toBe("Thinking")
+    })
+
+    test("stays up after visible reasoning", () => {
+      expect(rowTags([{ type: "reasoning", text: "Weighing options" }], "busy").at(-1)).toBe("Thinking")
+    })
+
+    test("stays up when reasoning summaries are off", () => {
+      const reasoning = { type: "reasoning", text: "Weighing options" }
+      expect(rowTags([reasoning, finished], "busy", { showReasoning: false }).at(-1)).toBe("Thinking")
+    })
+
+    test("stays up after a tool that failed", () => {
+      const failed = tool({ status: "error", input: { command: "false" }, error: { message: "exit 1" } })
+      expect(rowTags([failed], "busy").at(-1)).toBe("Thinking")
+    })
+
+    test("stays up when the assistant message is finished but the session is still busy", () => {
+      expect(rowTags([finished], "busy", { completed: 4 }).at(-1)).toBe("Thinking")
+    })
+
+    test("stays up before the assistant has produced anything", () => {
+      expect(rowTags([], "busy")).toEqual(["UserMessage", "Thinking"])
+    })
+
+    test("is hidden while a tool is running, which shows its own indicator", () => {
+      const running = tool({ status: "running", input: { command: "sleep 20" } })
+      expect(rowTags([running], "busy")).not.toContain("Thinking")
+    })
+
+    test("is hidden while a tool call is still streaming its input", () => {
+      const streaming = tool({ status: "streaming", input: '{"command":"sl' })
+      expect(rowTags([streaming], "busy")).not.toContain("Thinking")
+    })
+
+    test("stays up while only a hidden tool is running", () => {
+      const todos = { ...tool({ status: "running", input: { todos: [] } }), name: "todowrite" }
+      expect(rowTags([todos], "busy")).toContain("Thinking")
+    })
+
+    test("is hidden while a question waits on the user", () => {
+      const question = { ...tool({ status: "running", input: { questions: [] } }), name: "question" }
+      expect(rowTags([question], "busy")).not.toContain("Thinking")
+    })
+
+    test("is hidden once the session is idle", () => {
+      expect(rowTags([finished], "idle", { completed: 4 })).not.toContain("Thinking")
+    })
+
+    test("is hidden when the turn failed", () => {
+      expect(rowTags([], "busy", { completed: 4, error: { type: "ProviderError", message: "boom" } })).not.toContain(
+        "Thinking",
+      )
+    })
   })
 })

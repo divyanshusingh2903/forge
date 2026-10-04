@@ -1332,8 +1332,8 @@ function Playground() {
     appendParts([reasoningPart(REASONING_SAMPLES[idx])])
   }
 
-  const addTool = (name: keyof typeof TOOL_SAMPLES) => {
-    appendParts([toolPart(TOOL_SAMPLES[name])])
+  const addTool = (name: keyof typeof TOOL_SAMPLES, status?: string) => {
+    appendParts([toolPart(TOOL_SAMPLES[name], status)])
   }
 
   // ---- Composite helpers (create full turns with user + assistant) ----
@@ -1751,6 +1751,20 @@ function Playground() {
                 <For each={Object.keys(TOOL_SAMPLES) as (keyof typeof TOOL_SAMPLES)[]}>
                   {(key) => (
                     <button style={btnStyle} onClick={() => addTool(key)}>
+                      {key}
+                    </button>
+                  )}
+                </For>
+              </div>
+
+              <div style={{ ...sectionLabel, "margin-top": "8px" }}>Running tools</div>
+              <div style={{ "font-size": "10px", color: "var(--text-weaker)", "margin-bottom": "2px" }}>
+                Never completes, so the activity indicator keeps animating
+              </div>
+              <div style={{ display: "flex", "flex-wrap": "wrap", gap: "4px" }}>
+                <For each={["bash", "edit", "webfetch", "websearch"] as const}>
+                  {(key) => (
+                    <button style={btnStyle} onClick={() => addTool(key, "running")}>
                       {key}
                     </button>
                   )}
