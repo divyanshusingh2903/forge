@@ -1088,6 +1088,9 @@ export function ContextToolGroup(props: {
             data-slot="context-tool-group-title"
             class="min-w-0 flex items-center gap-2 text-14-medium text-text-strong"
           >
+            <Show when={pending()}>
+              <SessionProgressIndicatorV2 class="shrink-0" />
+            </Show>
             <span data-slot="context-tool-group-label" class="shrink-0">
               <ToolStatusTitle
                 active={pending()}
@@ -2146,6 +2149,7 @@ ToolRegistry.register({
         status={props.status}
         time={props.time}
         trigger={trigger()}
+        hideIndicator
         hideDetails
         triggerAsLink
         triggerHref={href()}

@@ -57,9 +57,11 @@
     line-height: 20px;
     min-height: 20px;
 
-    [data-component="spinner"] {
-      width: 16px;
-      height: 16px;
+    /* Brief gaps between consecutive tools would otherwise flash the row on and off. */
+    animation: session-turn-thinking-in 150ms ease 250ms backwards;
+
+    [data-component="session-progress-indicator-v2"] {
+      flex-shrink: 0;
     }
   }
 
@@ -249,4 +251,10 @@ body:not([data-new-layout]) [data-component="session-turn"] {
 
 [data-slot="session-turn-list"] {
   gap: 24px;
+}
+
+@keyframes session-turn-thinking-in {
+  from {
+    opacity: 0;
+  }
 }

@@ -14,7 +14,7 @@ import { getDirectory, getFilename } from "@opencode-ai/core/util/path"
 import { createEffect, createMemo, createSignal, For, on, ParentProps, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Dynamic } from "solid-js/web"
-import { AssistantParts, Message, MessageDivider, PART_MAPPING, type UserActions } from "./message-part"
+import { AssistantParts, Message, MessageDivider, renderable, type UserActions } from "./message-part"
 import { Card } from "@opencode-ai/ui/card"
 import { Accordion } from "@opencode-ai/ui/accordion"
 import { StickyAccordionHeader } from "@opencode-ai/ui/sticky-accordion-header"
@@ -22,6 +22,7 @@ import { DiffChanges } from "@opencode-ai/ui/diff-changes"
 import { Icon } from "@opencode-ai/ui/icon"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
 import { SessionRetry } from "./session-retry"
+import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 import { TextReveal } from "@opencode-ai/ui/text-reveal"
 import { createAutoScroll } from "@opencode-ai/ui/hooks"
 import { useI18n } from "@opencode-ai/ui/context/i18n"
@@ -95,23 +96,6 @@ type SummaryDiff = (SnapshotFileDiff & { file: string }) | FileDiffInfo
 
 function summaryDiff(value: SnapshotFileDiff): value is SummaryDiff {
   return typeof value.file === "string"
-}
-
-const hidden = new Set(["todowrite"])
-
-function partState(part: PartType, showReasoningSummaries: boolean) {
-  if (part.type === "tool") {
-    if (hidden.has(part.tool)) return
-    if (part.tool === "question" && (part.state.status === "pending" || part.state.status === "running")) return
-    return "visible" as const
-  }
-  if (part.type === "text") return part.text?.trim() ? ("visible" as const) : undefined
-  if (part.type === "reasoning") {
-    if (showReasoningSummaries && part.text?.trim()) return "visible" as const
-    return
-  }
-  if (PART_MAPPING[part.type]) return "visible" as const
-  return
 }
 
 function clean(value: string) {
@@ -351,13 +335,16 @@ export function SessionTurn(
     return end - start
   })
   const assistantDerived = createMemo(() => {
-    let visible = 0
+    let toolActive = false
     let reason: string | undefined
-    const show = showReasoningSummaries()
     for (const message of assistantMessages()) {
       for (const part of list(data.store.part?.[message.id], emptyParts)) {
-        if (partState(part, show) === "visible") {
-          visible++
+        if (
+          part.type === "tool" &&
+          (part.state.status === "pending" || part.state.status === "running") &&
+          (part.tool === "question" || renderable(part, showReasoningSummaries()))
+        ) {
+          toolActive = true
         }
         if (part.type === "reasoning" && part.text) {
           const h = heading(part.text)
@@ -365,15 +352,15 @@ export function SessionTurn(
         }
       }
     }
-    return { visible, reason }
+    return { toolActive, reason }
   })
-  const assistantVisible = createMemo(() => assistantDerived().visible)
   const reasoningHeading = createMemo(() => assistantDerived().reason)
+  // A running tool shows its own indicator; otherwise keep this row up for the whole busy turn, including quiet gaps.
   const showThinking = createMemo(() => {
     if (!working() || !!error()) return false
     if (status().type === "retry") return false
-    if (showReasoningSummaries()) return assistantVisible() === 0
-    return true
+    // With summaries off this row is the only place the reasoning topic appears, so it stays up while tools run.
+    return !showReasoningSummaries() || !assistantDerived().toolActive
   })
 
   const autoScroll = createAutoScroll({
@@ -421,6 +408,7 @@ export function SessionTurn(
               </Show>
               <Show when={showThinking()}>
                 <div data-slot="session-turn-thinking">
+                  <SessionProgressIndicatorV2 />
                   <TextShimmer text={i18n.t("ui.sessionTurn.status.thinking")} />
                   <Show when={!showReasoningSummaries()}>
                     <TextReveal

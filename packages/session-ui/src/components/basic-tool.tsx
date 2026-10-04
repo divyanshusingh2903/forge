@@ -18,6 +18,7 @@ import { Collapsible } from "@opencode-ai/ui/collapsible"
 import type { IconProps } from "@opencode-ai/ui/icon"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
 import { formatElapsed, useElapsed } from "@opencode-ai/ui/hooks"
+import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 import { ToolResponse } from "./tool-response"
 
 export type TriggerTitle = {
@@ -57,6 +58,8 @@ export interface BasicToolProps {
   triggerHref?: string
   triggerAsLink?: boolean
   clickable?: boolean
+  // For tools whose trigger already renders its own activity indicator.
+  hideIndicator?: boolean
 }
 
 const SPRING = { type: "spring" as const, visualDuration: 0.35, bounce: 0 }
@@ -216,6 +219,11 @@ export function BasicTool(props: BasicToolProps) {
       data-hide-details={props.hideDetails ? "true" : undefined}
     >
       <div data-slot="basic-tool-tool-trigger-content">
+        <Show when={pending() && !props.hideIndicator}>
+          <span data-slot="basic-tool-tool-spinner">
+            <SessionProgressIndicatorV2 />
+          </span>
+        </Show>
         <div data-slot="basic-tool-tool-info">
           <Switch>
             <Match when={dynamicTrigger !== undefined}>{dynamicTrigger}</Match>
