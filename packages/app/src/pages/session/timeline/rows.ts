@@ -192,7 +192,8 @@ export namespace Timeline {
 
     // Keep a working indicator up for the whole busy turn, including quiet gaps between parts. A visible running tool
     // shows its own indicator, and an unanswered question means the session is waiting on the user, so neither needs
-    // this row. Hidden tools (e.g. todowrite) draw nothing, so they must not suppress it.
+    // this row. Hidden tools (e.g. todowrite) draw nothing, so they must not suppress it. With reasoning summaries off
+    // this row is the only place the reasoning topic appears, so it stays up regardless of running tools.
     const assistantParts = assistantMessages.flatMap((message) => getMessageParts(message.id))
     const toolActive = assistantParts.some(
       (part) =>
@@ -200,7 +201,7 @@ export namespace Timeline {
         (part.state.status === "pending" || part.state.status === "running") &&
         (part.tool === "question" || renderable(part, showReasoning)),
     )
-    if (isActive && status === "busy" && !error && !toolActive) {
+    if (isActive && status === "busy" && !error && (!showReasoning || !toolActive)) {
       const heading = assistantParts
         .map((part) => (part.type === "reasoning" && part.text ? reasoningHeading(part.text) : undefined))
         .find((value): value is string => !!value)

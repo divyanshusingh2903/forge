@@ -61,6 +61,9 @@ import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
 import { AnimatedCountList } from "./tool-count-summary"
 import { ToolStatusTitle } from "./tool-status-title"
 import { patchFiles } from "./apply-patch-file"
+import { parseWebSearchResults } from "./web-search-results"
+import { ToolResponse } from "./tool-response"
+import { writeClipboard } from "./clipboard"
 import { partDefaultOpen } from "./part-default-open"
 import { animate } from "motion"
 import { attached, inline, kind, typeLabel } from "./message-file"
@@ -68,30 +71,6 @@ import { readPartText } from "./message-part-text"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 import { highlightStreamingCode, disposeStreamingCode } from "./markdown-worker"
 import type { MarkdownToken } from "./markdown-worker-protocol"
-
-async function writeClipboard(text: string): Promise<boolean> {
-  const body = typeof document === "undefined" ? undefined : document.body
-  if (body) {
-    const textarea = document.createElement("textarea")
-    textarea.value = text
-    textarea.setAttribute("readonly", "")
-    textarea.style.position = "fixed"
-    textarea.style.opacity = "0"
-    textarea.style.pointerEvents = "none"
-    body.appendChild(textarea)
-    textarea.select()
-    const copied = document.execCommand("copy")
-    body.removeChild(textarea)
-    if (copied) return true
-  }
-
-  const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard
-  if (!clipboard?.writeText) return false
-  return clipboard.writeText(text).then(
-    () => true,
-    () => false,
-  )
-}
 
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
   let widthRef: HTMLSpanElement | undefined
@@ -959,6 +938,9 @@ function ExaOutput(props: { output?: string }) {
     </Show>
   )
 }
+
+// Search responses can carry many long excerpts, so only the first few results start expanded.
+const WEB_SEARCH_OPEN_RESULTS = 3
 
 export function registerPartComponent(type: string, component: PartComponent) {
   PART_MAPPING[type] = component
@@ -2028,18 +2010,43 @@ ToolRegistry.register({
       return value
     })
     const title = createMemo(() => webSearchProviderLabel(props.metadata.provider, i18n))
+    const results = createMemo(() => parseWebSearchResults(props.output))
 
     return (
       <BasicTool
         {...props}
         icon="window-cursor"
+        defaultOpen={props.defaultOpen ?? true}
         trigger={{
           title: title(),
           subtitle: query(),
           subtitleClass: "exa-tool-query",
         }}
       >
-        <ExaOutput output={props.output} />
+        <Show when={props.output}>
+          <div data-component="tool-response-group">
+            <Show
+              when={results()}
+              fallback={
+                <>
+                  <ExaOutput output={props.output} />
+                  <ToolResponse output={props.output} />
+                </>
+              }
+            >
+              <For each={results()}>
+                {(result, index) => (
+                  <ToolResponse
+                    output={result.text}
+                    href={result.url}
+                    title={result.title}
+                    defaultOpen={index() < WEB_SEARCH_OPEN_RESULTS}
+                  />
+                )}
+              </For>
+            </Show>
+          </div>
+        </Show>
       </BasicTool>
     )
   },

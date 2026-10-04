@@ -287,6 +287,11 @@ describe("current session timeline rows", () => {
       expect(rowTags([running], "busy")).not.toContain("Thinking")
     })
 
+    test("stays up while a tool runs when reasoning summaries are off", () => {
+      const running = tool({ status: "running", input: { command: "sleep 20" } })
+      expect(rowTags([running], "busy", { showReasoning: false }).at(-1)).toBe("Thinking")
+    })
+
     test("is hidden while a tool call is still streaming its input", () => {
       const streaming = tool({ status: "streaming", input: '{"command":"sl' })
       expect(rowTags([streaming], "busy")).not.toContain("Thinking")

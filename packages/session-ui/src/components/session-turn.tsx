@@ -359,7 +359,8 @@ export function SessionTurn(
   const showThinking = createMemo(() => {
     if (!working() || !!error()) return false
     if (status().type === "retry") return false
-    return !assistantDerived().toolActive
+    // With summaries off this row is the only place the reasoning topic appears, so it stays up while tools run.
+    return !showReasoningSummaries() || !assistantDerived().toolActive
   })
 
   const autoScroll = createAutoScroll({

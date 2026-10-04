@@ -41,7 +41,7 @@ const profiles = [
     summaries: true,
     reasoning: "## Inspecting stability",
     other: false,
-    thinking: false,
+    thinking: true,
     body: true,
   },
   {
@@ -87,7 +87,8 @@ test("does not infer reasoning visibility from provider identity", async ({ page
   })
   await timeline.send(status("busy"), 150)
 
-  await expect(page.locator('[data-timeline-row="Thinking"]')).toHaveCount(0)
+  // The working indicator stays up while busy, even after output has arrived; it is not a reasoning body.
+  await expect(page.locator('[data-timeline-row="Thinking"]')).toHaveCount(1)
   await expect(page.locator('[data-timeline-part-id*="reasoning"]')).toHaveCount(0)
   await expect(page.locator('[data-timeline-part-id="prt_provider_text"]')).toBeVisible()
 })

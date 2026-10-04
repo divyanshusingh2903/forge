@@ -1,8 +1,9 @@
 - To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit `src/generated` or `src/generated-effect` directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk-next` composes Client, Core, and Server.
-- The default branch in this repo is `dev`.
-- Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
+- The default branch in this repo is `main`. Open pull requests against `main`.
+- `origin/dev` is leftover upstream OpenCode history with no Forge work; do not target it or diff against it. Use `main` or `origin/main` for diffs.
+- Releases never run on merge. The `forge-release` workflow is started by hand from the Actions tab, so merging to `main` does not tag or bump a version.
 
 ## Branch Names
 
