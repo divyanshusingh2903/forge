@@ -18,6 +18,7 @@ import { Collapsible } from "@opencode-ai/ui/collapsible"
 import type { IconProps } from "@opencode-ai/ui/icon"
 import { TextShimmer } from "@opencode-ai/ui/text-shimmer"
 import { formatElapsed, useElapsed } from "@opencode-ai/ui/hooks"
+import { ToolResponse } from "./tool-response"
 
 export type TriggerTitle = {
   title: string
@@ -329,5 +330,60 @@ export function BasicTool(props: BasicToolProps) {
         </Collapsible.Content>
       </Show>
     </Collapsible>
+  )
+}
+
+function label(input: Record<string, unknown> | undefined) {
+  const keys = ["description", "query", "url", "filePath", "path", "pattern", "name"]
+  return keys.map((key) => input?.[key]).find((value): value is string => typeof value === "string" && value.length > 0)
+}
+
+function args(input: Record<string, unknown> | undefined) {
+  if (!input) return []
+  const skip = new Set(["description", "query", "url", "filePath", "path", "pattern", "name"])
+  return Object.entries(input)
+    .filter(([key]) => !skip.has(key))
+    .flatMap(([key, value]) => {
+      if (typeof value === "string") return [`${key}=${value}`]
+      if (typeof value === "number") return [`${key}=${value}`]
+      if (typeof value === "boolean") return [`${key}=${value}`]
+      return []
+    })
+    .slice(0, 3)
+}
+
+// Fallback for tools without a registered renderer, which in practice are MCP tools.
+export function GenericTool(props: {
+  tool: string
+  status?: string
+  hideDetails?: boolean
+  input?: Record<string, unknown>
+  output?: string
+  time?: { start: number; end?: number }
+  defaultOpen?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  const i18n = useI18n()
+
+  return (
+    <BasicTool
+      icon="mcp"
+      status={props.status}
+      time={props.time}
+      defaultOpen={props.defaultOpen ?? true}
+      open={props.open}
+      onOpenChange={props.onOpenChange}
+      trigger={{
+        title: i18n.t("ui.basicTool.called", { tool: props.tool }),
+        subtitle: label(props.input),
+        args: args(props.input),
+      }}
+      hideDetails={props.hideDetails}
+    >
+      <Show when={props.output}>
+        <ToolResponse output={props.output} />
+      </Show>
+    </BasicTool>
   )
 }

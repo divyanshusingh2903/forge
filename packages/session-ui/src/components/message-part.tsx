@@ -36,7 +36,7 @@ import { useFileComponent } from "@opencode-ai/ui/context/file"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { type UiI18n, useI18n } from "@opencode-ai/ui/context/i18n"
 import { formatElapsed, useElapsed } from "@opencode-ai/ui/hooks"
-import { BasicTool } from "./basic-tool"
+import { BasicTool, GenericTool } from "./basic-tool"
 import { Accordion } from "@opencode-ai/ui/accordion"
 import { StickyAccordionHeader } from "@opencode-ai/ui/sticky-accordion-header"
 import { Collapsible } from "@opencode-ai/ui/collapsible"
@@ -62,7 +62,8 @@ import { AnimatedCountList } from "./tool-count-summary"
 import { ToolStatusTitle } from "./tool-status-title"
 import { patchFiles } from "./apply-patch-file"
 import { parseWebSearchResults } from "./web-search-results"
-import { formatToolResponse, previewToolResponse } from "./tool-response-text"
+import { ToolResponse } from "./tool-response"
+import { writeClipboard } from "./clipboard"
 import { partDefaultOpen } from "./part-default-open"
 import { animate } from "motion"
 import { attached, inline, kind, typeLabel } from "./message-file"
@@ -70,30 +71,6 @@ import { readPartText } from "./message-part-text"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 import { highlightStreamingCode, disposeStreamingCode } from "./markdown-worker"
 import type { MarkdownToken } from "./markdown-worker-protocol"
-
-async function writeClipboard(text: string): Promise<boolean> {
-  const body = typeof document === "undefined" ? undefined : document.body
-  if (body) {
-    const textarea = document.createElement("textarea")
-    textarea.value = text
-    textarea.setAttribute("readonly", "")
-    textarea.style.position = "fixed"
-    textarea.style.opacity = "0"
-    textarea.style.pointerEvents = "none"
-    body.appendChild(textarea)
-    textarea.select()
-    const copied = document.execCommand("copy")
-    body.removeChild(textarea)
-    if (copied) return true
-  }
-
-  const clipboard = typeof navigator === "undefined" ? undefined : navigator.clipboard
-  if (!clipboard?.writeText) return false
-  return clipboard.writeText(text).then(
-    () => true,
-    () => false,
-  )
-}
 
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
   let widthRef: HTMLSpanElement | undefined
@@ -965,88 +942,6 @@ function ExaOutput(props: { output?: string }) {
 // Search responses can carry many long excerpts, so only the first few results start expanded.
 const WEB_SEARCH_OPEN_RESULTS = 3
 
-// With `href`, the card is one source of a multi-result response: the link is the header and the body can be collapsed.
-function ToolResponse(props: { output?: string; href?: string; title?: string; defaultOpen?: boolean }) {
-  const i18n = useI18n()
-  const [open, setOpen] = createSignal(props.defaultOpen ?? true)
-  const text = createMemo(() => formatToolResponse(props.output))
-  const [expanded, setExpanded] = createSignal(false)
-  const [copied, setCopied] = createSignal(false)
-  const preview = createMemo(() => previewToolResponse(text(), expanded()))
-
-  const handleCopy = async () => {
-    if (!(await writeClipboard(text()))) return
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <Show when={text().trim() || props.href}>
-      <div data-component="tool-response" dir="ltr">
-        <div data-slot="tool-response-header">
-          <Show when={props.href} fallback={<span data-slot="tool-response-label">{i18n.t("ui.tool.response")}</span>}>
-            {(href) => (
-              <>
-                <button
-                  data-slot="tool-response-collapse"
-                  type="button"
-                  aria-expanded={open()}
-                  aria-label={props.title ?? href()}
-                  onClick={() => setOpen((value) => !value)}
-                >
-                  <Icon name={open() ? "chevron-down" : "chevron-right"} size="small" />
-                </button>
-                <div data-slot="tool-response-source">
-                  <a
-                    data-slot="tool-response-link"
-                    href={href()}
-                    title={href()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {props.title ?? href()}
-                  </a>
-                </div>
-              </>
-            )}
-          </Show>
-          <div data-slot="tool-response-copy">
-            <TooltipV2 value={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copy")} placement="top">
-              <IconButtonV2
-                icon={<IconV2 name={copied() ? "check" : "outline-copy"} size="small" />}
-                size="normal"
-                variant="ghost-muted"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={handleCopy}
-                aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copy")}
-              />
-            </TooltipV2>
-          </div>
-        </div>
-        <Show when={open() && text().trim()}>
-          <div
-            data-slot="tool-response-scroll"
-            data-scrollable
-            tabIndex={0}
-            role="region"
-            aria-label={i18n.t("ui.scrollView.ariaLabel")}
-          >
-            <pre data-slot="tool-response-pre">
-              <code>{preview().visible}</code>
-            </pre>
-          </div>
-          <Show when={preview().truncated}>
-            <button data-slot="tool-response-toggle" type="button" onClick={() => setExpanded((value) => !value)}>
-              {expanded() ? i18n.t("ui.tool.response.showLess") : i18n.t("ui.tool.response.showAll")}
-            </button>
-          </Show>
-        </Show>
-      </div>
-    </Show>
-  )
-}
-
 export function registerPartComponent(type: string, component: PartComponent) {
   PART_MAPPING[type] = component
 }
@@ -1686,7 +1581,7 @@ PART_MAPPING["tool"] = function ToolPartDisplay(props) {
     return taskId()
   })
 
-  const render = createMemo(() => ToolRegistry.render(part().tool) ?? McpTool)
+  const render = createMemo(() => ToolRegistry.render(part().tool) ?? GenericTool)
   const controlledOpen = () => (props.onToolOpenChange ? (props.toolOpen ?? props.defaultOpen) : undefined)
   const handleToolOpenChange = (open: boolean) => props.onToolOpenChange?.(open)
 
@@ -2153,41 +2048,6 @@ ToolRegistry.register({
     )
   },
 })
-
-// Fallback for tools without a registered renderer, which in practice are MCP tools.
-const MCP_LABEL_KEYS = ["description", "query", "url", "filePath", "path", "pattern", "name"]
-
-function McpTool(props: ToolProps) {
-  const i18n = useI18n()
-  const subtitle = () =>
-    MCP_LABEL_KEYS.map((key) => props.input[key]).find(
-      (value): value is string => typeof value === "string" && value.length > 0,
-    )
-  const args = () =>
-    Object.entries(props.input)
-      .filter(([key]) => !MCP_LABEL_KEYS.includes(key))
-      .flatMap(([key, value]) =>
-        typeof value === "string" || typeof value === "number" || typeof value === "boolean" ? [`${key}=${value}`] : [],
-      )
-      .slice(0, 3)
-
-  return (
-    <BasicTool
-      {...props}
-      icon="mcp"
-      defaultOpen={props.defaultOpen ?? true}
-      trigger={{
-        title: i18n.t("ui.basicTool.called", { tool: props.tool }),
-        subtitle: subtitle(),
-        args: args(),
-      }}
-    >
-      <Show when={props.output}>
-        <ToolResponse output={props.output} />
-      </Show>
-    </BasicTool>
-  )
-}
 
 ToolRegistry.register({
   name: "task",
