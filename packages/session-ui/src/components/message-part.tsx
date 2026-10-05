@@ -46,6 +46,7 @@ import { ToolErrorCard } from "./tool-error-card"
 import { Checkbox } from "@opencode-ai/ui/checkbox"
 import { DiffChanges } from "@opencode-ai/ui/diff-changes"
 import { Markdown } from "./markdown"
+import { parseReference } from "./reference"
 import { ImagePreview } from "@opencode-ai/ui/image-preview"
 import { getDirectory as _getDirectory, getFilename } from "@opencode-ai/core/util/path"
 import { AttachmentCardV2 } from "../v2/components/attachment-card-v2"
@@ -343,7 +344,7 @@ function createPacedValue(getValue: () => string, live?: () => boolean) {
   return value
 }
 
-function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boolean }) {
+function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boolean; references?: boolean }) {
   const value = createPacedValue(
     () => props.text,
     () => props.streaming,
@@ -351,7 +352,7 @@ function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boole
 
   return (
     <Show when={value()}>
-      <Markdown text={value()} cacheKey={props.cacheKey} streaming={props.streaming} />
+      <Markdown text={value()} cacheKey={props.cacheKey} streaming={props.streaming} references={props.references} />
     </Show>
   )
 }
@@ -1768,7 +1769,12 @@ PART_MAPPING["text"] = function TextPartDisplay(props) {
     <Show when={text()}>
       <div data-component="text-part" data-timeline-part-id={part().id}>
         <div data-slot="text-part-body">
-          <PacedMarkdown text={text()} cacheKey={part().id} streaming={streaming()} />
+          <PacedMarkdown
+            text={text()}
+            cacheKey={part().id}
+            streaming={streaming()}
+            references={props.message.role === "assistant"}
+          />
         </div>
         <Show when={showCopy()}>
           <div data-slot="text-part-copy-wrapper" data-interrupted={interrupted() ? "" : undefined}>
@@ -1980,6 +1986,7 @@ ToolRegistry.register({
                   data-slot="basic-tool-tool-subtitle"
                   class="clickable subagent-link"
                   href={url()}
+                  data-reference={parseReference(url()!) ? "" : undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   onClick={(event) => event.stopPropagation()}

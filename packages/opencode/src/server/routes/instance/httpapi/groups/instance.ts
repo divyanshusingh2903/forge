@@ -1,6 +1,7 @@
 import { Agent } from "@/agent/agent"
 import { Command } from "@/command"
 import { Format } from "@/format"
+import { LinkPreview } from "@/link-preview"
 import { LSP } from "@/lsp/lsp"
 import { Vcs } from "@/project/vcs"
 import { Skill } from "@/skill"
@@ -27,6 +28,11 @@ export const VcsDiffQuery = Schema.Struct({
   ...WorkspaceRoutingQueryFields,
   mode: Vcs.Mode,
   context: Schema.optional(Schema.NumberFromString.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0))),
+})
+
+export const LinkPreviewQuery = Schema.Struct({
+  ...WorkspaceRoutingQueryFields,
+  ...LinkPreview.Input.fields,
 })
 
 export class ApiVcsApplyError extends Schema.ErrorClass<ApiVcsApplyError>("VcsApplyError")(
@@ -56,6 +62,7 @@ export const InstancePaths = {
   path: "/path",
   vcs: "/vcs",
   vcsStatus: "/vcs/status",
+  linkPreview: "/link-preview",
   vcsDiff: "/vcs/diff",
   vcsDiffRaw: "/vcs/diff/raw",
   vcsApply: "/vcs/apply",
@@ -158,6 +165,16 @@ export const InstanceApi = HttpApi.make("instance")
             identifier: "vcs.apply",
             summary: "Apply VCS patch",
             description: "Apply a raw patch to the current working tree.",
+          }),
+        ),
+        HttpApiEndpoint.get("linkPreview", InstancePaths.linkPreview, {
+          query: LinkPreviewQuery,
+          success: described(LinkPreview.Result, "Status of a GitHub or Linear reference"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "instance.linkPreview",
+            summary: "Resolve link preview",
+            description: "Look up the latest status of a GitHub issue or pull request, or a Linear issue or project.",
           }),
         ),
         HttpApiEndpoint.get("vcsChanges", InstancePaths.vcsChanges, {

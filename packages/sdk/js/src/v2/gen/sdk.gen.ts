@@ -90,6 +90,8 @@ import type {
   GlobalUpgradeResponses,
   InstanceDisposeErrors,
   InstanceDisposeResponses,
+  InstanceLinkPreviewErrors,
+  InstanceLinkPreviewResponses,
   InstanceVcsChangesErrors,
   InstanceVcsChangesResponses,
   InstanceVcsCommitErrors,
@@ -1978,6 +1980,48 @@ export class Instance extends HeyApiClient {
     )
     return (options?.client ?? this.client).post<InstanceDisposeResponses, InstanceDisposeErrors, ThrowOnError>({
       url: "/instance/dispose",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Resolve link preview
+   *
+   * Look up the latest status of a GitHub issue or pull request, or a Linear issue or project.
+   */
+  public linkPreview<ThrowOnError extends boolean = false>(
+    parameters: {
+      directory?: string
+      workspace?: string
+      kind: "github-issue" | "github-pr" | "github-release" | "linear-issue" | "linear-project"
+      owner?: string
+      repo?: string
+      number?: string
+      tag?: string
+      id?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "query", key: "kind" },
+            { in: "query", key: "owner" },
+            { in: "query", key: "repo" },
+            { in: "query", key: "number" },
+            { in: "query", key: "tag" },
+            { in: "query", key: "id" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<InstanceLinkPreviewResponses, InstanceLinkPreviewErrors, ThrowOnError>({
+      url: "/link-preview",
       ...options,
       ...params,
     })
