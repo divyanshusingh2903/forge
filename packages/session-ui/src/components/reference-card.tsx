@@ -59,19 +59,16 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
     return parts.filter(Boolean).join(" → ")
   }
 
-  const stats = () =>
-    [
-      props.result.comments !== undefined &&
-        props.result.comments > 0 &&
-        i18n.plural("ui.reference.comments", props.result.comments),
-      props.result.changedFiles !== undefined && i18n.plural("ui.reference.files", props.result.changedFiles),
-      props.result.assets !== undefined && i18n.plural("ui.reference.assets", props.result.assets),
-      props.result.downloads !== undefined &&
-        props.result.downloads > 0 &&
-        i18n.plural("ui.reference.downloads", props.result.downloads, {
-          count: compactNumber(props.result.downloads, i18n.locale()),
-        }),
-    ].filter((item): item is string => typeof item === "string")
+  const stats = () => {
+    const result = props.result
+    const count = (value: number) => ({ count: compactNumber(value, i18n.locale()) })
+    return [
+      result.comments ? i18n.t("ui.reference.comments", count(result.comments)) : undefined,
+      result.changedFiles !== undefined ? i18n.t("ui.reference.files", count(result.changedFiles)) : undefined,
+      result.assets !== undefined ? i18n.t("ui.reference.assets", count(result.assets)) : undefined,
+      result.downloads ? i18n.t("ui.reference.downloads", count(result.downloads)) : undefined,
+    ].filter((item): item is string => item !== undefined)
+  }
 
   return (
     <div data-component="reference-card" data-kind={kind()}>
