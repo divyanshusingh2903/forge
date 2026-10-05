@@ -32,6 +32,7 @@ import { markdownBlockKey, type MarkdownToken } from "./markdown-worker-protocol
 import { shouldResetCodeTokens, type RenderedCodeState } from "./markdown-code-state"
 import { getCachedMarkdown, sanitizeMarkdown, touchCachedMarkdown, type MarkdownCacheEntry } from "./markdown-cache"
 import { inlineCodeKind } from "./markdown-inline-code-kind"
+import { parseReference } from "./reference"
 
 type RenderedBlock =
   | (MarkdownCacheEntry & { key: string; mode: Exclude<Block["mode"], "code"> })
@@ -275,14 +276,26 @@ function markInlineCode(root: HTMLDivElement) {
   }
 }
 
-function decorate(root: HTMLDivElement, labels: CopyLabels) {
+// Tags GitHub/Linear links so the shared reference popup can show their status. Re-running is safe
+// because streaming re-decorates the same links.
+function markReferences(root: HTMLDivElement) {
+  for (const link of Array.from(root.querySelectorAll("a[href]"))) {
+    if (!(link instanceof HTMLAnchorElement)) continue
+    if (parseReference(link.href)) link.dataset.reference = ""
+    else delete link.dataset.reference
+  }
+}
+
+function decorate(root: HTMLDivElement, labels: CopyLabels, references: boolean) {
   const blocks = Array.from(root.querySelectorAll("pre"))
   for (const block of blocks) {
     ensureCodeWrapper(block, labels)
   }
-  if (!document.body.hasAttribute("data-new-layout")) return
-  markInlineCode(root)
-  markCodeLinks(root)
+  if (document.body.hasAttribute("data-new-layout")) {
+    markInlineCode(root)
+    markCodeLinks(root)
+  }
+  if (references) markReferences(root)
 }
 
 function setupCodeCopy(root: HTMLDivElement, getLabels: () => CopyLabels) {
@@ -366,11 +379,13 @@ export function Markdown(
     text: string
     cacheKey?: string
     streaming?: boolean
+    // Assistant text only: marks GitHub/Linear links for the status popup.
+    references?: boolean
     class?: string
     classList?: Record<string, boolean>
   },
 ) {
-  const [local, others] = splitProps(props, ["text", "cacheKey", "streaming", "class", "classList"])
+  const [local, others] = splitProps(props, ["text", "cacheKey", "streaming", "references", "class", "classList"])
   const i18n = useI18n()
   const [root, setRoot] = createSignal<HTMLDivElement>()
   const owner = createUniqueId()
@@ -515,7 +530,7 @@ export function Markdown(
     })
     activeCodeKeys.clear()
     nextCodeKeys.forEach((key) => activeCodeKeys.add(key))
-    content.forEach((block, index) => updateBlock(container, index, block, labels))
+    content.forEach((block, index) => updateBlock(container, index, block, labels, !!local.references))
     while (container.children.length > content.length) {
       const child = container.lastElementChild
       if (!child) break
@@ -586,7 +601,13 @@ function disposeCode(key: string) {
   disposeStreamingCode(key)
 }
 
-function updateBlock(container: HTMLDivElement, index: number, block: RenderedBlock, labels: CopyLabels) {
+function updateBlock(
+  container: HTMLDivElement,
+  index: number,
+  block: RenderedBlock,
+  labels: CopyLabels,
+  references: boolean,
+) {
   const current = container.children[index]
   if (block.mode === "code") {
     updateCodeBlock(container, current, block, labels)
@@ -605,7 +626,7 @@ function updateBlock(container: HTMLDivElement, index: number, block: RenderedBl
   next.dataset.markdownHash = block.hash
   next.style.display = "contents"
   next.innerHTML = block.html
-  decorate(next, labels)
+  decorate(next, labels, references)
 
   if (!(current instanceof HTMLDivElement)) {
     container.appendChild(next)

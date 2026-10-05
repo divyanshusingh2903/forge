@@ -5,6 +5,7 @@ import { Icon as IconV2 } from "@opencode-ai/ui/v2/icon"
 import { IconButtonV2 } from "@opencode-ai/ui/v2/icon-button-v2"
 import { TooltipV2 } from "@opencode-ai/ui/v2/tooltip-v2"
 import { writeClipboard } from "./clipboard"
+import { parseReference } from "./reference"
 import { formatToolResponse, previewToolResponse } from "./tool-response-text"
 
 // With `href`, the card is one source of a multi-result response: the link is the header and the body can be collapsed.
@@ -42,7 +43,8 @@ export function ToolResponse(props: { output?: string; href?: string; title?: st
                   <a
                     data-slot="tool-response-link"
                     href={href()}
-                    title={href()}
+                    title={parseReference(href()) ? undefined : href()}
+                    data-reference={parseReference(href()) ? "" : undefined}
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(event) => event.stopPropagation()}

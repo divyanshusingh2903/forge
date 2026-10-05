@@ -3,6 +3,7 @@ import { Command } from "@/command"
 import * as InstanceState from "@/effect/instance-state"
 import { Format } from "@/format"
 import { Global } from "@opencode-ai/core/global"
+import { LinkPreview } from "@/link-preview"
 import { LSP } from "@/lsp/lsp"
 import { Vcs } from "@/project/vcs"
 import { Session } from "@/session/session"
@@ -15,7 +16,7 @@ import { Effect, Schema } from "effect"
 import * as Stream from "effect/Stream"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
-import { ApiVcsApplyError, ApiVcsOperationError } from "../groups/instance"
+import { ApiVcsApplyError, ApiVcsOperationError, type LinkPreviewQuery } from "../groups/instance"
 import { markInstanceForDisposal } from "../lifecycle"
 
 export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance", (handlers) =>
@@ -26,6 +27,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     const lsp = yield* LSP.Service
     const skill = yield* Skill.Service
     const vcs = yield* Vcs.Service
+    const linkPreview = yield* LinkPreview.Service
     const sessions = yield* Session.Service
     const provider = yield* Provider.Service
     const llm = yield* LLM.Service
@@ -51,6 +53,12 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
         concurrency: "unbounded",
       })
       return { branch, default_branch }
+    })
+
+    const getLinkPreview = Effect.fn("InstanceHttpApi.linkPreview")(function* (ctx: {
+      query: Schema.Schema.Type<typeof LinkPreviewQuery>
+    }) {
+      return yield* linkPreview.resolve(ctx.query)
     })
 
     const getVcsStatus = Effect.fn("InstanceHttpApi.vcsStatus")(function* () {
@@ -273,6 +281,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       .handle("vcsApply", applyVcs)
       .handle("vcsChanges", getVcsChanges)
       .handle("vcsRemote", getVcsRemote)
+      .handle("linkPreview", getLinkPreview)
       .handle("vcsStage", stageVcs)
       .handle("vcsUnstage", unstageVcs)
       .handle("vcsStageAll", stageAllVcs)

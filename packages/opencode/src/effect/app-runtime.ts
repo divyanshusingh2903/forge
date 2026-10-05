@@ -40,6 +40,7 @@ import { ToolRegistry } from "@/tool/registry"
 import { Format } from "@/format"
 import { InstanceStore } from "@/project/instance-store"
 import { Project } from "@/project/project"
+import { LinkPreview } from "@/link-preview"
 import { Vcs } from "@/project/vcs"
 import { Workspace } from "@/control-plane/workspace"
 import { Worktree } from "@/worktree"
@@ -100,6 +101,7 @@ export const AppLayer = AppNodeBuilderV1.build(
     InstanceStore.node,
     Project.node,
     Vcs.node,
+    LinkPreview.node,
     Workspace.node,
     Worktree.node,
     Installation.node,

@@ -75,6 +75,8 @@ import {
 import { createOpenReviewFile, createSessionTabs, createSizing, shouldShowFileTree } from "@/pages/session/helpers"
 import { ensurePlanActive } from "@/pages/session/plan-tab-activation"
 import { MessageTimeline } from "@/pages/session/timeline/message-timeline"
+import { ReferencePopup } from "@opencode-ai/session-ui/reference-popup"
+import type { Reference } from "@opencode-ai/session-ui/reference"
 import { createTimelineModel } from "@/pages/session/timeline/model"
 import { type DiffStyle, SessionReviewTab, type SessionReviewTabProps } from "@/pages/session/review-tab"
 import { useSessionLayout } from "@/pages/session/session-layout"
@@ -2363,8 +2365,25 @@ export default function Page() {
     </>
   )
 
+  const resolveReference = (reference: Reference) =>
+    sdk()
+      .client.instance.linkPreview(
+        {
+          directory: sdk().directory,
+          kind: reference.kind,
+          ...("tag" in reference
+            ? { owner: reference.owner, repo: reference.repo, tag: reference.tag }
+            : "owner" in reference
+              ? { owner: reference.owner, repo: reference.repo, number: String(reference.number) }
+              : { id: reference.id }),
+        },
+        { throwOnError: true },
+      )
+      .then((response) => response.data)
+
   return (
     <SessionRouteFrame>
+      <ReferencePopup resolve={resolveReference} />
       <SessionHeader diffs={reviewDiffs} />
       <div
         ref={panelRow}

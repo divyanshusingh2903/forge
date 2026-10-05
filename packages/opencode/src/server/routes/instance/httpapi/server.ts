@@ -24,6 +24,7 @@ import { Plugin } from "@/plugin"
 import { PluginPtyEnvironment } from "@/plugin/pty-environment"
 import { InstanceStore } from "@/project/instance-store"
 import { Project } from "@/project/project"
+import { LinkPreview } from "@/link-preview"
 import { Vcs } from "@/project/vcs"
 import { ProviderAuth } from "@/provider/auth"
 import { Provider } from "@/provider/provider"
@@ -255,6 +256,7 @@ const app = LayerNode.group([
   Format.node,
   Project.node,
   Vcs.node,
+  LinkPreview.node,
   Workspace.node,
   Worktree.node,
   Installation.node,

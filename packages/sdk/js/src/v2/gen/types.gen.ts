@@ -2339,6 +2339,44 @@ export type VcsApplyError = {
   }
 }
 
+export type LinkPreviewResult = {
+  outcome: "ok" | "unavailable" | "forbidden" | "not-found"
+  title?: string
+  state?: string
+  stateType?: string
+  identifier?: string
+  summary?: string
+  author?: {
+    name: string
+    avatarUrl?: string
+  }
+  labels?: Array<{
+    name: string
+    color?: string
+  }>
+  createdAt?: string
+  updatedAt?: string
+  closedAt?: string
+  mergedAt?: string
+  publishedAt?: string
+  comments?: number
+  head?: string
+  base?: string
+  additions?: number
+  deletions?: number
+  changedFiles?: number
+  tag?: string
+  assets?: number
+  downloads?: number
+  priority?: string
+  assignee?: string
+  project?: string
+  team?: string
+  startDate?: string
+  targetDate?: string
+  initiatives?: Array<string>
+}
+
 export type VcsChangeStatus = {
   file: string
   staged: boolean
@@ -8306,6 +8344,40 @@ export type VcsApplyResponses = {
 }
 
 export type VcsApplyResponse = VcsApplyResponses[keyof VcsApplyResponses]
+
+export type InstanceLinkPreviewData = {
+  body?: never
+  path?: never
+  query: {
+    directory?: string
+    workspace?: string
+    kind: "github-issue" | "github-pr" | "github-release" | "linear-issue" | "linear-project"
+    owner?: string
+    repo?: string
+    number?: string
+    tag?: string
+    id?: string
+  }
+  url: "/link-preview"
+}
+
+export type InstanceLinkPreviewErrors = {
+  /**
+   * Bad request
+   */
+  400: BadRequestError
+}
+
+export type InstanceLinkPreviewError = InstanceLinkPreviewErrors[keyof InstanceLinkPreviewErrors]
+
+export type InstanceLinkPreviewResponses = {
+  /**
+   * Status of a GitHub or Linear reference
+   */
+  200: LinkPreviewResult
+}
+
+export type InstanceLinkPreviewResponse = InstanceLinkPreviewResponses[keyof InstanceLinkPreviewResponses]
 
 export type InstanceVcsChangesData = {
   body?: never
