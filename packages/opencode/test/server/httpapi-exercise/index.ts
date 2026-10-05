@@ -199,6 +199,16 @@ const scenarios: Scenario[] = [
       check(stable(body) === stable({ upstream: true, ahead: 1, behind: 0 }), "remote should report one commit ahead")
     }),
   http.protected
+    .get("/link-preview", "linkPreview.get")
+    // No Linear MCP server is connected in the exerciser, so the lookup deterministically reports `unavailable`.
+    .at((ctx) => ({
+      path: `/link-preview?${new URLSearchParams({ kind: "linear-issue", id: "EXERCISE-1" })}`,
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      check(stable(body) === stable({ outcome: "unavailable" }), "link preview should be unavailable without Linear")
+    }),
+  http.protected
     .post("/vcs/stage", "vcs.stage")
     .mutating()
     .seeded((ctx) => dirtyFile(ctx))
