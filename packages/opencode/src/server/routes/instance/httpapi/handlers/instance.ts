@@ -394,6 +394,14 @@ function conventionalCommit(output: string) {
   ).slice(0, 200)
   const body = lines.slice((index < 0 ? 0 : index) + 1)
   const end = body.findIndex((item) => !/^- \S/.test(item))
-  const bullets = body.slice(0, end < 0 ? body.length : end).slice(0, 5)
+  const bullets = body
+    .slice(0, end < 0 ? body.length : end)
+    .filter(
+      (item) =>
+        !/^- (?:co-authored-by\s*:|(?:generated|authored|written|signed) (?:by|with)\b|(?:author|signature|ai(?:\/model)? credits)\s*:)/i.test(
+          item,
+        ),
+    )
+    .slice(0, 5)
   return bullets.length ? `${subject}\n\n${bullets.join("\n")}` : subject
 }
