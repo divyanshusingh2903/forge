@@ -93,7 +93,10 @@ const desktop = [
   "Valin viðhengi fara yfir {{limit}} MB hámarkið",
 ]
 
+import { gitDict } from "./git"
+
 export const dict = {
+  ...gitDict("is"),
   ...Object.fromEntries(DESKTOP_NATIVE_KEYS.map((key, index) => [key, desktop[index]])),
   "command.category.suggested": "Tillögur",
   "command.category.view": "Skoða",

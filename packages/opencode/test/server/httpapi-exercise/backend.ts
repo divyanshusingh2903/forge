@@ -1,5 +1,9 @@
 import { ConfigProvider, Effect, Layer } from "effect"
 import { HttpRouter } from "effect/unstable/http"
+import fs from "fs"
+import os from "os"
+import path from "path"
+import { lazy } from "@/util/lazy"
 import { parse } from "./assertions"
 import { runtime, type Runtime } from "./runtime"
 import type { ActiveScenario, BackendApp, CallResult, CaptureMode, SeededContext } from "./types"
@@ -86,12 +90,17 @@ function toRequest(scenario: ActiveScenario, ctx: SeededContext<unknown>) {
   })
 }
 
+// Probes can reach real handlers. Without a directory header the server falls back to the process
+// cwd, which is this checkout, so a probe like `POST /vcs/stash/create {}` would stash local work.
+const probeDirectory = lazy(() => fs.mkdtempSync(path.join(os.tmpdir(), "httpapi-auth-probe-")))
+
 function toAuthProbeRequest(scenario: ActiveScenario, credentials: "missing" | "valid", signal: AbortSignal) {
   const spec = scenario.authProbe ?? {
     path: authProbePath(scenario.path),
     body: scenario.method === "GET" ? undefined : {},
   }
   const headers = {
+    "x-opencode-directory": probeDirectory(),
     ...(spec.body === undefined ? {} : { "content-type": "application/json" }),
     ...spec.headers,
     ...(credentials === "valid" ? { authorization: basic("opencode", "secret") } : {}),

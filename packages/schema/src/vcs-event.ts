@@ -11,4 +11,6 @@ export const BranchUpdated = Event.define({
   },
 })
 
-export const Definitions = Event.inventory(BranchUpdated)
+export const Changed = Event.define({ type: "vcs.changed", schema: {} })
+export const CurrentDefinitions = Event.inventory(Changed)
+export const Definitions = Event.inventory(BranchUpdated, Changed)

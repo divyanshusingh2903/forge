@@ -14,6 +14,15 @@ export interface MockServerConfig {
   sessions: ({ id: string } & Record<string, unknown>)[]
   pageMessages: (sessionId: string, limit: number, before?: string) => { items: unknown[]; cursor?: string }
   vcsDiff?: unknown[]
+  vcsChanges?: () => unknown[]
+  vcsRemote?: () => unknown
+  vcsInfo?: () => unknown
+  vcsTargets?: () => unknown
+  vcsStashes?: () => unknown[]
+  onGitOperation?: (input: {
+    path: string
+    body: unknown
+  }) => { status?: number; body: unknown } | Promise<{ status?: number; body: unknown }>
   messageDelay?: number
   beforeMessagesResponse?: (input: { sessionID: string; before?: string }) => Promise<void>
   onMessages?: (input: { sessionID: string; before?: string; phase: "start" | "end" }) => void
@@ -57,6 +66,18 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
     if (url.port !== targetPort && url.port !== appPort) return route.fallback()
 
     const path = url.pathname
+    if (path === "/vcs/changes") return json(route, config.vcsChanges?.() ?? [])
+    if (path === "/vcs/remote") return json(route, config.vcsRemote?.() ?? { upstream: false, ahead: 0, behind: 0 })
+    if (path === "/vcs" && config.vcsInfo) return json(route, config.vcsInfo())
+    if (path === "/vcs/targets") return json(route, config.vcsTargets?.() ?? { remotes: [], branches: [] })
+    if (path === "/vcs/stashes") return json(route, config.vcsStashes?.() ?? [])
+    if (path.startsWith("/vcs/") && route.request().method() === "POST" && config.onGitOperation) {
+      const result = await config.onGitOperation({
+        path,
+        body: route.request().postData() ? route.request().postDataJSON() : undefined,
+      })
+      return json(route, result.body, undefined, result.status ?? 200)
+    }
     if (path === "/global/event" || path === "/event" || path === "/api/event") {
       const events = config.events?.()
       return sse(

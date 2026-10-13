@@ -96,8 +96,7 @@ export interface Interface {
   readonly commit: (cwd: string, message: string) => Effect.Effect<Result>
   readonly fetch: (cwd: string) => Effect.Effect<Result>
   readonly aheadBehind: (cwd: string) => Effect.Effect<{ ahead: number; behind: number } | undefined>
-  readonly push: (cwd: string) => Effect.Effect<Result>
-  readonly pull: (cwd: string) => Effect.Effect<Result>
+  readonly unpublished: (cwd: string) => Effect.Effect<number>
   readonly stagedDiff: (cwd: string) => Effect.Effect<Result>
   readonly stagedStat: (cwd: string) => Effect.Effect<Result>
 }
@@ -374,11 +373,14 @@ const layer = Layer.effect(
       if (!Number.isFinite(behind) || !Number.isFinite(ahead)) return undefined
       return { ahead, behind }
     })
-    const push = Effect.fn("Git.push")(function* (cwd: string) {
-      return yield* run(["push"], { cwd, env: { GIT_TERMINAL_PROMPT: "0" } })
-    })
-    const pull = Effect.fn("Git.pull")(function* (cwd: string) {
-      return yield* run(["pull"], { cwd, env: { GIT_TERMINAL_PROMPT: "0" } })
+    // Commits on HEAD that no remote-tracking branch contains. Zero without remotes or on a detached
+    // HEAD, since there is then nowhere (or no branch) to publish them to.
+    const unpublished = Effect.fn("Git.unpublished")(function* (cwd: string) {
+      if (!out(yield* run(["remote"], { cwd }))) return 0
+      if ((yield* run(["symbolic-ref", "--quiet", "HEAD"], { cwd })).exitCode !== 0) return 0
+      const result = yield* run(["rev-list", "--count", "HEAD", "--not", "--remotes"], { cwd })
+      const count = Number.parseInt(out(result), 10)
+      return result.exitCode === 0 && Number.isFinite(count) ? count : 0
     })
     const stagedDiff = Effect.fn("Git.stagedDiff")(function* (cwd: string) {
       // Callers budget the patch per file; the cap only bounds memory for enormous commits.
@@ -418,8 +420,7 @@ const layer = Layer.effect(
       commit,
       fetch,
       aheadBehind,
-      push,
-      pull,
+      unpublished,
       stagedDiff,
       stagedStat,
     })

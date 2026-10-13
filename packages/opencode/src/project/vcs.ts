@@ -7,6 +7,11 @@ import { Git } from "@/git"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { EventV2 } from "@opencode-ai/core/event"
 import { VcsEvent } from "@opencode-ai/schema/vcs-event"
+import { Vcs } from "@opencode-ai/schema/vcs"
+import { GitActions } from "@opencode-ai/core/git-actions"
+import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/location-services"
+import { Location } from "@opencode-ai/core/location"
+import { AbsolutePath } from "@opencode-ai/core/schema"
 
 const PATCH_CONTEXT_LINES = 2_147_483_647
 const MAX_PATCH_BYTES = 10_000_000
@@ -274,6 +279,7 @@ export const ChangeStatus = Schema.Struct({
   staged: Schema.Boolean,
   unstaged: Schema.Boolean,
   untracked: Schema.Boolean,
+  conflicted: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: "VcsChangeStatus" })
 export type ChangeStatus = Schema.Schema.Type<typeof ChangeStatus>
 
@@ -281,6 +287,7 @@ export const RemoteStatus = Schema.Struct({
   upstream: Schema.Boolean,
   ahead: Schema.Finite,
   behind: Schema.Finite,
+  target: Schema.optional(Vcs.Upstream),
 }).annotate({ identifier: "VcsRemoteStatus" })
 export type RemoteStatus = Schema.Schema.Type<typeof RemoteStatus>
 
@@ -304,7 +311,22 @@ export type OperationResult = Schema.Schema.Type<typeof OperationResult>
 
 export class OperationError extends Schema.TaggedErrorClass<OperationError>()("VcsOperationError", {
   message: Schema.String,
-  operation: Schema.Literals(["stage", "unstage", "discard", "commit", "fetch", "push", "pull", "message"]),
+  operation: Schema.Literals([
+    "stage",
+    "unstage",
+    "discard",
+    "commit",
+    "fetch",
+    "push",
+    "pull",
+    "message",
+    "targets",
+    "stash-list",
+    "stash-create",
+    "stash-apply",
+    "stash-pop",
+    "stash-drop",
+  ]),
 }) {}
 
 const safeFile = (file: string) =>
@@ -380,8 +402,14 @@ export interface Interface {
   readonly discard: (input: FileInput) => Effect.Effect<OperationResult, OperationError>
   readonly commit: (input: CommitInput) => Effect.Effect<OperationResult, OperationError>
   readonly fetch: () => Effect.Effect<OperationResult, OperationError>
-  readonly push: () => Effect.Effect<OperationResult, OperationError>
-  readonly pull: () => Effect.Effect<OperationResult, OperationError>
+  readonly push: (input?: Vcs.PushInput) => Effect.Effect<OperationResult, OperationError>
+  readonly pull: (input?: Vcs.PullInput) => Effect.Effect<OperationResult, OperationError>
+  readonly targets: () => Effect.Effect<Vcs.Targets, OperationError>
+  readonly stashes: () => Effect.Effect<readonly Vcs.Stash[], OperationError>
+  readonly stashCreate: (input: Vcs.StashCreateInput) => Effect.Effect<OperationResult, OperationError>
+  readonly stashApply: (input: Vcs.StashInput) => Effect.Effect<OperationResult, OperationError>
+  readonly stashPop: (input: Vcs.StashInput) => Effect.Effect<OperationResult, OperationError>
+  readonly stashDrop: (input: Vcs.StashInput) => Effect.Effect<OperationResult, OperationError>
   readonly stagedDiff: () => Effect.Effect<string, OperationError>
 }
 
@@ -397,7 +425,29 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
   Effect.gen(function* () {
     const git = yield* Git.Service
     const events = yield* EventV2Bridge.Service
+    const locations = yield* LocationServiceMap.Service
     const scope = yield* Scope.Scope
+    const actions = Effect.fnUntraced(function* <A, E>(run: (service: GitActions.Interface) => Effect.Effect<A, E>) {
+      const ctx = yield* InstanceState.context
+      const workspaceID = yield* InstanceState.workspaceID
+      return yield* GitActions.Service.use(run).pipe(
+        Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory), workspaceID }))),
+      )
+    })
+    const runAction = Effect.fnUntraced(function* <A>(
+      operation: OperationError["operation"],
+      run: (
+        service: GitActions.Interface,
+        repository: NonNullable<GitActions.Interface["repository"]>,
+      ) => Effect.Effect<A, { message: string }>,
+    ) {
+      return yield* actions((service) => {
+        if (!service.repository) return Effect.fail(new OperationError({ operation, message: "Not a Git repository" }))
+        return run(service, service.repository).pipe(
+          Effect.mapError((error) => new OperationError({ operation, message: error.message })),
+        )
+      })
+    })
     const checkResult = Effect.fnUntraced(function* (operation: OperationError["operation"], result: Git.Result) {
       if (result.exitCode !== 0)
         return yield* new OperationError({
@@ -448,12 +498,16 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         const value = { current, root }
 
         const unsubscribe = yield* events.listen((event) => {
-          if (event.type !== Watcher.Event.Updated.type || event.location?.directory !== ctx.directory)
+          if (
+            event.location?.directory !== ctx.directory ||
+            (event.type !== Event.Changed.type && event.type !== Watcher.Event.Updated.type)
+          )
             return Effect.void
           const data = event.data as EventV2.Data<typeof Watcher.Event.Updated>
-          if (!data.file.endsWith("HEAD")) return Effect.void
+          if (event.type !== Event.Changed.type && !data.file.endsWith("HEAD")) return Effect.void
           return Effect.gen(function* () {
             const next = yield* get()
+            value.root = yield* git.defaultBranch(ctx.directory)
             if (next !== value.current) {
               value.current = next
               yield* events.publish(Event.BranchUpdated, { branch: next })
@@ -471,10 +525,14 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         yield* InstanceState.get(state).pipe(Effect.forkIn(scope))
       }),
       branch: Effect.fn("Vcs.branch")(function* () {
-        return yield* InstanceState.use(state, (x) => x.current)
+        const ctx = yield* InstanceState.context
+        if (ctx.project.vcs !== "git") return undefined
+        yield* actions(() => Effect.void)
+        return yield* git.branch(ctx.directory)
       }),
       defaultBranch: Effect.fn("Vcs.defaultBranch")(function* () {
-        return yield* InstanceState.use(state, (x) => x.root?.name)
+        const ctx = yield* InstanceState.context
+        return ctx.project.vcs === "git" ? (yield* git.defaultBranch(ctx.directory))?.name : undefined
       }),
       status: Effect.fn("Vcs.status")(function* () {
         const ctx = yield* InstanceState.context
@@ -504,6 +562,7 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
       changes: Effect.fn("Vcs.changes")(function* () {
         const ctx = yield* InstanceState.context
         if (ctx.project.vcs !== "git") return []
+        yield* actions(() => Effect.void)
         return (yield* git.status(ctx.directory))
           .filter((item) => !isPlanFile(item.file))
           .map((item) => ({
@@ -511,13 +570,25 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
             staged: item.code[0] !== " " && item.code[0] !== "?",
             unstaged: item.code[1] !== " ",
             untracked: item.code === "??",
+            ...(["DD", "AU", "UD", "UA", "DU", "AA", "UU"].includes(item.code) ? { conflicted: true } : {}),
           }))
       }),
       remote: Effect.fn("Vcs.remote")(function* () {
         const ctx = yield* InstanceState.context
         if (ctx.project.vcs !== "git") return { upstream: false, ahead: 0, behind: 0 }
         const counts = yield* git.aheadBehind(ctx.directory)
-        return { upstream: counts !== undefined, ahead: counts?.ahead ?? 0, behind: counts?.behind ?? 0 }
+        const target = yield* actions((service) =>
+          service.repository
+            ? service.git.remote.upstream(service.repository).pipe(Effect.catch(() => Effect.succeed(undefined)))
+            : Effect.succeed(undefined),
+        )
+        return {
+          upstream: counts !== undefined || target !== undefined,
+          // Without a reachable upstream, count the commits a push would publish for the first time.
+          ahead: counts?.ahead ?? (yield* git.unpublished(ctx.directory)),
+          behind: counts?.behind ?? 0,
+          ...(target ? { target } : {}),
+        }
       }),
       stage: Effect.fn("Vcs.stage")(function* (input: FileInput) {
         return yield* runFileOperation("stage", input.file)
@@ -558,18 +629,16 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
           return yield* new OperationError({ message: "Not a Git repository", operation: "fetch" })
         return yield* checkResult("fetch", yield* git.fetch(ctx.directory))
       }),
-      push: Effect.fn("Vcs.push")(function* () {
-        const ctx = yield* InstanceState.context
-        if (ctx.project.vcs !== "git")
-          return yield* new OperationError({ message: "Not a Git repository", operation: "push" })
-        return yield* checkResult("push", yield* git.push(ctx.directory))
-      }),
-      pull: Effect.fn("Vcs.pull")(function* () {
-        const ctx = yield* InstanceState.context
-        if (ctx.project.vcs !== "git")
-          return yield* new OperationError({ message: "Not a Git repository", operation: "pull" })
-        return yield* checkResult("pull", yield* git.pull(ctx.directory))
-      }),
+      push: (input) => runAction("push", (service, repository) => service.git.sync.push(repository, input)),
+      pull: (input) => runAction("pull", (service, repository) => service.git.sync.pull(repository, input)),
+      targets: () => runAction("targets", (service, repository) => service.git.remote.targets(repository)),
+      stashes: () => runAction("stash-list", (service, repository) => service.git.stash.list(repository)),
+      stashCreate: (input) =>
+        runAction("stash-create", (service, repository) => service.git.stash.create(repository, input)),
+      stashApply: (input) =>
+        runAction("stash-apply", (service, repository) => service.git.stash.apply(repository, input)),
+      stashPop: (input) => runAction("stash-pop", (service, repository) => service.git.stash.pop(repository, input)),
+      stashDrop: (input) => runAction("stash-drop", (service, repository) => service.git.stash.drop(repository, input)),
       stagedDiff: Effect.fn("Vcs.stagedDiff")(function* () {
         const ctx = yield* InstanceState.context
         if (ctx.project.vcs !== "git")
@@ -588,16 +657,17 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         return summarizeStagedDiff(stat.text(), { text: patch.text(), truncated: patch.truncated })
       }),
       diff: Effect.fn("Vcs.diff")(function* (mode: Mode, options?: DiffOptions) {
-        const value = yield* InstanceState.get(state)
+        yield* InstanceState.get(state)
         const ctx = yield* InstanceState.context
         if (ctx.project.vcs !== "git") return []
         if (mode === "git") {
           return yield* track(git, ctx.directory, (yield* git.hasHead(ctx.directory)) ? "HEAD" : undefined, options)
         }
 
-        if (!value.root) return []
-        if (value.current && value.current === value.root.name) return []
-        const ref = yield* git.mergeBase(ctx.directory, value.root.ref)
+        const root = yield* git.defaultBranch(ctx.directory)
+        if (!root) return []
+        if ((yield* git.branch(ctx.directory)) === root.name) return []
+        const ref = yield* git.mergeBase(ctx.directory, root.ref)
         if (!ref) return []
         return yield* diffAgainstRef(git, ctx.directory, ref, options)
       }),
@@ -633,7 +703,7 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
       }),
     })
   }),
-)
+).pipe(Layer.provide(locationServiceMapLayer))
 
 export const node = LayerNode.make({ service: Service, layer: layer, deps: [Git.node, EventV2Bridge.node] })
 

@@ -10,6 +10,7 @@ import { EventV2 } from "@opencode-ai/core/event"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { Watcher } from "@opencode-ai/core/filesystem/watcher"
 import { Location } from "@opencode-ai/core/location"
+import { VcsEvent } from "@opencode-ai/schema/vcs-event"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { location } from "../fixture/location"
 import { tmpdir } from "../fixture/tmpdir"
@@ -35,7 +36,7 @@ const flagsLayer = ConfigProvider.layer(
   }),
 )
 
-function provide(directory: string, vcs?: Location.Interface["vcs"]) {
+function provide(directory: string, vcs?: Location.Interface["vcs"], experimental = true) {
   const locationLayer = Layer.succeed(
     Location.Service,
     Location.Service.of(location({ directory: AbsolutePath.make(directory) }, { vcs })),
@@ -44,13 +45,24 @@ function provide(directory: string, vcs?: Location.Interface["vcs"]) {
     AppNodeBuilder.build(Watcher.node, [
       [Config.node, configLayer],
       [Location.node, locationLayer],
-    ]).pipe(Layer.provide(flagsLayer)),
+    ]).pipe(
+      Layer.provide(
+        experimental
+          ? flagsLayer
+          : ConfigProvider.layer(
+              ConfigProvider.fromUnknown({
+                OPENCODE_EXPERIMENTAL_FILEWATCHER: "false",
+                OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER: "false",
+              }),
+            ),
+      ),
+    ),
   )
 }
 
 function withTmp<A, E, R>(
   f: (directory: string, vcs?: Location.Interface["vcs"]) => Effect.Effect<A, E, R>,
-  options?: { git?: boolean; init?: (directory: string) => Promise<void> },
+  options?: { git?: boolean; experimental?: boolean; init?: (directory: string) => Promise<void> },
 ) {
   return Effect.acquireRelease(
     Effect.promise(async () => {
@@ -66,7 +78,7 @@ function withTmp<A, E, R>(
       return { tmp, vcs: { type: "git" as const, store: AbsolutePath.make(path.join(tmp.path, ".git")) } }
     }),
     ({ tmp }) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
-  ).pipe(Effect.flatMap(({ tmp, vcs }) => f(tmp.path, vcs).pipe(provide(tmp.path, vcs))))
+  ).pipe(Effect.flatMap(({ tmp, vcs }) => f(tmp.path, vcs).pipe(provide(tmp.path, vcs, options?.experimental ?? true))))
 }
 
 function wait(check: (event: WatcherEvent) => boolean) {
@@ -197,19 +209,27 @@ describeWatcher("Watcher", () => {
     }).pipe(Effect.provide(AppNodeBuilder.build(LayerNode.group([FSUtil.node, EventV2.node])))),
   )
 
-  it.live("ignores .git/index changes", () =>
+  it.live("publishes semantic VCS invalidation for index changes without exposing Git internals", () =>
     withTmp(
       (directory) =>
         Effect.gen(function* () {
           const fs = yield* FSUtil.Service
           const index = path.join(directory, ".git", "index")
           yield* ready(directory)
+          const events = yield* EventV2.Service
+          const changed = yield* Deferred.make<void>()
+          yield* events.subscribe(VcsEvent.Changed).pipe(
+            Stream.runForEach(() => Deferred.succeed(changed, undefined)),
+            Effect.forkScoped,
+          )
+          yield* Effect.yieldNow
           yield* noUpdate(
             (event) => event.file === index,
             fs
               .writeFileString(path.join(directory, "tracked.txt"), "a")
               .pipe(Effect.andThen(Effect.promise(() => $`git add .`.cwd(directory).quiet())), Effect.asVoid),
           )
+          yield* Deferred.await(changed).pipe(Effect.timeout("5 seconds"))
         }),
       { git: true },
     ),
@@ -229,6 +249,24 @@ describeWatcher("Watcher", () => {
           ).toMatchObject({ file: head })
         }),
       { git: true },
+    ),
+  )
+
+  it.live("observes external file edits with generic watching disabled", () =>
+    withTmp(
+      (directory) =>
+        Effect.gen(function* () {
+          const events = yield* EventV2.Service
+          const changed = yield* Deferred.make<void>()
+          yield* events.subscribe(VcsEvent.Changed).pipe(
+            Stream.runForEach(() => Deferred.succeed(changed, undefined)),
+            Effect.forkScoped,
+          )
+          yield* Effect.yieldNow
+          yield* Effect.promise(() => Bun.write(path.join(directory, "external.txt"), "external\n"))
+          yield* Deferred.await(changed).pipe(Effect.timeout("5 seconds"))
+        }),
+      { git: true, experimental: false },
     ),
   )
 

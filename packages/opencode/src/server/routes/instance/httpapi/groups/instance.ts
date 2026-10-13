@@ -15,6 +15,7 @@ import {
   WorkspaceRoutingQueryFields,
 } from "../middleware/workspace-routing"
 import { described } from "./metadata"
+import { Targets, Stash, StashInput, StashCreateInput, PushInput, PullInput } from "@opencode-ai/schema/vcs"
 
 const PathInfo = Schema.Struct({
   home: Schema.String,
@@ -51,7 +52,7 @@ export class ApiVcsOperationError extends Schema.ErrorClass<ApiVcsOperationError
     name: Schema.Literal("VcsOperationError"),
     data: Schema.Struct({
       message: Schema.String,
-      operation: Schema.Literals(["stage", "unstage", "discard", "commit", "fetch", "push", "pull", "message"]),
+      operation: Vcs.OperationError.fields.operation,
     }),
   },
   { httpApiStatus: 400 },
@@ -77,6 +78,14 @@ export const InstancePaths = {
   vcsFetch: "/vcs/fetch",
   vcsPush: "/vcs/push",
   vcsPull: "/vcs/pull",
+  vcsPushWithUpstream: "/vcs/push/upstream",
+  vcsPullFrom: "/vcs/pull/from",
+  vcsTargets: "/vcs/targets",
+  vcsStashes: "/vcs/stashes",
+  vcsStashCreate: "/vcs/stash/create",
+  vcsStashApply: "/vcs/stash/apply",
+  vcsStashPop: "/vcs/stash/pop",
+  vcsStashDrop: "/vcs/stash/drop",
   vcsStagedDiff: "/vcs/staged-diff",
   vcsGenerateMessage: "/vcs/commit-message",
   command: "/command",
@@ -237,6 +246,52 @@ export const InstanceApi = HttpApi.make("instance")
         HttpApiEndpoint.get("vcsStagedDiff", InstancePaths.vcsStagedDiff, {
           query: WorkspaceRoutingQuery,
           success: described(Schema.String, "Staged changes diff"),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.get("vcsTargets", InstancePaths.vcsTargets, {
+          query: WorkspaceRoutingQuery,
+          success: Targets,
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.get("vcsStashes", InstancePaths.vcsStashes, {
+          query: WorkspaceRoutingQuery,
+          success: Schema.Array(Stash),
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsPushWithUpstream", InstancePaths.vcsPushWithUpstream, {
+          query: WorkspaceRoutingQuery,
+          payload: PushInput,
+          success: Vcs.OperationResult,
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsPullFrom", InstancePaths.vcsPullFrom, {
+          query: WorkspaceRoutingQuery,
+          payload: PullInput,
+          success: Vcs.OperationResult,
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsStashCreate", InstancePaths.vcsStashCreate, {
+          query: WorkspaceRoutingQuery,
+          payload: StashCreateInput,
+          success: Vcs.OperationResult,
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsStashApply", InstancePaths.vcsStashApply, {
+          query: WorkspaceRoutingQuery,
+          payload: StashInput,
+          success: Vcs.OperationResult,
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsStashPop", InstancePaths.vcsStashPop, {
+          query: WorkspaceRoutingQuery,
+          payload: StashInput,
+          success: Vcs.OperationResult,
+          error: ApiVcsOperationError,
+        }),
+        HttpApiEndpoint.post("vcsStashDrop", InstancePaths.vcsStashDrop, {
+          query: WorkspaceRoutingQuery,
+          payload: StashInput,
+          success: Vcs.OperationResult,
           error: ApiVcsOperationError,
         }),
         HttpApiEndpoint.post("vcsGenerateMessage", InstancePaths.vcsGenerateMessage, {

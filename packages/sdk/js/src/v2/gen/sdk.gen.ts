@@ -103,9 +103,13 @@ import type {
   InstanceVcsGenerateMessageErrors,
   InstanceVcsGenerateMessageResponses,
   InstanceVcsPullErrors,
+  InstanceVcsPullFromErrors,
+  InstanceVcsPullFromResponses,
   InstanceVcsPullResponses,
   InstanceVcsPushErrors,
   InstanceVcsPushResponses,
+  InstanceVcsPushWithUpstreamErrors,
+  InstanceVcsPushWithUpstreamResponses,
   InstanceVcsRemoteErrors,
   InstanceVcsRemoteResponses,
   InstanceVcsStageAllErrors,
@@ -114,6 +118,18 @@ import type {
   InstanceVcsStagedDiffResponses,
   InstanceVcsStageErrors,
   InstanceVcsStageResponses,
+  InstanceVcsStashApplyErrors,
+  InstanceVcsStashApplyResponses,
+  InstanceVcsStashCreateErrors,
+  InstanceVcsStashCreateResponses,
+  InstanceVcsStashDropErrors,
+  InstanceVcsStashDropResponses,
+  InstanceVcsStashesErrors,
+  InstanceVcsStashesResponses,
+  InstanceVcsStashPopErrors,
+  InstanceVcsStashPopResponses,
+  InstanceVcsTargetsErrors,
+  InstanceVcsTargetsResponses,
   InstanceVcsUnstageAllErrors,
   InstanceVcsUnstageAllResponses,
   InstanceVcsUnstageErrors,
@@ -425,6 +441,10 @@ import type {
   VcsDiffResponses,
   VcsGetErrors,
   VcsGetResponses,
+  VcsPullInput,
+  VcsPushInput,
+  VcsStashCreateInput,
+  VcsStashInput,
   VcsStatusErrors,
   VcsStatusResponses,
   WorktreeCreateErrors,
@@ -2362,6 +2382,268 @@ export class Instance extends HeyApiClient {
       url: "/vcs/staged-diff",
       ...options,
       ...params,
+    })
+  }
+
+  public vcsTargets<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<InstanceVcsTargetsResponses, InstanceVcsTargetsErrors, ThrowOnError>({
+      url: "/vcs/targets",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsStashes<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<InstanceVcsStashesResponses, InstanceVcsStashesErrors, ThrowOnError>({
+      url: "/vcs/stashes",
+      ...options,
+      ...params,
+    })
+  }
+
+  public vcsPushWithUpstream<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      vcsPushInput?: VcsPushInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "vcsPushInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      InstanceVcsPushWithUpstreamResponses,
+      InstanceVcsPushWithUpstreamErrors,
+      ThrowOnError
+    >({
+      url: "/vcs/push/upstream",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public vcsPullFrom<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      vcsPullInput?: VcsPullInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "vcsPullInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsPullFromResponses, InstanceVcsPullFromErrors, ThrowOnError>(
+      {
+        url: "/vcs/pull/from",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+
+  public vcsStashCreate<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      vcsStashCreateInput?: VcsStashCreateInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "vcsStashCreateInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      InstanceVcsStashCreateResponses,
+      InstanceVcsStashCreateErrors,
+      ThrowOnError
+    >({
+      url: "/vcs/stash/create",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public vcsStashApply<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      vcsStashInput?: VcsStashInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "vcsStashInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      InstanceVcsStashApplyResponses,
+      InstanceVcsStashApplyErrors,
+      ThrowOnError
+    >({
+      url: "/vcs/stash/apply",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  public vcsStashPop<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      vcsStashInput?: VcsStashInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "vcsStashInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<InstanceVcsStashPopResponses, InstanceVcsStashPopErrors, ThrowOnError>(
+      {
+        url: "/vcs/stash/pop",
+        ...options,
+        ...params,
+        headers: {
+          "Content-Type": "application/json",
+          ...options?.headers,
+          ...params.headers,
+        },
+      },
+    )
+  }
+
+  public vcsStashDrop<ThrowOnError extends boolean = false>(
+    parameters?: {
+      directory?: string
+      workspace?: string
+      vcsStashInput?: VcsStashInput
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { key: "vcsStashInput", map: "body" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      InstanceVcsStashDropResponses,
+      InstanceVcsStashDropErrors,
+      ThrowOnError
+    >({
+      url: "/vcs/stash/drop",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

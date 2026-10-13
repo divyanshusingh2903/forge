@@ -10,6 +10,7 @@ import { AppProcess } from "./process"
 import { makeGlobalNode } from "./effect/app-node"
 import { File } from "./file"
 import { KeyedMutex } from "./effect/keyed-mutex"
+import { Vcs } from "@opencode-ai/schema/vcs"
 
 export class Repository extends Schema.Class<Repository>("Git.Repository")({
   worktree: AbsolutePath,
@@ -35,6 +36,15 @@ export class OperationError extends Schema.TaggedErrorClass<OperationError>()("G
     "list_files",
     "diff",
     "restore",
+    "push",
+    "pull",
+    "targets",
+    "upstream",
+    "stash-list",
+    "stash-create",
+    "stash-apply",
+    "stash-pop",
+    "stash-drop",
   ]),
   message: Schema.String,
   directory: Schema.optional(AbsolutePath),
@@ -78,6 +88,8 @@ export interface Interface {
   }
   readonly remote: {
     readonly get: (repository: Repository, name?: string) => Effect.Effect<string | undefined>
+    readonly targets: (repository: Repository) => Effect.Effect<Vcs.Targets, OperationError>
+    readonly upstream: (repository: Repository) => Effect.Effect<Vcs.Upstream | undefined, OperationError>
   }
   readonly history: {
     readonly head: (repository: Repository) => Effect.Effect<string | undefined>
@@ -96,6 +108,21 @@ export interface Interface {
       input: { remote?: string; branch: string; reset?: boolean },
     ) => Effect.Effect<void, OperationError>
     readonly resetHard: (repository: Repository, revision: string) => Effect.Effect<void, OperationError>
+    readonly push: (repository: Repository, input?: Vcs.PushInput) => Effect.Effect<Vcs.OperationResult, OperationError>
+    readonly pull: (repository: Repository, input?: Vcs.PullInput) => Effect.Effect<Vcs.OperationResult, OperationError>
+  }
+  readonly stash: {
+    readonly list: (repository: Repository) => Effect.Effect<readonly Vcs.Stash[], OperationError>
+    readonly create: (
+      repository: Repository,
+      input: Vcs.StashCreateInput,
+    ) => Effect.Effect<Vcs.OperationResult, OperationError>
+    readonly apply: (
+      repository: Repository,
+      input: Vcs.StashInput,
+    ) => Effect.Effect<Vcs.OperationResult, OperationError>
+    readonly pop: (repository: Repository, input: Vcs.StashInput) => Effect.Effect<Vcs.OperationResult, OperationError>
+    readonly drop: (repository: Repository, input: Vcs.StashInput) => Effect.Effect<Vcs.OperationResult, OperationError>
   }
   readonly change: {
     readonly capture: (input: { repository: Repository; path: AbsolutePath }) => Effect.Effect<ChangeSet, PatchError>
@@ -124,6 +151,7 @@ export interface Interface {
     readonly list: (repository: Repository) => Effect.Effect<readonly Worktree[], WorktreeError>
   }
   readonly index: {
+    readonly watchIgnores: (repository: Repository) => Effect.Effect<readonly string[], OperationError>
     /** Refresh only the requested project-relative scope, preserving all other entries. */
     readonly refresh: (input: {
       repository: Repository
@@ -134,6 +162,7 @@ export interface Interface {
     readonly ignored: (input: {
       repository: Repository
       paths: readonly RelativePath[]
+      tracked?: boolean
     }) => Effect.Effect<ReadonlySet<RelativePath>, OperationError>
   }
   readonly tree: {
@@ -356,6 +385,174 @@ const layer = Layer.effect(
       })
     })
 
+    const targets = Effect.fn("Git.remote.targets")(function* (repository: Repository) {
+      const remotes = (yield* repositoryOperation("targets", repository, ["remote"])).text
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+      const refs = (yield* repositoryOperation("targets", repository, [
+        "for-each-ref",
+        "--format=%(refname)",
+        "refs/remotes/",
+      ])).text.split("\n")
+      const current = yield* branch(repository)
+      const config = run(repository.worktree, proc)
+      // branch.<name>.rebase overrides pull.rebase; any value other than false means rebase.
+      const rebase =
+        (current ? (yield* config(["config", "--get", `branch.${current}.rebase`])).text.trim() : "") ||
+        (yield* config(["config", "--get", "pull.rebase"])).text.trim()
+      const longest = remotes.toSorted((a, b) => b.length - a.length)
+      return {
+        remotes,
+        pull: rebase && rebase !== "false" ? ("rebase" as const) : ("merge" as const),
+        branches: refs.flatMap((ref) => {
+          const remote = longest.find((name) => ref.startsWith(`refs/remotes/${name}/`))
+          if (!remote) return []
+          const branch = ref.slice(`refs/remotes/${remote}/`.length)
+          return branch && branch !== "HEAD" ? [{ remote, branch }] : []
+        }),
+      }
+    })
+    const upstream = Effect.fn("Git.remote.upstream")(function* (repository: Repository) {
+      const current = yield* branch(repository)
+      if (!current) return undefined
+      const remote = (yield* run(
+        repository.worktree,
+        proc,
+      )(["config", "--get", `branch.${current}.remote`])).text.trim()
+      const ref = (yield* run(repository.worktree, proc)(["config", "--get", `branch.${current}.merge`])).text.trim()
+      if (!remote || !ref?.startsWith("refs/heads/")) return undefined
+      return { remote, branch: ref.slice("refs/heads/".length) }
+    })
+    const requireRemote = Effect.fnUntraced(function* (
+      repository: Repository,
+      remote: string,
+      operation: "push" | "pull",
+    ) {
+      if (!remote.startsWith("-") && (yield* targets(repository)).remotes.includes(remote)) return remote
+      return yield* new OperationError({
+        operation,
+        directory: repository.worktree,
+        message: "Select a configured Git remote",
+      })
+    })
+    const action = Effect.fnUntraced(function* (
+      repository: Repository,
+      operation: OperationError["operation"],
+      args: string[],
+    ) {
+      const result = yield* repositoryOperation(operation, repository, args, {
+        env: {
+          GIT_TERMINAL_PROMPT: "0",
+          GIT_EDITOR: "true",
+          GIT_SEQUENCE_EDITOR: "true",
+          GIT_MERGE_AUTOEDIT: "no",
+          GIT_OPTIONAL_LOCKS: "0",
+        },
+      })
+      return { success: true, output: [result.text.trim(), result.stderr.trim()].filter(Boolean).join("\n") }
+    })
+    const push = Effect.fn("Git.sync.push")(function* (repository: Repository, input: Vcs.PushInput = {}) {
+      if (!input.setUpstream && !input.remote) return yield* action(repository, "push", ["push"])
+      const current = yield* branch(repository)
+      if (!current || !(yield* head(repository)))
+        return yield* new OperationError({
+          operation: "push",
+          directory: repository.worktree,
+          message: "Push requires a branch with at least one commit",
+        })
+      const remote = yield* requireRemote(repository, input.remote ?? "origin", "push")
+      return yield* action(repository, "push", [
+        "push",
+        ...(input.setUpstream ? ["--set-upstream"] : []),
+        "--",
+        remote,
+        `refs/heads/${current}:refs/heads/${current}`,
+      ])
+    })
+    const pull = Effect.fn("Git.sync.pull")(function* (repository: Repository, input: Vcs.PullInput = {}) {
+      if (!!input.remote !== !!input.branch)
+        return yield* new OperationError({
+          operation: "pull",
+          directory: repository.worktree,
+          message: "Select both a remote and branch",
+        })
+      if (input.remote) yield* requireRemote(repository, input.remote, "pull")
+      if (input.branch) {
+        if (input.branch.startsWith("-"))
+          return yield* new OperationError({
+            operation: "pull",
+            directory: repository.worktree,
+            message: "Invalid branch name",
+          })
+        yield* repositoryOperation("pull", repository, ["check-ref-format", `refs/heads/${input.branch}`])
+      }
+      // Without an explicit strategy, defer to the user's pull.rebase and pull.ff configuration.
+      // An explicit merge also allows a merge commit when pull.ff=only would refuse it.
+      return yield* action(repository, "pull", [
+        "pull",
+        "--no-autostash",
+        ...(input.strategy === "rebase" ? ["--rebase"] : []),
+        ...(input.strategy === "merge" ? ["--no-rebase", "--ff"] : []),
+        "--no-edit",
+        ...(input.remote && input.branch ? ["--", input.remote, `refs/heads/${input.branch}`] : []),
+      ])
+    })
+    const stashList = Effect.fn("Git.stash.list")(function* (repository: Repository) {
+      const result = yield* repositoryOperation("stash-list", repository, [
+        "stash",
+        "list",
+        "--format=%gd%x00%H%x00%ct%x00%gs%x00",
+      ])
+      const fields = result.text.split("\0")
+      return fields.flatMap((field, index) => {
+        if (index % 4 !== 0 || !field.trim()) return []
+        return [
+          {
+            ref: field.trim(),
+            oid: fields[index + 1] ?? "",
+            createdAt: Number(fields[index + 2]) * 1000,
+            message: fields[index + 3] ?? "",
+          },
+        ]
+      })
+    })
+    const stashCreate = Effect.fn("Git.stash.create")((repository: Repository, input: Vcs.StashCreateInput) =>
+      locks.withLock(repository.commonDirectory)(
+        action(repository, "stash-create", [
+          "stash",
+          "push",
+          ...(input.includeUntracked ? ["--include-untracked"] : []),
+          ...(input.message?.trim() ? ["--message", input.message.trim()] : []),
+        ]),
+      ),
+    )
+    const stashAction = Effect.fnUntraced(function* (
+      repository: Repository,
+      input: Vcs.StashInput,
+      operation: "apply" | "pop" | "drop",
+    ) {
+      return yield* locks.withLock(repository.commonDirectory)(
+        Effect.gen(function* () {
+          if (
+            !/^stash@\{\d+\}$/.test(input.ref) ||
+            !(yield* stashList(repository)).some((stash) => stash.ref === input.ref && stash.oid === input.oid)
+          )
+            return yield* new OperationError({
+              operation: `stash-${operation}`,
+              directory: repository.worktree,
+              message: "The selected stash has changed; refresh the stash list and try again",
+            })
+          // Apply by immutable object ID. Pop/drop also need Git's positional reflog selector.
+          return yield* action(repository, `stash-${operation}`, [
+            "stash",
+            operation,
+            operation === "apply" ? input.oid : input.ref,
+          ])
+        }),
+      )
+    })
+
     const create = Effect.fn("Git.repo.create")(function* (input: {
       worktree: AbsolutePath
       gitDirectory: AbsolutePath
@@ -488,17 +685,43 @@ const layer = Layer.effect(
       return { skipped }
     })
 
+    const watchIgnores = Effect.fn("Git.index.watchIgnores")(function* (repository: Repository) {
+      const tracked = (yield* repositoryOperation("list_files", repository, ["ls-files", "--cached", "-z"])).text
+        .split("\0")
+        .filter(Boolean)
+      const excluded = (yield* repositoryOperation("list_files", repository, [
+        "ls-files",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "--directory",
+        "-z",
+      ])).text.split("\0")
+      return excluded
+        .filter((file) => file.endsWith("/") && !tracked.some((path) => path.startsWith(file)))
+        .map((file) => file.slice(0, -1))
+    })
     const ignored = Effect.fn("Git.index.ignored")(function* (input: {
       repository: Repository
       paths: readonly RelativePath[]
+      tracked?: boolean
     }) {
       if (!input.paths.length) return new Set<RelativePath>()
       const result = yield* proc
         .run(
-          ChildProcess.make("git", repositoryArgs(input.repository, ["check-ignore", "--no-index", "--stdin", "-z"]), {
-            cwd: input.repository.worktree,
-            extendEnv: true,
-          }),
+          ChildProcess.make(
+            "git",
+            repositoryArgs(input.repository, [
+              "check-ignore",
+              ...(input.tracked ? [] : ["--no-index"]),
+              "--stdin",
+              "-z",
+            ]),
+            {
+              cwd: input.repository.worktree,
+              extendEnv: true,
+            },
+          ),
           { stdin: input.paths.join("\0") + "\0" },
         )
         .pipe(
@@ -924,12 +1147,19 @@ const layer = Layer.effect(
 
     return Service.of({
       repo: { discover, clone, create },
-      remote: { get: remote },
+      remote: { get: remote, targets, upstream },
       history: { head, branch, defaultRemoteBranch: remoteHead, rootCommits: roots },
-      sync: { fetchRemotes: fetch, fetchBranch, checkoutRemoteBranch: checkout, resetHard: reset },
+      sync: { fetchRemotes: fetch, fetchBranch, checkoutRemoteBranch: checkout, resetHard: reset, push, pull },
+      stash: {
+        list: stashList,
+        create: stashCreate,
+        apply: (repository, input) => stashAction(repository, input, "apply"),
+        pop: (repository, input) => stashAction(repository, input, "pop"),
+        drop: (repository, input) => stashAction(repository, input, "drop"),
+      },
       change: { capture, apply, discard },
       worktree: { create: worktreeCreate, remove: worktreeRemove, list: worktreeList },
-      index: { refresh, ignored },
+      index: { refresh, ignored, watchIgnores },
       tree: {
         capture: captureTree,
         write: writeTree,

@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export const dict = {
+  ...gitDict("sr"),
   "desktop.menu.app": "OpenCode",
   "desktop.menu.file": "датотека",
   "desktop.menu.edit": "Уреди",

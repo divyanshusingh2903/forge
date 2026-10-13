@@ -196,7 +196,8 @@ const scenarios: Scenario[] = [
     )
     .at((ctx) => ({ path: "/vcs/remote", headers: ctx.headers() }))
     .json(200, (body) => {
-      check(stable(body) === stable({ upstream: true, ahead: 1, behind: 0 }), "remote should report one commit ahead")
+      object(body)
+      check(body.upstream === true && body.ahead === 1 && body.behind === 0, "remote should report one commit ahead")
     }),
   http.protected
     .get("/link-preview", "linkPreview.get")
@@ -283,6 +284,73 @@ const scenarios: Scenario[] = [
     .json(200, (body) => {
       check(typeof body === "string" && body.includes("exercise.txt"), "staged diff should mention the staged file")
     }),
+  http.protected
+    .get("/vcs/targets", "vcs.targets")
+    .seeded(trackedRemote)
+    .json(200, (body) => {
+      object(body)
+      check(Array.isArray(body.remotes) && body.remotes.includes("origin"), "targets should list origin")
+    }),
+  http.protected
+    .get("/vcs/stashes", "vcs.stashes")
+    .json(200, (body) => check(Array.isArray(body) && body.length === 0, "stash list should start empty")),
+  http.protected
+    .post("/vcs/push/upstream", "vcs.pushUpstream")
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        yield* trackedRemote(ctx)
+        yield* git(ctx, "checkout", "-b", "exercise/publish")
+      }),
+    )
+    .at((ctx) => ({ path: "/vcs/push/upstream", headers: ctx.headers(), body: { remote: "origin" } }))
+    .json(200, operationResult),
+  http.protected
+    .post("/vcs/pull/from", "vcs.pullFrom")
+    .seeded((ctx) =>
+      Effect.gen(function* () {
+        yield* trackedRemote(ctx)
+        return yield* Effect.promise(() =>
+          Bun.$`git symbolic-ref --short HEAD`
+            .cwd(ctx.directory ?? "")
+            .quiet()
+            .text(),
+        ).pipe(Effect.map((branch) => branch.trim()))
+      }),
+    )
+    .at((ctx) => ({
+      path: "/vcs/pull/from",
+      headers: ctx.headers(),
+      body: { remote: "origin", branch: ctx.state, strategy: "rebase" },
+    }))
+    .json(200, operationResult),
+  http.protected
+    .post("/vcs/stash/create", "vcs.stashCreate")
+    .seeded((ctx) => dirtyFile(ctx, true))
+    .at((ctx) => ({
+      path: "/vcs/stash/create",
+      headers: ctx.headers(),
+      body: { message: "exercise stash", includeUntracked: true },
+    }))
+    .json(200, operationResult),
+  ...["apply", "pop", "drop"].map((action) =>
+    http.protected
+      .post(`/vcs/stash/${action}`, `vcs.stash.${action}`)
+      .seeded((ctx) =>
+        Effect.gen(function* () {
+          yield* dirtyFile(ctx, true)
+          yield* git(ctx, "stash", "push", "-m", "exercise stash")
+          const oid = yield* Effect.promise(() =>
+            Bun.$`git rev-parse refs/stash`
+              .cwd(ctx.directory ?? "")
+              .quiet()
+              .text(),
+          )
+          return { ref: "stash@{0}", oid: oid.trim() }
+        }),
+      )
+      .at((ctx) => ({ path: `/vcs/stash/${action}`, headers: ctx.headers(), body: ctx.state }))
+      .json(200, operationResult),
+  ),
   ...[
     {
       name: "subject",
@@ -302,7 +370,7 @@ const scenarios: Scenario[] = [
     {
       name: "wrapped",
       output:
-        '<think>Choose a concise subject.</think>Here is the commit message:\n```text\nfeat: add exercise file\n\n- Support staged changes\n```\nThis describes the changes.',
+        "<think>Choose a concise subject.</think>Here is the commit message:\n```text\nfeat: add exercise file\n\n- Support staged changes\n```\nThis describes the changes.",
       expected: "feat: add exercise file\n\n- Support staged changes",
     },
     {

@@ -67,6 +67,7 @@ export type Event =
   | EventQuestionV2Asked
   | EventQuestionV2Replied
   | EventQuestionV2Rejected
+  | EventVcsChanged
   | EventTodoUpdated
   | EventLspUpdated
   | EventPermissionAsked
@@ -1360,6 +1361,13 @@ export type GlobalEvent = {
       }
     | {
         id: string
+        type: "vcs.changed"
+        properties: {
+          [key: string]: unknown
+        }
+      }
+    | {
+        id: string
         type: "todo.updated"
         properties: {
           sessionID: string
@@ -2382,19 +2390,35 @@ export type VcsChangeStatus = {
   staged: boolean
   unstaged: boolean
   untracked: boolean
+  conflicted?: boolean
 }
 
 export type VcsRemoteStatus = {
   upstream: boolean
   ahead: number
   behind: number
+  target?: VcsUpstream
 }
 
 export type VcsOperationError = {
   name: "VcsOperationError"
   data: {
     message: string
-    operation: "stage" | "unstage" | "discard" | "commit" | "fetch" | "push" | "pull" | "message"
+    operation:
+      | "stage"
+      | "unstage"
+      | "discard"
+      | "commit"
+      | "fetch"
+      | "push"
+      | "pull"
+      | "message"
+      | "targets"
+      | "stash-list"
+      | "stash-create"
+      | "stash-apply"
+      | "stash-pop"
+      | "stash-drop"
   }
 }
 
@@ -2977,6 +3001,7 @@ export type V2Event =
   | QuestionV2Asked
   | QuestionV2Replied
   | QuestionV2Rejected
+  | VcsChanged
   | TodoUpdated
   | LspUpdated
   | PermissionAsked
@@ -3904,6 +3929,45 @@ export type ConfigV2ExperimentalPolicy = {
   action: "provider.use"
   effect: PolicyEffect
   resource: string
+}
+
+export type VcsUpstream = {
+  remote: string
+  branch: string
+}
+
+export type VcsTargets = {
+  remotes: Array<string>
+  branches: Array<VcsUpstream>
+  pull?: "merge" | "rebase"
+}
+
+export type VcsStash = {
+  ref: string
+  oid: string
+  message: string
+  createdAt: number
+}
+
+export type VcsPushInput = {
+  remote?: string
+  setUpstream?: boolean
+}
+
+export type VcsPullInput = {
+  remote?: string
+  branch?: string
+  strategy?: "merge" | "rebase"
+}
+
+export type VcsStashCreateInput = {
+  message?: string
+  includeUntracked?: boolean
+}
+
+export type VcsStashInput = {
+  ref: string
+  oid: string
 }
 
 export type ProjectDirectories = Array<{
@@ -5720,6 +5784,23 @@ export type QuestionV2Rejected = {
   }
 }
 
+export type VcsChanged = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "vcs.changed"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    [key: string]: unknown
+  }
+}
+
 export type TodoUpdated = {
   id: string
   metadata?: {
@@ -6898,6 +6979,14 @@ export type EventQuestionV2Rejected = {
   properties: {
     sessionID: string
     requestID: string
+  }
+}
+
+export type EventVcsChanged = {
+  id: string
+  type: "vcs.changed"
+  properties: {
+    [key: string]: unknown
   }
 }
 
@@ -8749,6 +8838,250 @@ export type InstanceVcsStagedDiffResponses = {
 }
 
 export type InstanceVcsStagedDiffResponse = InstanceVcsStagedDiffResponses[keyof InstanceVcsStagedDiffResponses]
+
+export type InstanceVcsTargetsData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/targets"
+}
+
+export type InstanceVcsTargetsErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsTargetsError = InstanceVcsTargetsErrors[keyof InstanceVcsTargetsErrors]
+
+export type InstanceVcsTargetsResponses = {
+  /**
+   * Vcs.Targets
+   */
+  200: VcsTargets
+}
+
+export type InstanceVcsTargetsResponse = InstanceVcsTargetsResponses[keyof InstanceVcsTargetsResponses]
+
+export type InstanceVcsStashesData = {
+  body?: never
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/stashes"
+}
+
+export type InstanceVcsStashesErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsStashesError = InstanceVcsStashesErrors[keyof InstanceVcsStashesErrors]
+
+export type InstanceVcsStashesResponses = {
+  /**
+   * Success
+   */
+  200: Array<VcsStash>
+}
+
+export type InstanceVcsStashesResponse = InstanceVcsStashesResponses[keyof InstanceVcsStashesResponses]
+
+export type InstanceVcsPushWithUpstreamData = {
+  body?: VcsPushInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/push/upstream"
+}
+
+export type InstanceVcsPushWithUpstreamErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsPushWithUpstreamError =
+  InstanceVcsPushWithUpstreamErrors[keyof InstanceVcsPushWithUpstreamErrors]
+
+export type InstanceVcsPushWithUpstreamResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsPushWithUpstreamResponse =
+  InstanceVcsPushWithUpstreamResponses[keyof InstanceVcsPushWithUpstreamResponses]
+
+export type InstanceVcsPullFromData = {
+  body?: VcsPullInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/pull/from"
+}
+
+export type InstanceVcsPullFromErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsPullFromError = InstanceVcsPullFromErrors[keyof InstanceVcsPullFromErrors]
+
+export type InstanceVcsPullFromResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsPullFromResponse = InstanceVcsPullFromResponses[keyof InstanceVcsPullFromResponses]
+
+export type InstanceVcsStashCreateData = {
+  body?: VcsStashCreateInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/stash/create"
+}
+
+export type InstanceVcsStashCreateErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsStashCreateError = InstanceVcsStashCreateErrors[keyof InstanceVcsStashCreateErrors]
+
+export type InstanceVcsStashCreateResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsStashCreateResponse = InstanceVcsStashCreateResponses[keyof InstanceVcsStashCreateResponses]
+
+export type InstanceVcsStashApplyData = {
+  body?: VcsStashInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/stash/apply"
+}
+
+export type InstanceVcsStashApplyErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsStashApplyError = InstanceVcsStashApplyErrors[keyof InstanceVcsStashApplyErrors]
+
+export type InstanceVcsStashApplyResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsStashApplyResponse = InstanceVcsStashApplyResponses[keyof InstanceVcsStashApplyResponses]
+
+export type InstanceVcsStashPopData = {
+  body?: VcsStashInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/stash/pop"
+}
+
+export type InstanceVcsStashPopErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsStashPopError = InstanceVcsStashPopErrors[keyof InstanceVcsStashPopErrors]
+
+export type InstanceVcsStashPopResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsStashPopResponse = InstanceVcsStashPopResponses[keyof InstanceVcsStashPopResponses]
+
+export type InstanceVcsStashDropData = {
+  body?: VcsStashInput
+  path?: never
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/vcs/stash/drop"
+}
+
+export type InstanceVcsStashDropErrors = {
+  /**
+   * VcsOperationError | InvalidRequestError
+   */
+  400: VcsOperationError | InvalidRequestError
+}
+
+export type InstanceVcsStashDropError = InstanceVcsStashDropErrors[keyof InstanceVcsStashDropErrors]
+
+export type InstanceVcsStashDropResponses = {
+  /**
+   * Success
+   */
+  200: {
+    success: boolean
+    output: string
+  }
+}
+
+export type InstanceVcsStashDropResponse = InstanceVcsStashDropResponses[keyof InstanceVcsStashDropResponses]
 
 export type InstanceVcsGenerateMessageData = {
   body?: {

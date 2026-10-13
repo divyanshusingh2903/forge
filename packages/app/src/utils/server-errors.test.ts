@@ -68,6 +68,13 @@ describe("parseReadableConfigInvalidError", () => {
 })
 
 describe("formatServerError", () => {
+  test("preserves Git diagnostics in direct and transport-wrapped operation errors", () => {
+    const error = { name: "VcsOperationError", data: { message: "Merge conflict in file.txt", operation: "pull" } }
+    expect(formatServerError(error)).toBe("Merge conflict in file.txt")
+    expect(formatServerError(new Error("Request failed", { cause: { body: error } }))).toBe(
+      "Merge conflict in file.txt",
+    )
+  })
   test("formats config invalid errors", () => {
     const error = {
       name: "ConfigInvalidError",
