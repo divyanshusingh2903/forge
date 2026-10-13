@@ -11,6 +11,21 @@ test("publishes a new branch with origin upstream", async ({ page }) => {
   expect(git.state.operations).toEqual([{ path: "/vcs/push/upstream", body: { remote: "origin", setUpstream: true } }])
 })
 
+test("offers push with upstream as the primary action once a new branch is committed", async ({ page }) => {
+  const git = await setupReviewGit(page)
+  git.state.changes = []
+  git.state.remote = { upstream: false, ahead: 1, behind: 0 }
+  await git.changed()
+  const primary = page.getByRole("button", { name: /^Push and set upstream\s*1$/ })
+  await expect(primary).toBeVisible()
+  await primary.click()
+  const dialog = page.getByRole("dialog")
+  await dialog.getByRole("button", { name: "Push", exact: true }).click()
+  await expect(dialog).toBeHidden()
+  expect(git.state.operations).toEqual([{ path: "/vcs/push/upstream", body: { remote: "origin", setUpstream: true } }])
+  await expect(page.getByRole("button", { name: "Fetch", exact: true })).toBeVisible()
+})
+
 test("pulls an explicit branch with rebase and surfaces conflicts", async ({ page }) => {
   const git = await setupReviewGit(page)
   await openGitMenu(page, "Pull")

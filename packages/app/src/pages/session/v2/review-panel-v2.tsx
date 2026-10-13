@@ -253,7 +253,11 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
           <SplitButtonV2 data-variant="outline">
             <SplitButtonV2Action
               disabled={git.busy}
-              onClick={() => void runGit(pushReady() ? remote.push : remote.fetch)}
+              onClick={() => {
+                if (pushReady() && !git.remote.upstream)
+                  return dialog.show(() => <ReviewRemoteDialog controller={controller} mode="push" />)
+                void runGit(pushReady() ? remote.push : remote.fetch)
+              }}
             >
               <Show
                 when={pushReady()}
@@ -265,7 +269,7 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
                 }
               >
                 <Icon name="arrow-up" size="small" />
-                {language.t("session.review.git.push")}
+                {language.t(git.remote.upstream ? "session.review.git.push" : "session.review.git.pushUpstream")}
                 <span class="tabular-nums text-v2-text-text-muted">{git.remote.ahead}</span>
               </Show>
             </SplitButtonV2Action>

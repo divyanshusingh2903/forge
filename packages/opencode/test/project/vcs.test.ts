@@ -392,8 +392,41 @@ describe("Vcs diff", () => {
         yield* vcs.stage({ file: "commit.txt" })
         expect((yield* vcs.commit({ message: "Save changes" })).success).toBe(true)
         expect(yield* vcs.changes()).toEqual([])
+        // Without any remote there is nowhere to publish, so nothing counts as ahead.
+        expect(yield* vcs.remote()).toEqual({ upstream: false, ahead: 0, behind: 0 })
         expect((yield* Effect.exit(vcs.push()))._tag).toBe("Failure")
         expect((yield* Effect.exit(vcs.pull()))._tag).toBe("Failure")
+      }),
+    { git: true },
+  )
+
+  it.instance(
+    "counts unpublished commits on a branch without an upstream",
+    () =>
+      Effect.gen(function* () {
+        const test = yield* TestInstance
+        const remote = yield* tmpdirScoped()
+        yield* git(remote, ["init", "--bare", "--quiet"])
+        yield* git(test.directory, ["remote", "add", "origin", remote])
+        yield* git(test.directory, ["push", "--quiet", "origin", "HEAD:refs/heads/main"])
+        yield* git(test.directory, ["checkout", "-b", "feature/unpublished"])
+        const vcs = yield* init()
+        yield* write(path.join(test.directory, "feature.txt"), "feature\n")
+        yield* vcs.stage({ file: "feature.txt" })
+        yield* vcs.commit({ message: "Feature" })
+        expect(yield* vcs.remote()).toEqual({ upstream: false, ahead: 1, behind: 0 })
+        expect((yield* vcs.push({ setUpstream: true })).success).toBe(true)
+        expect(yield* vcs.remote()).toEqual({
+          upstream: true,
+          ahead: 0,
+          behind: 0,
+          target: { remote: "origin", branch: "feature/unpublished" },
+        })
+        yield* write(path.join(test.directory, "detached.txt"), "detached\n")
+        yield* vcs.stage({ file: "detached.txt" })
+        yield* vcs.commit({ message: "Detached" })
+        yield* git(test.directory, ["checkout", "--quiet", "--detach"])
+        expect((yield* vcs.remote()).ahead).toBe(0)
       }),
     { git: true },
   )

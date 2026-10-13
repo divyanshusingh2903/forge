@@ -78,7 +78,7 @@ export async function setupReviewGit(page: Page, input: { locale?: "ar" } = {}) 
       if (state.failure)
         return { status: 400, body: { name: "VcsOperationError", data: { message: state.failure, operation: "pull" } } }
       if (!state.result.success) return { body: state.result }
-      if (operation.path === "/vcs/push/upstream") state.remote.upstream = true
+      if (operation.path === "/vcs/push/upstream") state.remote = { ...state.remote, upstream: true, ahead: 0 }
       if (operation.path === "/vcs/stash/pop" || operation.path === "/vcs/stash/drop") state.stashes = []
       return { body: state.result }
     },

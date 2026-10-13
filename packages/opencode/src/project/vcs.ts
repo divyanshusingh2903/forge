@@ -584,7 +584,8 @@ const layer: Layer.Layer<Service, never, Git.Service | EventV2Bridge.Service> = 
         )
         return {
           upstream: counts !== undefined || target !== undefined,
-          ahead: counts?.ahead ?? 0,
+          // Without a reachable upstream, count the commits a push would publish for the first time.
+          ahead: counts?.ahead ?? (yield* git.unpublished(ctx.directory)),
           behind: counts?.behind ?? 0,
           ...(target ? { target } : {}),
         }
