@@ -12,6 +12,10 @@ import { testEffect } from "./lib/effect"
 
 const it = testEffect(LayerNode.compile(Git.node))
 
+// Windows CI checks files out with core.autocrlf=true, so compare contents with normalized line endings.
+const read = (file: string) =>
+  Effect.promise(() => Bun.file(file).text()).pipe(Effect.map((text) => text.replaceAll("\r\n", "\n")))
+
 function fixture<A, E, R>(
   body: (input: Awaited<ReturnType<typeof gitRemote>>, repository: Git.Repository) => Effect.Effect<A, E, R>,
 ) {
@@ -88,12 +92,8 @@ describe("Git review actions", () => {
             await commit(input.source, "remote\n", "remote")
           })
           yield* service.sync.pull(repository, { remote: "origin", branch: "main", strategy })
-          expect(yield* Effect.promise(() => Bun.file(path.join(repository.worktree, "README.md")).text())).toBe(
-            "remote\n",
-          )
-          expect(yield* Effect.promise(() => Bun.file(path.join(repository.worktree, "local.txt")).text())).toBe(
-            "local\n",
-          )
+          expect(yield* read(path.join(repository.worktree, "README.md"))).toBe("remote\n")
+          expect(yield* read(path.join(repository.worktree, "local.txt"))).toBe("local\n")
           expect(yield* service.history.branch(repository)).toBe("main")
           expect(yield* service.remote.upstream(repository)).toEqual({ remote: "origin", branch: "main" })
         }),
@@ -113,9 +113,7 @@ describe("Git review actions", () => {
           expect(
             yield* Effect.promise(() => $`git status --porcelain`.cwd(repository.worktree).quiet().text()),
           ).toContain("UU README.md")
-          expect(yield* Effect.promise(() => Bun.file(path.join(repository.worktree, "README.md")).text())).toContain(
-            "<<<<<<<",
-          )
+          expect(yield* read(path.join(repository.worktree, "README.md"))).toContain("<<<<<<<")
         }),
       ),
     )
@@ -156,10 +154,8 @@ describe("Git review actions", () => {
         const saved = (yield* service.stash.list(repository))[0]
         if (!saved) return yield* Effect.die(new Error("Missing shared stash"))
         yield* service.stash.apply(linked, saved)
-        expect(yield* Effect.promise(() => Bun.file(path.join(repository.worktree, "README.md")).text())).toBe("one\n")
-        expect(yield* Effect.promise(() => Bun.file(path.join(linked.worktree, "README.md")).text())).toBe(
-          "linked change\n",
-        )
+        expect(yield* read(path.join(repository.worktree, "README.md"))).toBe("one\n")
+        expect(yield* read(path.join(linked.worktree, "README.md"))).toBe("linked change\n")
       }),
     ),
   )
@@ -174,9 +170,7 @@ describe("Git review actions", () => {
         if (!first) return yield* Effect.die(new Error("Missing stash"))
         expect(first.message).toContain("first stash")
         yield* service.stash.apply(repository, first)
-        expect(yield* Effect.promise(() => Bun.file(path.join(repository.worktree, "README.md")).text())).toBe(
-          "first\n",
-        )
+        expect(yield* read(path.join(repository.worktree, "README.md"))).toBe("first\n")
         expect(yield* service.stash.list(repository)).toHaveLength(1)
         yield* Effect.promise(() => git(repository.worktree, "restore", "README.md"))
         yield* Effect.promise(() => Bun.write(path.join(repository.worktree, "untracked.txt"), "untracked\n"))
@@ -190,9 +184,7 @@ describe("Git review actions", () => {
         const second = (yield* service.stash.list(repository))[0]
         if (!second) return yield* Effect.die(new Error("Missing second stash"))
         yield* service.stash.pop(repository, second)
-        expect(yield* Effect.promise(() => Bun.file(path.join(repository.worktree, "untracked.txt")).text())).toBe(
-          "untracked\n",
-        )
+        expect(yield* read(path.join(repository.worktree, "untracked.txt"))).toBe("untracked\n")
         const remaining = (yield* service.stash.list(repository))[0]
         if (!remaining) return yield* Effect.die(new Error("Missing remaining stash"))
         yield* service.stash.drop(repository, remaining)
