@@ -20,6 +20,8 @@ import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
 import { ApiVcsApplyError, ApiVcsOperationError, type LinkPreviewQuery } from "../groups/instance"
 import { markInstanceForDisposal } from "../lifecycle"
+import { VcsEvent } from "@opencode-ai/schema/vcs-event"
+import { EventV2Bridge } from "@/event-v2-bridge"
 
 export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance", (handlers) =>
   Effect.gen(function* () {
@@ -29,6 +31,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     const lsp = yield* LSP.Service
     const skill = yield* Skill.Service
     const vcs = yield* Vcs.Service
+    const events = yield* EventV2Bridge.Service
     const linkPreview = yield* LinkPreview.Service
     const sessions = yield* Session.Service
     const provider = yield* Provider.Service
@@ -92,9 +95,7 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       )
     })
 
-    const runVcsOperation = (
-      effect: Effect.Effect<Schema.Schema.Type<typeof Vcs.OperationResult>, Vcs.OperationError>,
-    ) =>
+    const runVcsOperation = <A>(effect: Effect.Effect<A, Vcs.OperationError>) =>
       effect.pipe(
         Effect.mapError(
           (error) =>
@@ -104,6 +105,8 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
             }),
         ),
       )
+    const mutateVcs = <A>(effect: Effect.Effect<A, Vcs.OperationError>) =>
+      runVcsOperation(effect).pipe(Effect.ensuring(events.publish(VcsEvent.Changed, {})))
 
     const getVcsChanges = Effect.fn("InstanceHttpApi.vcsChanges")(function* () {
       return yield* vcs.changes()
@@ -115,37 +118,37 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
     const stageVcs = Effect.fn("InstanceHttpApi.vcsStage")(function* (ctx: {
       payload: Schema.Schema.Type<typeof Vcs.FileInput>
     }) {
-      return yield* runVcsOperation(vcs.stage(ctx.payload))
+      return yield* mutateVcs(vcs.stage(ctx.payload))
     })
     const unstageVcs = Effect.fn("InstanceHttpApi.vcsUnstage")(function* (ctx: {
       payload: Schema.Schema.Type<typeof Vcs.FileInput>
     }) {
-      return yield* runVcsOperation(vcs.unstage(ctx.payload))
+      return yield* mutateVcs(vcs.unstage(ctx.payload))
     })
     const stageAllVcs = Effect.fn("InstanceHttpApi.vcsStageAll")(function* () {
-      return yield* runVcsOperation(vcs.stageAll())
+      return yield* mutateVcs(vcs.stageAll())
     })
     const unstageAllVcs = Effect.fn("InstanceHttpApi.vcsUnstageAll")(function* () {
-      return yield* runVcsOperation(vcs.unstageAll())
+      return yield* mutateVcs(vcs.unstageAll())
     })
     const discardVcs = Effect.fn("InstanceHttpApi.vcsDiscard")(function* (ctx: {
       payload: Schema.Schema.Type<typeof Vcs.FileInput>
     }) {
-      return yield* runVcsOperation(vcs.discard(ctx.payload))
+      return yield* mutateVcs(vcs.discard(ctx.payload))
     })
     const commitVcs = Effect.fn("InstanceHttpApi.vcsCommit")(function* (ctx: {
       payload: Schema.Schema.Type<typeof Vcs.CommitInput>
     }) {
-      return yield* runVcsOperation(vcs.commit(ctx.payload))
+      return yield* mutateVcs(vcs.commit(ctx.payload))
     })
     const fetchVcs = Effect.fn("InstanceHttpApi.vcsFetch")(function* () {
-      return yield* runVcsOperation(vcs.fetch())
+      return yield* mutateVcs(vcs.fetch())
     })
     const pushVcs = Effect.fn("InstanceHttpApi.vcsPush")(function* () {
-      return yield* runVcsOperation(vcs.push())
+      return yield* mutateVcs(vcs.push())
     })
     const pullVcs = Effect.fn("InstanceHttpApi.vcsPull")(function* () {
-      return yield* runVcsOperation(vcs.pull())
+      return yield* mutateVcs(vcs.pull())
     })
     const stagedDiffVcs = Effect.fn("InstanceHttpApi.vcsStagedDiff")(function* () {
       return yield* vcs.stagedDiff().pipe(
@@ -320,6 +323,14 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       .handle("vcsFetch", fetchVcs)
       .handle("vcsPush", pushVcs)
       .handle("vcsPull", pullVcs)
+      .handle("vcsTargets", () => runVcsOperation(vcs.targets()))
+      .handle("vcsStashes", () => runVcsOperation(vcs.stashes()))
+      .handle("vcsPushWithUpstream", (ctx) => mutateVcs(vcs.push({ ...ctx.payload, setUpstream: true })))
+      .handle("vcsPullFrom", (ctx) => mutateVcs(vcs.pull(ctx.payload)))
+      .handle("vcsStashCreate", (ctx) => mutateVcs(vcs.stashCreate(ctx.payload)))
+      .handle("vcsStashApply", (ctx) => mutateVcs(vcs.stashApply(ctx.payload)))
+      .handle("vcsStashPop", (ctx) => mutateVcs(vcs.stashPop(ctx.payload)))
+      .handle("vcsStashDrop", (ctx) => mutateVcs(vcs.stashDrop(ctx.payload)))
       .handle("vcsStagedDiff", stagedDiffVcs)
       .handle("vcsGenerateMessage", generateCommitMessage)
       .handle("command", getCommand)
@@ -379,7 +390,12 @@ function conventionalCommit(output: string) {
     .replace(/<think>[\s\S]*?<\/think>\s*/g, "")
     .split("\n")
     .filter((line) => !line.trim().startsWith("```"))
-    .map((line) => line.trim().replace(/^[`"'*]+|[`"'*]+$/g, "").trim())
+    .map((line) =>
+      line
+        .trim()
+        .replace(/^[`"'*]+|[`"'*]+$/g, "")
+        .trim(),
+    )
     .filter(Boolean)
   const index = lines.findIndex((item) => CONVENTIONAL.test(item.toLowerCase()))
   const line = lines[index < 0 ? 0 : index]

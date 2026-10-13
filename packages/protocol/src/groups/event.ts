@@ -52,5 +52,9 @@ export const makeEventGroup = <const Definitions extends ReadonlyArray<Definitio
 const event = make(EventManifest.ServerDefinitions)
 export const EventGroup = event.group
 export const OpenCodeEvent = event.schema
+export const EventTypes: ReadonlySet<string> = new Set([
+  ...EventManifest.ServerDefinitions.map((definition) => definition.type),
+  "server.connected",
+])
 export type OpenCodeEvent = typeof OpenCodeEvent.Type
 export type OpenCodeEventEncoded = typeof OpenCodeEvent.Encoded

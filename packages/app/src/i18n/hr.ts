@@ -93,7 +93,10 @@ const desktop = [
   "Odabrani prilozi premašuju ograničenje od {{limit}} MB",
 ]
 
+import { gitDict } from "./git"
+
 export const dict = {
+  ...gitDict("hr"),
   ...Object.fromEntries(DESKTOP_NATIVE_KEYS.map((key, index) => [key, desktop[index]])),
   "command.category.suggested": "Predloženo",
   "command.category.view": "Prikaz",

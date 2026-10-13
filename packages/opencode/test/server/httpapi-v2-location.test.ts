@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { EventV2 } from "@opencode-ai/core/event"
 import { Location } from "@opencode-ai/core/location"
+import { Watcher } from "@opencode-ai/core/filesystem/watcher"
+import { $ } from "bun"
 import { Context, Schema } from "effect"
 import { HttpApiApp } from "../../src/server/routes/instance/httpapi/server"
 import { resetDatabase } from "../fixture/db"
@@ -64,12 +66,12 @@ async function readEvent(reader: AsyncIterator<typeof Event.Type>) {
   return value.value
 }
 
-async function readEventType(reader: AsyncIterator<typeof Event.Type>, type: string) {
-  for (let index = 0; index < 20; index++) {
+async function readEventType(reader: AsyncIterator<typeof Event.Type>, type: string, directory?: string) {
+  // The native stream is global: other locations may legitimately publish between our events.
+  while (true) {
     const event = await readEvent(reader)
-    if (event.type === type) return event
+    if (event.type === type && (!directory || event.location?.directory === directory)) return event
   }
-  throw new Error(`timed out waiting for ${type}`)
 }
 
 afterEach(async () => {
@@ -123,4 +125,53 @@ describe("v2 location HttpApi", () => {
     })
     await reader.return(undefined)
   })
+
+  test("streams canonical VCS invalidations after a Git mutation", async () => {
+    await using tmp = await tmpdir({ git: true })
+    const response = await request("/api/event", tmp.path)
+    if (!response.body) throw new Error("Missing event stream")
+    const reader = eventStream(response.body)
+    expect((await readEvent(reader)).type).toBe("server.connected")
+    await Bun.write(`${tmp.path}/staged.txt`, "staged\n")
+    const staged = await request("/vcs/stage", tmp.path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ file: "staged.txt" }),
+    })
+    expect(staged.status).toBe(200)
+    expect(await readEventType(reader, "vcs.changed", tmp.path)).toMatchObject({
+      location: { directory: tmp.path },
+      data: {},
+    })
+    const changes = await request("/vcs/changes", tmp.path)
+    expect(await changes.json()).toContainEqual({ file: "staged.txt", staged: true, unstaged: false, untracked: false })
+    await reader.return(undefined)
+  })
+
+  test.skipIf(!Watcher.hasNativeBinding() || !!process.env.CI)(
+    "branch notifications do not disconnect the native VCS stream",
+    async () => {
+      await using tmp = await tmpdir({ git: true })
+      const response = await request("/api/event", tmp.path)
+      if (!response.body) throw new Error("Missing event stream")
+      const reader = eventStream(response.body)
+      expect((await readEvent(reader)).type).toBe("server.connected")
+      expect((await request("/vcs", tmp.path)).status).toBe(200)
+      await $`git checkout -b native-stream-branch`.cwd(tmp.path).quiet()
+      expect(await readEventType(reader, "vcs.changed", tmp.path)).toMatchObject({ location: { directory: tmp.path } })
+      expect(await (await request("/vcs", tmp.path)).json()).toMatchObject({ branch: "native-stream-branch" })
+      await Bun.write(`${tmp.path}/next.txt`, "next\n")
+      expect(
+        (
+          await request("/vcs/stage", tmp.path, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ file: "next.txt" }),
+          })
+        ).status,
+      ).toBe(200)
+      expect(await readEventType(reader, "vcs.changed", tmp.path)).toMatchObject({ location: { directory: tmp.path } })
+      await reader.return(undefined)
+    },
+  )
 })

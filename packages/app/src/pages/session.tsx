@@ -780,7 +780,13 @@ export default function Page() {
   })
   const vcsKey = createMemo(
     () =>
-      ["session-vcs", sdk().directory, sync().data.vcs?.branch ?? "", sync().data.vcs?.default_branch ?? ""] as const,
+      [
+        serverSDK().scope,
+        "session-vcs",
+        sdk().directory,
+        sync().data.vcs?.branch ?? "",
+        sync().data.vcs?.default_branch ?? "",
+      ] as const,
   )
   const vcsQuery = createQuery(() => {
     const mode = vcsMode()
@@ -789,6 +795,8 @@ export default function Page() {
     return {
       queryKey: [...vcsKey(), mode] as const,
       enabled,
+      placeholderData: (previous, query) =>
+        query?.queryKey[0] === serverSDK().scope && query.queryKey[2] === sdk().directory ? previous : undefined,
       queryFn: mode
         ? () =>
             sdk()
@@ -801,11 +809,14 @@ export default function Page() {
         : skipToken,
     }
   })
-  const refreshVcs = debounce(() => void queryClient.invalidateQueries({ queryKey: vcsKey() }), 100)
+  const refreshVcs = debounce(
+    () => void queryClient.invalidateQueries({ queryKey: [serverSDK().scope, "session-vcs", sdk().directory] }),
+    100,
+  )
   const reviewDiffs = () => {
     if (reviewMode() === "git" || reviewMode() === "branch")
       // avoids suspense
-      return vcsQuery.isFetched ? (vcsQuery.data ?? []) : []
+      return vcsQuery.isFetched || vcsQuery.isPlaceholderData ? (vcsQuery.data ?? []) : []
     return turnDiffs()
   }
   const activeReviewFile = () => {
@@ -835,7 +846,7 @@ export default function Page() {
     const request = (scope: string, context?: number) =>
       queryClient
         .fetchQuery({
-          queryKey: [serverSDK().scope, ...vcsKey(), mode, "directory", scope, context, version] as const,
+          queryKey: [...vcsKey(), mode, "directory", scope, context, version] as const,
           staleTime: Number.POSITIVE_INFINITY,
           retry: 2,
           queryFn: () =>
@@ -1051,18 +1062,33 @@ export default function Page() {
     ),
   )
 
-  const stopVcs = sdk().event.listen((evt) => {
-    const details = evt.details as { type: string; properties?: unknown }
-    if (details.type !== "file.watcher.updated" && details.type !== "filesystem.changed") return
-    const props =
-      typeof details.properties === "object" && details.properties
-        ? (details.properties as Record<string, unknown>)
-        : undefined
-    const file = typeof props?.file === "string" ? props.file : undefined
-    if (!file || file.startsWith(".git/")) return
-    refreshVcs()
-  })
-  onCleanup(stopVcs)
+  createEffect(
+    on(
+      () => [sdk().scope, sdk().directory] as const,
+      () => {
+        const stopVcs = sdk().event.listen((evt) => {
+          const details = evt.details as { type: string; properties?: unknown }
+          if (details.type === "vcs.changed") {
+            refreshVcs()
+            return
+          }
+          if (details.type !== "file.watcher.updated" && details.type !== "filesystem.changed") return
+          if (details.type === "file.watcher.updated" && sync().project?.vcs === "git") return
+          const props =
+            typeof details.properties === "object" && details.properties
+              ? (details.properties as Record<string, unknown>)
+              : undefined
+          const file = typeof props?.file === "string" ? props.file : undefined
+          if (!file || file.startsWith(".git/")) return
+          refreshVcs()
+        })
+        onCleanup(() => {
+          stopVcs()
+          refreshVcs.clear()
+        })
+      },
+    ),
+  )
 
   createEffect(
     on(

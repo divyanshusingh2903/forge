@@ -16,6 +16,9 @@ import { Location } from "../location"
 import { lazy } from "../util/lazy"
 import { Ignore } from "./ignore"
 import { Protected } from "./protected"
+import { VcsWatch } from "./vcs-watch"
+import { VcsEvent } from "@opencode-ai/schema/vcs-event"
+import { RelativePath } from "../schema"
 
 declare const OPENCODE_LIBC: string | undefined
 
@@ -91,8 +94,8 @@ const layer = Layer.effect(
       }
     }
 
-    const subscribe = (directory: string, ignore: string[]) => {
-      const pending = w.subscribe(directory, callback, { ignore, backend })
+    const subscribe = (directory: string, ignore: string[], onUpdate = callback) => {
+      const pending = w.subscribe(directory, onUpdate, { ignore, backend })
       return Effect.promise(() => pending).pipe(
         Effect.tap((subscription) => Effect.sync(() => subscriptions.push(subscription))),
         Effect.timeout(SUBSCRIBE_TIMEOUT_MS),
@@ -103,24 +106,117 @@ const layer = Layer.effect(
       )
     }
 
-    const config = (yield* (yield* Config.Service).entries())
+    const configService = yield* Config.Service
+    const config = (yield* configService.entries())
       .filter((entry): entry is Config.Document => entry.type === "document")
       .flatMap((item) => item.info.watcher?.ignore ?? [])
-    if (location.vcs && (yield* Flag.OPENCODE_EXPERIMENTAL_FILEWATCHER)) {
+    const generic = yield* Flag.OPENCODE_EXPERIMENTAL_FILEWATCHER
+    if (location.vcs && generic && location.vcs.type !== "git") {
       yield* Effect.forkScoped(
         subscribe(location.directory, [...Ignore.PATTERNS, ...config, ...protecteds(location.directory)]),
       )
     }
 
     if (location.vcs?.type === "git") {
-      const resolved = (yield* git.repo.discover(location.directory))?.gitDirectory
-      const vcs = resolved ? yield* fs.realPath(resolved).pipe(Effect.catch(() => Effect.succeed(resolved))) : undefined
-      if (vcs && !config.includes(".git") && !config.includes(vcs) && (!resolved || !config.includes(resolved))) {
-        const ignore = (yield* fs.readDirectoryEntries(vcs).pipe(Effect.catch(() => Effect.succeed([])))).flatMap(
-          (entry) => (entry.name === "HEAD" ? [] : [entry.name]),
-        )
-        yield* Effect.forkScoped(subscribe(vcs, ignore))
+      const repository = yield* git.repo.discover(location.directory)
+      if (!repository) {
+        if (generic)
+          yield* Effect.forkScoped(
+            subscribe(location.directory, [...Ignore.PATTERNS, ...config, ...protecteds(location.directory)]),
+          )
+        return Service.of({})
       }
+      const paths = new Set<RelativePath>()
+      const dirty = { metadata: false }
+      const notify = yield* VcsWatch.coalesce(() =>
+        Effect.gen(function* () {
+          const files = Array.from(paths)
+          paths.clear()
+          const metadata = dirty.metadata
+          dirty.metadata = false
+          if (metadata || files.some((file) => file.endsWith(".gitignore"))) yield* refreshWorktree()
+          const ignored = yield* git.index
+            .ignored({ repository, paths: files, tracked: true })
+            .pipe(Effect.catch(() => Effect.succeed(new Set<RelativePath>())))
+          if (ignored.size && !metadata) yield* refreshWorktree()
+          if (metadata || files.some((file) => !ignored.has(file))) yield* events.publish(VcsEvent.Changed, {})
+        }),
+      )
+      const worktreeCallback: ParcelWatcher.SubscribeCallback = (error, updates) => {
+        if (error) return runFork(Effect.logError("working-tree watcher failed", { error }))
+        const relevant = updates.filter((update) => {
+          const file = path.relative(repository.worktree, update.path)
+          if (!file || file.startsWith("../") || path.isAbsolute(file)) return false
+          paths.add(RelativePath.make(file))
+          return true
+        })
+        if (generic)
+          callback(
+            null,
+            relevant.filter((update) => {
+              const relative = path.relative(location.directory, update.path)
+              return !relative.startsWith("../") && !path.isAbsolute(relative) && !Ignore.match(relative)
+            }),
+          )
+        if (relevant.length) notify()
+      }
+      const root: { subscription?: ParcelWatcher.AsyncSubscription; ignores?: string } = {}
+      const refreshWorktree = Effect.fn("Watcher.refreshWorktree")(function* () {
+        // Prune Git-ignored directories, but never a directory containing tracked files.
+        // Recompute after index/ignore changes so force-added files become observable.
+        const ignored = yield* git.index.watchIgnores(repository).pipe(Effect.catch(() => Effect.succeed([])))
+        const list = [".git", ...ignored, ...config, ...protecteds(repository.worktree)].toSorted()
+        const signature = JSON.stringify(list)
+        if (root.subscription && root.ignores === signature) return
+        const next = yield* subscribe(repository.worktree, list, worktreeCallback)
+        if (!next) return
+        const previous = root.subscription
+        root.subscription = next
+        root.ignores = signature
+        if (!previous) return
+        const index = subscriptions.indexOf(previous)
+        if (index >= 0) subscriptions.splice(index, 1)
+        yield* Effect.promise(() => previous.unsubscribe())
+      })
+      // Subscribing walks the whole worktree, so keep it off the Location boot path. Clients that
+      // read status before the watchers were ready are told to re-read once they are.
+      yield* Effect.forkScoped(
+        Effect.gen(function* () {
+          yield* refreshWorktree()
+          const roots = yield* Effect.forEach(
+            Array.from(new Set([repository.gitDirectory, repository.commonDirectory])),
+            (directory) =>
+              fs.realPath(directory).pipe(
+                Effect.catch(() => Effect.succeed(directory)),
+                Effect.map((resolved) => ({ directory, resolved })),
+              ),
+          )
+          yield* Effect.forEach(
+            roots.filter((root, index) => roots.findIndex((value) => value.resolved === root.resolved) === index),
+            (root) => {
+              if (config.includes(".git") || config.includes(root.directory) || config.includes(root.resolved))
+                return Effect.void
+              const sharedOnly = root.directory !== repository.gitDirectory
+              return subscribe(root.resolved, ["objects", "worktrees", "hooks", "logs/HEAD"], (error, updates) => {
+                if (error) return runFork(Effect.logError("Git watcher failed", { error }))
+                const relevant = updates.filter((update) =>
+                  VcsWatch.metadata(path.relative(root.resolved, update.path), sharedOnly),
+                )
+                // Preserve compatibility consumers of the ordinary HEAD notification.
+                callback(
+                  null,
+                  relevant.filter((update) => path.relative(root.resolved, update.path) === "HEAD"),
+                )
+                if (!relevant.length) return
+                dirty.metadata = true
+                notify()
+              })
+            },
+            { concurrency: "unbounded" },
+          )
+          yield* events.publish(VcsEvent.Changed, {})
+        }),
+      )
     }
 
     return Service.of({})

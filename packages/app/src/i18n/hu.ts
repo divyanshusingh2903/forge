@@ -93,7 +93,10 @@ const desktop = [
   "A kiválasztott mellékletek meghaladják a(z) {{limit}} MB-os korlátot",
 ]
 
+import { gitDict } from "./git"
+
 export const dict = {
+  ...gitDict("hu"),
   ...Object.fromEntries(DESKTOP_NATIVE_KEYS.map((key, index) => [key, desktop[index]])),
   "command.category.suggested": "Javasolt",
   "command.category.view": "Nézet",

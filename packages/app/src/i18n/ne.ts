@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export const dict: Record<string, string> = {
+  ...gitDict("ne"),
   "desktop.menu.app": "OpenCode",
   "desktop.menu.file": "फाइल",
   "desktop.menu.edit": "सम्पादन गर्नुहोस्",

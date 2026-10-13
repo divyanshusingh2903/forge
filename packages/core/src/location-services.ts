@@ -11,6 +11,7 @@ import { FileSystem } from "./filesystem"
 import { FileSystemSearch } from "./filesystem/search"
 import { Watcher } from "./filesystem/watcher"
 import { Image } from "./image"
+import { GitActions } from "./git-actions"
 import { Integration } from "./integration"
 import { Location } from "./location"
 import { LocationMutation } from "./location-mutation"
@@ -56,6 +57,7 @@ export const locationServices = LayerNode.group([
   FileSystemSearch.node,
   FileSystem.node,
   Watcher.node,
+  GitActions.node,
   Pty.node,
   SkillV2.node,
   SystemContextRegistry.node,

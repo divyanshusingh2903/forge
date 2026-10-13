@@ -27,6 +27,18 @@ function tr(translator: Translator | undefined, key: string, text: string, vars?
 
 export function formatServerError(error: unknown, translate?: Translator, fallback?: string) {
   const unwrapped = unwrapNamedError(error)
+  if (
+    typeof unwrapped === "object" &&
+    unwrapped !== null &&
+    "name" in unwrapped &&
+    unwrapped.name === "VcsOperationError" &&
+    "data" in unwrapped &&
+    typeof unwrapped.data === "object" &&
+    unwrapped.data !== null &&
+    "message" in unwrapped.data &&
+    typeof unwrapped.data.message === "string"
+  )
+    return unwrapped.data.message
   if (isConfigInvalidErrorLike(unwrapped)) return parseReadableConfigInvalidError(unwrapped, translate)
   if (isProviderModelNotFoundErrorLike(unwrapped)) return parseReadableProviderModelNotFoundError(unwrapped, translate)
   if (error instanceof Error && error.message) return error.message

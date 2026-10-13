@@ -96,8 +96,6 @@ export interface Interface {
   readonly commit: (cwd: string, message: string) => Effect.Effect<Result>
   readonly fetch: (cwd: string) => Effect.Effect<Result>
   readonly aheadBehind: (cwd: string) => Effect.Effect<{ ahead: number; behind: number } | undefined>
-  readonly push: (cwd: string) => Effect.Effect<Result>
-  readonly pull: (cwd: string) => Effect.Effect<Result>
   readonly stagedDiff: (cwd: string) => Effect.Effect<Result>
   readonly stagedStat: (cwd: string) => Effect.Effect<Result>
 }
@@ -374,12 +372,6 @@ const layer = Layer.effect(
       if (!Number.isFinite(behind) || !Number.isFinite(ahead)) return undefined
       return { ahead, behind }
     })
-    const push = Effect.fn("Git.push")(function* (cwd: string) {
-      return yield* run(["push"], { cwd, env: { GIT_TERMINAL_PROMPT: "0" } })
-    })
-    const pull = Effect.fn("Git.pull")(function* (cwd: string) {
-      return yield* run(["pull"], { cwd, env: { GIT_TERMINAL_PROMPT: "0" } })
-    })
     const stagedDiff = Effect.fn("Git.stagedDiff")(function* (cwd: string) {
       // Callers budget the patch per file; the cap only bounds memory for enormous commits.
       return yield* run(["diff", "--cached", "--patch", "--no-ext-diff", "--no-renames", "--", "."], {
@@ -418,8 +410,6 @@ const layer = Layer.effect(
       commit,
       fetch,
       aheadBehind,
-      push,
-      pull,
       stagedDiff,
       stagedStat,
     })

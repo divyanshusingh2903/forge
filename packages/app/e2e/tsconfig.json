@@ -13,6 +13,10 @@
     "./reproduction/timeline-suspense/**/*.ts",
     "./reproduction/timeline-suspense/**/*.tsx",
     "../src/pages/session/timeline/observe-element-offset.ts",
+    "../src/i18n/ar.ts",
+    "../src/i18n/en.ts",
+    "../src/i18n/git.ts",
+    "../src/i18n/desktop-native.ts",
     "./regression/new-session-panel-corner.spec.ts",
     "./regression/session-timeline-context-resize.spec.ts",
     "./utils/**/*.ts"

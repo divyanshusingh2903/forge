@@ -469,10 +469,10 @@ describe("Vcs diff", () => {
         yield* write(path.join(test.directory, "c.txt"), "c\n")
         yield* git(test.directory, ["add", "."])
         yield* git(test.directory, ["commit", "--no-gpg-sign", "-m", "two"])
-        expect(yield* vcs.remote()).toEqual({ upstream: true, ahead: 2, behind: 0 })
+        expect(yield* vcs.remote()).toMatchObject({ upstream: true, ahead: 2, behind: 0 })
 
         expect((yield* vcs.push()).success).toBe(true)
-        expect(yield* vcs.remote()).toEqual({ upstream: true, ahead: 0, behind: 0 })
+        expect(yield* vcs.remote()).toMatchObject({ upstream: true, ahead: 0, behind: 0 })
         yield* Effect.promise(() => fs.rm(remote, { recursive: true, force: true }))
       }),
     { git: true },
