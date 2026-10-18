@@ -263,6 +263,10 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
     if (state?.status !== "ready") return
     return state.version
   }
+  const manualUpdate = () => {
+    const state = platform.updater?.state()
+    return state?.status === "ready" && !!state.manualUrl
+  }
 
   async function exportDebugLogs() {
     const exportLogs = platform.exportDebugLogs
@@ -339,7 +343,9 @@ export const ErrorPage: Component<ErrorPageProps> = (props) => {
             >
               {(version) => (
                 <Button size="large" onClick={installUpdate}>
-                  {language.t("error.page.action.updateTo", { version: version() })}
+                  {manualUpdate()
+                    ? language.t("toast.update.action.download")
+                    : language.t("error.page.action.updateTo", { version: version() })}
                 </Button>
               )}
             </Show>

@@ -1,4 +1,4 @@
-import { app, dialog } from "electron"
+import { app, dialog, shell } from "electron"
 import pkg from "electron-updater"
 import { UPDATER_ENABLED } from "./constants"
 import { createUpdaterController, type UpdaterReadyRecord } from "./updater-controller"
@@ -6,9 +6,15 @@ import { getLogger } from "./logging"
 import { getStore } from "./store"
 import { setAppQuitting } from "./windows"
 import { nativeT } from "./native-translations"
+import { createManualUpdateUrl } from "./updater-signature"
 
 const { autoUpdater } = pkg
 const key = "ready"
+const manualUrl = createManualUpdateUrl({
+  platform: process.platform,
+  packaged: app.isPackaged,
+  executable: process.execPath,
+})
 
 export function setupAutoUpdater(stop: () => Promise<void>) {
   const logger = getLogger()
@@ -56,6 +62,8 @@ export function setupAutoUpdater(stop: () => Promise<void>) {
       clear: () => store.delete(key),
     },
     stop,
+    manualUrl,
+    openExternal: (url) => shell.openExternal(url),
     log: (message, data) => logger.log(message, data),
   })
 }
@@ -84,9 +92,14 @@ export async function showUpdaterDialog(controller: ReturnType<typeof setupAutoU
 
   const response = await dialog.showMessageBox({
     type: "info",
-    message: nativeT("desktop.updater.dialog.ready.message", { version: state.version }),
+    message: nativeT(state.manualUrl ? "desktop.updater.dialog.manual.message" : "desktop.updater.dialog.ready.message", {
+      version: state.version,
+    }),
     title: nativeT("desktop.updater.dialog.ready.title"),
-    buttons: [nativeT("desktop.updater.dialog.restart"), nativeT("desktop.updater.dialog.later")],
+    buttons: [
+      nativeT(state.manualUrl ? "desktop.updater.dialog.download" : "desktop.updater.dialog.restart"),
+      nativeT("desktop.updater.dialog.later"),
+    ],
     defaultId: 0,
     cancelId: 1,
   })

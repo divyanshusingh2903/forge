@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { createUpdaterController, type UpdaterBackend, type UpdaterReadyRecord } from "./updater-controller"
 
-function setup(input?: { currentVersion?: string; ready?: UpdaterReadyRecord }) {
+function setup(input?: { currentVersion?: string; ready?: UpdaterReadyRecord; manualUrl?: string; openError?: Error }) {
   const calls: string[] = []
   const backend: UpdaterBackend = {
     async checkForUpdates() {
@@ -16,6 +16,7 @@ function setup(input?: { currentVersion?: string; ready?: UpdaterReadyRecord }) 
     },
   }
   let ready = input?.ready
+  const persisted: UpdaterReadyRecord[] = []
   const controller = createUpdaterController({
     enabled: true,
     currentVersion: input?.currentVersion ?? "1.0.0",
@@ -23,6 +24,7 @@ function setup(input?: { currentVersion?: string; ready?: UpdaterReadyRecord }) 
     persistence: {
       get: () => ready,
       set: (value) => {
+        persisted.push(value)
         ready = value
       },
       clear: () => {
@@ -32,11 +34,47 @@ function setup(input?: { currentVersion?: string; ready?: UpdaterReadyRecord }) 
     stop: async () => {
       calls.push("stop")
     },
+    manualUrl: async () => input?.manualUrl,
+    openExternal: async (url) => {
+      calls.push(url)
+      if (input?.openError) throw input.openError
+    },
   })
-  return { controller, calls, getReady: () => ready }
+  return { controller, calls, persisted, getReady: () => ready }
 }
 
 describe("updater controller", () => {
+  test("manual checks skip download and persistence, then open externally without stopping or installing", async () => {
+    const manualUrl = "https://github.com/divyanshusingh2903/forge/releases/tag/v2.0.0"
+    const app = setup({ manualUrl, ready: { version: "2.0.0" } })
+    const states: ReturnType<typeof app.controller.getState>[] = []
+    app.controller.subscribe((state) => states.push(state))
+
+    await Promise.all([app.controller.start(), app.controller.check(), app.controller.check()])
+
+    expect(app.calls).toEqual(["check"])
+    expect(app.persisted).toEqual([])
+    expect(app.getReady()).toBeUndefined()
+    expect(app.controller.getState()).toEqual({ status: "ready", version: "2.0.0", manualUrl })
+
+    await app.controller.install()
+
+    expect(app.calls).toEqual(["check", manualUrl])
+    expect(states.map((state) => state.status)).toEqual(["idle", "checking", "ready"])
+    expect(app.controller.getState()).toEqual({ status: "ready", version: "2.0.0", manualUrl })
+  })
+
+  test("manual readiness survives a failed browser launch", async () => {
+    const manualUrl = "https://github.com/divyanshusingh2903/forge/releases/tag/v2.0.0"
+    const app = setup({ manualUrl, openError: new Error("browser failed") })
+    await app.controller.check()
+
+    await expect(app.controller.install()).rejects.toThrow("browser failed")
+
+    expect(app.calls).toEqual(["check", manualUrl])
+    expect(app.controller.getState()).toEqual({ status: "ready", version: "2.0.0", manualUrl })
+  })
+
   test("checks, downloads, persists, and publishes one authoritative ready state", async () => {
     const app = setup()
     const states: ReturnType<typeof app.controller.getState>[] = []
@@ -99,6 +137,7 @@ describe("updater controller", () => {
         quitAndInstall() {},
       },
       persistence: { get: () => undefined, set() {}, clear() {} },
+      openExternal: async () => {},
       stop: async () => {
         throw new Error("stop failed")
       },
