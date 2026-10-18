@@ -106,3 +106,46 @@ describe("shell", () => {
     })
   }
 })
+
+describe("shell guard", () => {
+  const supported = process.platform === "linux" && which("setpriv") !== null
+  const group = (pgid: number) =>
+    Bun.spawnSync(["ps", "-o", "pid=", "-g", String(pgid)])
+      .stdout.toString()
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+
+  test.skipIf(supported)("is unavailable without Linux setpriv", () => {
+    expect(Shell.guarded("/bin/sh", "true")).toBeUndefined()
+  })
+
+  test.skipIf(!supported)("preserves output, exit code, and quoting", () => {
+    const guard = Shell.guarded("/bin/bash", `printf '%s|' "a'b" "$#"; exit 3`)!
+    const result = Bun.spawnSync([guard.file, ...guard.args])
+
+    expect(result.stdout.toString()).toBe("a'b|0|")
+    expect(result.exitCode).toBe(3)
+  })
+
+  test.skipIf(!supported)(
+    "kills the whole process group when its parent is SIGKILLed",
+    async () => {
+      const parent = Bun.spawn(["bun", path.join(import.meta.dir, "fixture/guarded-parent.ts")], { stdout: "pipe" })
+      const reader = parent.stdout.getReader()
+      const pgid = Number(new TextDecoder().decode((await reader.read()).value).trim())
+      reader.releaseLock()
+      // Give the pipeline time to start; the group must survive while the parent is alive.
+      await Bun.sleep(500)
+      expect(group(pgid).length).toBeGreaterThanOrEqual(3)
+
+      parent.kill("SIGKILL")
+      await parent.exited
+      const deadline = Date.now() + 5_000
+      while (group(pgid).length > 0 && Date.now() < deadline) await Bun.sleep(50)
+
+      expect(group(pgid)).toEqual([])
+    },
+    15_000,
+  )
+})
