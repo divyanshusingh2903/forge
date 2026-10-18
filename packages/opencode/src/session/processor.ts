@@ -24,6 +24,7 @@ import { errorMessage } from "@/util/error"
 import { isRecord } from "@/util/record"
 import { EventV2Bridge } from "@/event-v2-bridge"
 import { Database } from "@opencode-ai/core/database/database"
+import { ServerInstance } from "@opencode-ai/core/server-instance"
 import { Usage, type LLMEvent } from "@opencode-ai/llm"
 
 const DOOM_LOOP_THRESHOLD = 3
@@ -94,6 +95,7 @@ const layer = Layer.effect(
     const image = yield* Image.Service
     const events = yield* EventV2Bridge.Service
     const database = yield* Database.Service
+    const instance = yield* ServerInstance.Service
 
     const create = Effect.fn("SessionProcessor.create")(function* (input: Input) {
       // Pre-capture snapshot before the LLM stream starts. The AI SDK
@@ -241,7 +243,8 @@ const layer = Layer.effect(
           tool: input.name,
           callID: input.id,
           state: { status: "pending", input: {}, raw: "" },
-          metadata: input.providerExecuted ? { providerExecuted: true } : undefined,
+          // Part-level metadata survives every state update, so SessionRecovery can find the owning server after a crash.
+          metadata: { owner: instance.owner, ...(input.providerExecuted ? { providerExecuted: true } : {}) },
         } satisfies SessionV1.ToolPart)
         ctx.toolcalls[input.id] = {
           done: yield* Deferred.make<void>(),
@@ -723,6 +726,7 @@ export const node = LayerNode.make({
     Plugin.node,
     SessionSummary.node,
     SessionStatus.node,
+    ServerInstance.node,
     Image.node,
     EventV2Bridge.node,
     Database.node,
