@@ -3,9 +3,11 @@ import { dict as en } from "./en"
 type Keys = keyof typeof en
 
 import { gitDict } from "./git"
+import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 export const dict = {
   ...gitDict("de"),
+  ...MANUAL_UPDATE_ENGLISH,
   "command.category.suggested": "Vorgeschlagen",
   "command.category.view": "Ansicht",
   "command.category.project": "Projekt",

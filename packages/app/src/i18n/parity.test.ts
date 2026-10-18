@@ -97,6 +97,18 @@ const domains = [
 ] as const
 
 describe("i18n parity", () => {
+  test.each([
+    ["hr", "Ponovno pokreni", "Kasnije", "Ponovno pokreni aplikaciju"],
+    ["hu", "Újraindítás", "Később", "Újraindítás"],
+    ["is", "Endurræsa", "Seinna", "Endurræsa forrit"],
+    ["lt", "Paleisti iš naujo", "Vėliau", "Paleisti iš naujo"],
+  ])("native actions remain aligned after adding update keys in %s", async (locale, restart, later, relaunch) => {
+    const target = await dictionary(`./${locale}.ts`)
+    expect(target["desktop.updater.dialog.restart"]).toBe(restart)
+    expect(target["desktop.updater.dialog.later"]).toBe(later)
+    expect(target["desktop.recovery.action.relaunch"]).toBe(relaunch)
+  })
+
   test("non-English locales have every English key and required plural variants", async () => {
     for (const domain of domains) {
       const source = await dictionary(domain.source)

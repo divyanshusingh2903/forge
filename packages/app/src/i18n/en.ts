@@ -1,7 +1,9 @@
 import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
+import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 export const dict = {
   ...DESKTOP_NATIVE_ENGLISH,
+  ...MANUAL_UPDATE_ENGLISH,
   "command.category.suggested": "Suggested",
   "command.category.view": "View",
   "command.category.project": "Project",
@@ -601,9 +603,6 @@ export const dict = {
   "toast.update.title": "Update available",
   "toast.update.description": "A new version of Forge ({{version}}) is now available to install.",
   "toast.update.action.installRestart": "Install and restart",
-  "toast.update.action.download": "Download update",
-  "toast.update.manual.description":
-    "Forge {{version}} is available. Open the release page to download and install it manually.",
   "toast.update.action.notYet": "Not yet",
 
   "error.page.title": "Something went wrong",
