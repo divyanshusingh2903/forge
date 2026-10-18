@@ -31,6 +31,7 @@ import { LocationServiceMap, locationServiceMapLayer } from "@opencode-ai/core/l
 import { Reference } from "@opencode-ai/core/reference"
 import { Location } from "@opencode-ai/core/location"
 import { PluginV2 } from "@opencode-ai/core/plugin"
+import { Memory } from "@opencode-ai/core/memory"
 
 export const Info = Schema.Struct({
   name: Schema.String,
@@ -55,6 +56,12 @@ export const Info = Schema.Struct({
 }).annotate({ identifier: "Agent" })
 export type Info = DeepMutable<Schema.Schema.Type<typeof Info>>
 
+export interface MemoryLocation {
+  readonly directory: string
+  /** Worktree-relative glob used by edit permission rules, matching how edit tools report paths. */
+  readonly editPattern: string
+}
+
 const GeneratedAgent = Schema.Struct({
   identifier: Schema.String,
   whenToUse: Schema.String,
@@ -66,6 +73,8 @@ export interface Interface {
   readonly list: () => Effect.Effect<Info[]>
   readonly defaultInfo: () => Effect.Effect<Info>
   readonly defaultAgent: () => Effect.Effect<string>
+  /** Native memory location for this instance, or undefined when `memory: false`. */
+  readonly memory: () => Effect.Effect<MemoryLocation | undefined>
   readonly generate: (input: {
     description: string
     model?: { providerID: ProviderV2.ID; modelID: ModelV2.ID }
@@ -94,6 +103,7 @@ const layer = Layer.effect(
     const skill = yield* Skill.Service
     const provider = yield* Provider.Service
     const locations = yield* LocationServiceMap.Service
+    const memory = yield* Memory.Service
 
     const state = yield* InstanceState.make<State>(
       Effect.fn("Agent.state")(function* (ctx) {
@@ -105,11 +115,21 @@ const layer = Layer.effect(
               return (yield* (yield* Reference.Service).list()).map((reference) => reference.path)
             }).pipe(Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(ctx.directory) }))))
           : []
+        const memoryLocation =
+          cfg.memory === false
+            ? undefined
+            : yield* memory.directory(AbsolutePath.make(ctx.directory)).pipe(
+                Effect.map((directory) => ({
+                  directory,
+                  editPattern: path.relative(ctx.worktree, path.join(directory, "*")),
+                })),
+              )
         const whitelistedDirs = [
           Truncate.GLOB,
           path.join(Global.Path.tmp, "*"),
           ...skillDirs.map((dir) => path.join(dir, "*")),
           ...referenceDirs.map((dir) => path.join(dir, "*")),
+          ...(memoryLocation ? [path.join(memoryLocation.directory, "*")] : []),
         ]
         const readonlyExternalDirectory = {
           "*": "ask",
@@ -174,6 +194,8 @@ const layer = Layer.effect(
                   "*": "deny",
                   [path.join(".opencode", "plans", "*.md")]: "allow",
                   [path.relative(ctx.worktree, path.join(Global.Path.data, path.join("plans", "*.md")))]: "allow",
+                  // Memory notes are not project files, so plan may still propose saving them with approval.
+                  ...(memoryLocation ? { [memoryLocation.editPattern]: "ask" as const } : {}),
                 },
               }),
               user,
@@ -350,6 +372,7 @@ const layer = Layer.effect(
           list,
           defaultInfo,
           defaultAgent,
+          memory: () => Effect.succeed(memoryLocation),
         } satisfies State
       }),
     )
@@ -366,6 +389,9 @@ const layer = Layer.effect(
       }),
       defaultAgent: Effect.fn("Agent.defaultAgent")(function* () {
         return yield* InstanceState.useEffect(state, (s) => s.defaultAgent())
+      }),
+      memory: Effect.fn("Agent.memory")(function* () {
+        return yield* InstanceState.useEffect(state, (s) => s.memory())
       }),
       generate: Effect.fn("Agent.generate")(function* (input: {
         description: string
@@ -449,7 +475,7 @@ const locationServiceMapNode = LayerNode.make({
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [Config.node, Auth.node, Plugin.node, Skill.node, Provider.node, locationServiceMapNode],
+  deps: [Config.node, Auth.node, Plugin.node, Skill.node, Provider.node, Memory.node, locationServiceMapNode],
 })
 
 export * as Agent from "./agent"

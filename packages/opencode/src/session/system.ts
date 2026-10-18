@@ -14,8 +14,10 @@ import PROMPT_META from "./prompt/meta.txt"
 
 import PROMPT_CODEX from "./prompt/codex.txt"
 import PROMPT_TRINITY from "./prompt/trinity.txt"
+import PROMPT_MEMORY from "./prompt/memory.txt"
 import type { Provider } from "@/provider/provider"
-import type { Agent } from "@/agent/agent"
+import { Agent } from "@/agent/agent"
+import { Memory } from "@opencode-ai/core/memory"
 import { Permission } from "@/permission"
 import { Skill } from "@/skill"
 import { AbsolutePath } from "@opencode-ai/core/schema"
@@ -54,6 +56,15 @@ export interface Interface {
   readonly environment: (model: Provider.Model) => Effect.Effect<string[]>
   readonly skills: (agent: Agent.Info) => Effect.Effect<string | undefined>
   readonly mcp: (agent: Agent.Info, permission?: PermissionV1.Ruleset) => Effect.Effect<string | undefined>
+  /**
+   * Memory guidance plus the bounded index. Snapshotted per Session and history window so the prompt
+   * prefix stays stable for caching: it reloads at session start and after compaction, not after edits.
+   */
+  readonly memory: (input: {
+    sessionID: string
+    windowKey: string | undefined
+    subagent: boolean
+  }) => Effect.Effect<string | undefined>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SystemPrompt") {}
@@ -64,6 +75,13 @@ const layer = Layer.effect(
     const skill = yield* Skill.Service
     const mcp = yield* MCP.Service
     const locations = yield* LocationServiceMap.Service
+    const agents = yield* Agent.Service
+    const memory = yield* Memory.Service
+    const memorySnapshots = yield* InstanceState.make(
+      Effect.fn("SystemPrompt.memorySnapshots")(() =>
+        Effect.succeed(new Map<string, { windowKey: string | undefined; text: string }>()),
+      ),
+    )
 
     return Service.of({
       environment: Effect.fn("SystemPrompt.environment")(function* (model: Provider.Model) {
@@ -159,9 +177,58 @@ const layer = Layer.effect(
         }
         return parts.join("\n")
       }),
+
+      memory: Effect.fn("SystemPrompt.memory")(function* (input: {
+        sessionID: string
+        windowKey: string | undefined
+        subagent: boolean
+      }) {
+        const location = yield* agents.memory()
+        if (!location) return
+        const snapshots = yield* InstanceState.get(memorySnapshots)
+        const cached = snapshots.get(input.sessionID)
+        if (cached && cached.windowKey === input.windowKey) return cached.text
+        const index = yield* memory.index(AbsolutePath.make(location.directory))
+        const text = [memoryGuidance(location.directory, input.subagent), memoryIndex(index)].join("\n\n")
+        snapshots.set(input.sessionID, { windowKey: input.windowKey, text })
+        return text
+      }),
     })
   }),
 )
+
+function memoryGuidance(directory: string, subagent: boolean) {
+  if (subagent)
+    return [
+      "# Memory",
+      "",
+      `The user's persistent memory for this repository is at \`${directory}\`. Its index is loaded below.`,
+      "Memory is read-only for you as a subagent: never create, edit, or delete files there.",
+      "Read a topic note with your normal file tools only when it looks relevant to your task.",
+    ].join("\n")
+  return PROMPT_MEMORY.replaceAll("{{MEMORY_DIR}}", directory).replaceAll("{{MAX_LINES}}", String(Memory.MAX_LINES))
+}
+
+function memoryIndex(index: Memory.Index) {
+  if (index.status === "missing") return "<memory_index>\n(empty: MEMORY.md does not exist yet)\n</memory_index>"
+  if (index.status === "unreadable")
+    return [
+      "<memory_index>",
+      "(MEMORY.md exists but could not be read.)",
+      "</memory_index>",
+      "Do not create or overwrite MEMORY.md or other memory notes; tell the user memory is unreadable if it matters.",
+    ].join("\n")
+  return [
+    "<memory_index>",
+    index.text,
+    "</memory_index>",
+    ...(index.truncated
+      ? [
+          `MEMORY.md exceeds ${Memory.MAX_LINES} lines or ${Memory.MAX_BYTES} bytes, so only the start is shown. Consolidate it by merging or removing entries next time you save a memory.`,
+        ]
+      : []),
+  ].join("\n")
+}
 
 const locationServiceMapNode = LayerNode.make({
   service: LocationServiceMap.Service,
@@ -172,7 +239,7 @@ const locationServiceMapNode = LayerNode.make({
 export const node = LayerNode.make({
   service: Service,
   layer: layer,
-  deps: [Skill.node, MCP.node, locationServiceMapNode],
+  deps: [Skill.node, MCP.node, Agent.node, Memory.node, locationServiceMapNode],
 })
 
 export * as SystemPrompt from "./system"
