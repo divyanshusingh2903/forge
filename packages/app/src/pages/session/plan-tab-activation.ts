@@ -22,8 +22,4 @@ export function ensurePlanActive(view: PlanTabView, tabs: PlanTabTabs) {
     void tabs.open("plan")
     tabs.setActive("plan")
   })
-  // `open()` applies synchronously today but persisted handoff restore and
-  // other effects can `setActive` in the same tick; re-assert after so the
-  // Plan tab wins for a newly pending plan.
-  queueMicrotask(() => tabs.setActive("plan"))
 }

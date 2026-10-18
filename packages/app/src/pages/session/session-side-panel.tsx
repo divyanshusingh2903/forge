@@ -57,6 +57,7 @@ import {
 import { setSessionHandoff } from "@/pages/session/handoff"
 import { useSessionLayout } from "@/pages/session/session-layout"
 import { ensurePlanActive } from "@/pages/session/plan-tab-activation"
+import { SessionPanelTabs } from "@/pages/session/session-panel-tabs"
 import { usePlanInfo } from "@/pages/session/use-plan-info"
 import { SessionFileBrowserTab, type SessionFileBrowserState } from "@/pages/session/v2/session-file-browser-tab"
 
@@ -361,7 +362,11 @@ export function SessionSidePanel(props: {
                       >
                         <DragDropSensors />
                         <ConstrainDragYAxis />
-                        <Tabs value={activeTab()} onChange={activateTab}>
+                        <SessionPanelTabs
+                          value={activeTab()}
+                          planOpen={tabs().all().includes("plan")}
+                          onChange={activateTab}
+                        >
                           <div class="sticky top-0 shrink-0 flex">
                             <Tabs.List
                               ref={(el: HTMLDivElement) => {
@@ -555,7 +560,7 @@ export function SessionSidePanel(props: {
                           <Show when={activeFileTab()} keyed>
                             {(tab) => <FileTabContent tab={tab} />}
                           </Show>
-                        </Tabs>
+                        </SessionPanelTabs>
                         <DragOverlay>
                           <Show when={store.activeDraggable} keyed>
                             {(tab) => {
@@ -598,7 +603,11 @@ export function SessionSidePanel(props: {
                         tabs().move(source.id.toString(), source.index)
                       }}
                     >
-                      <Tabs value={activeTab()} onChange={activateTab}>
+                      <SessionPanelTabs
+                        value={activeTab()}
+                        planOpen={tabs().all().includes("plan")}
+                        onChange={activateTab}
+                      >
                         <div class="session-review-v2-tabs-bar sticky top-0 shrink-0 flex items-center">
                           <Tabs.List
                             ref={(el: HTMLDivElement) => {
@@ -843,7 +852,7 @@ export function SessionSidePanel(props: {
                             />
                           </div>
                         </Show>
-                      </Tabs>
+                      </SessionPanelTabs>
                     </DndKitProvider>
                   </Show>
                 </div>
