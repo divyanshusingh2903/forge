@@ -41,6 +41,7 @@ import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
 import { SessionShare } from "@/share/session"
+import { SessionRecovery } from "@/session/recovery"
 import { ShareNext } from "@/share/share-next"
 import { Skill } from "@/skill"
 import { Discovery } from "@/skill/discovery"
@@ -262,6 +263,7 @@ const app = LayerNode.group([
   Installation.node,
   ShareNext.node,
   SessionShare.node,
+  SessionRecovery.startupNode,
   InstanceStore.node,
   httpClient,
   EventV2.node,
