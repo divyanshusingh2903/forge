@@ -1,7 +1,9 @@
 import { gitDict } from "./git"
+import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 export const dict = {
   ...gitDict("th"),
+  ...MANUAL_UPDATE_ENGLISH,
   "desktop.menu.app": "OpenCode",
   "desktop.menu.file": "ไฟล์",
   "desktop.menu.edit": "แก้ไข",

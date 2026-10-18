@@ -3,9 +3,11 @@ import { dict as en } from "./en"
 type Keys = keyof typeof en
 
 import { gitDict } from "./git"
+import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 export const dict = {
   ...gitDict("zht"),
+  ...MANUAL_UPDATE_ENGLISH,
   "desktop.menu.app": "OpenCode",
   "desktop.menu.file": "檔案",
   "desktop.menu.edit": "編輯",

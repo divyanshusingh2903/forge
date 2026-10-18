@@ -1,4 +1,5 @@
 import { DESKTOP_NATIVE_KEYS } from "./desktop-native"
+import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 const desktop = [
   "OpenCode",
@@ -52,6 +53,8 @@ const desktop = [
   "Nema ažuriranja",
   "Ažuriranje {{version}} je preuzeto. Ponovno pokrenuti sada?",
   "Ažuriranje je spremno",
+  MANUAL_UPDATE_ENGLISH["desktop.updater.dialog.manual.message"],
+  MANUAL_UPDATE_ENGLISH["desktop.updater.dialog.download"],
   "Ponovno pokreni",
   "Kasnije",
   "Ponovno pokreni aplikaciju",
@@ -97,6 +100,7 @@ import { gitDict } from "./git"
 
 export const dict = {
   ...gitDict("hr"),
+  ...MANUAL_UPDATE_ENGLISH,
   ...Object.fromEntries(DESKTOP_NATIVE_KEYS.map((key, index) => [key, desktop[index]])),
   "command.category.suggested": "Predloženo",
   "command.category.view": "Prikaz",

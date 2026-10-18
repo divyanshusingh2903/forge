@@ -1,7 +1,9 @@
 import { gitDict } from "./git"
+import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 export const dict: Record<string, string> = {
   ...gitDict("bn"),
+  ...MANUAL_UPDATE_ENGLISH,
   "desktop.menu.app": "OpenCode",
   "desktop.menu.file": "ফাইল",
   "desktop.menu.edit": "সম্পাদনা করুন",
