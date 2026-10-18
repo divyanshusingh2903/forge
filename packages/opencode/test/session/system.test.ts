@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import fs from "fs/promises"
+import path from "path"
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { Effect, Layer } from "effect"
 import type { Agent } from "../../src/agent/agent"
@@ -41,6 +43,12 @@ const build: Agent.Info = {
   mode: "primary",
   permission: Permission.fromConfig({ "*": "allow" }),
   options: {},
+}
+
+function memoryDirectory(output: string | undefined) {
+  const match = output?.match(/memory for this repository (?:is )?at `([^`]+)`/)
+  if (!match) throw new Error(`no memory directory in: ${output}`)
+  return match[1]
 }
 
 const it = testEffect(
@@ -211,5 +219,61 @@ describe("session.system", () => {
         ].join("\n"),
       )
     }),
+  )
+
+  it.instance("memory block reports an empty index and points at the memory directory", () =>
+    Effect.gen(function* () {
+      const prompt = yield* SystemPrompt.Service
+
+      const output = yield* prompt.memory({ sessionID: "ses_empty", windowKey: "msg_1", subagent: false })
+
+      expect(memoryDirectory(output)).toContain(`${path.sep}memory${path.sep}`)
+      expect(output).toContain("MEMORY.md does not exist yet")
+      expect(output).not.toContain("{{")
+    }),
+  )
+
+  it.instance("memory block is snapshotted per history window and never inlines topic notes", () =>
+    Effect.gen(function* () {
+      const prompt = yield* SystemPrompt.Service
+      const directory = memoryDirectory(yield* prompt.memory({ sessionID: "ses_probe", windowKey: "x", subagent: true }))
+      const index = path.join(directory, "MEMORY.md")
+      yield* Effect.promise(async () => {
+        await fs.mkdir(directory, { recursive: true })
+        await fs.writeFile(path.join(directory, "style.md"), "TOPIC-BODY")
+        await fs.writeFile(index, "- [Style](style.md) — first version\n")
+      })
+
+      const first = yield* prompt.memory({ sessionID: "ses_snap", windowKey: "msg_1", subagent: false })
+      yield* Effect.promise(() => fs.writeFile(index, "- [Style](style.md) — second version\n"))
+      const sameWindow = yield* prompt.memory({ sessionID: "ses_snap", windowKey: "msg_1", subagent: false })
+      const afterCompaction = yield* prompt.memory({ sessionID: "ses_snap", windowKey: "msg_9", subagent: false })
+
+      expect(first).toContain("<memory_index>\n- [Style](style.md) — first version\n</memory_index>")
+      expect(sameWindow).toBe(first)
+      expect(afterCompaction).toContain("second version")
+      expect(afterCompaction).not.toContain("TOPIC-BODY")
+    }),
+  )
+
+  it.instance("memory block tells subagents memory is read-only", () =>
+    Effect.gen(function* () {
+      const prompt = yield* SystemPrompt.Service
+
+      const output = yield* prompt.memory({ sessionID: "ses_child", windowKey: "msg_1", subagent: true })
+
+      expect(output).toContain("read-only for you as a subagent")
+      expect(output).not.toContain("## What to save")
+    }),
+  )
+
+  it.instance(
+    "memory: false omits the memory block",
+    () =>
+      Effect.gen(function* () {
+        const prompt = yield* SystemPrompt.Service
+        expect(yield* prompt.memory({ sessionID: "ses_off", windowKey: "msg_1", subagent: false })).toBeUndefined()
+      }),
+    { config: { memory: false } },
   )
 })

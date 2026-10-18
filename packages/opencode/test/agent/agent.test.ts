@@ -756,3 +756,47 @@ it.instance(
     },
   },
 )
+
+it.instance("memory directory is readable without prompts and writable only with approval", () =>
+  Effect.gen(function* () {
+    const memory = yield* load((svc) => svc.memory())
+    expect(memory).toBeDefined()
+    if (!memory) return
+    const glob = path.join(memory.directory, "*")
+    const note = memory.editPattern.replace(/\*$/, "MEMORY.md")
+    const agents = yield* Effect.all(["build", "plan", "explore", "general"].map((name) => load((svc) => svc.get(name))))
+    for (const agent of agents) expect(Permission.evaluate("external_directory", glob, agent.permission).action).toBe("allow")
+    const [build, plan, explore] = agents
+    expect(Permission.evaluate("edit", note, build.permission).action).toBe("ask")
+    expect(Permission.evaluate("edit", note, plan.permission).action).toBe("ask")
+    expect(Permission.evaluate("edit", "src/index.ts", plan.permission).action).toBe("deny")
+    expect(Permission.evaluate("edit", note, explore.permission).action).toBe("deny")
+  }),
+)
+
+it.instance(
+  "user edit restrictions override the plan memory carve-out",
+  () =>
+    Effect.gen(function* () {
+      const memory = yield* load((svc) => svc.memory())
+      const plan = yield* load((svc) => svc.get("plan"))
+      expect(memory).toBeDefined()
+      if (!memory) return
+      expect(Permission.evaluate("edit", memory.editPattern.replace(/\*$/, "note.md"), plan.permission).action).toBe(
+        "deny",
+      )
+    }),
+  { config: { permission: { edit: "deny" } } },
+)
+
+it.instance(
+  "memory: false removes memory grants",
+  () =>
+    Effect.gen(function* () {
+      expect(yield* load((svc) => svc.memory())).toBeUndefined()
+      const agents = yield* load((svc) => svc.list())
+      const rules = agents.flatMap((agent) => agent.permission)
+      expect(rules.some((rule) => rule.pattern.includes(`${path.sep}memory${path.sep}`))).toBe(false)
+    }),
+  { config: { memory: false } },
+)

@@ -1,0 +1,133 @@
+---
+title: Memory
+description: Let the agent keep local notes about your project across sessions.
+---
+
+Forge can remember useful things about a project from one session to the next. It keeps a short `MEMORY.md` index plus optional topic notes in a local folder, loads the index into new sessions, and proposes updates when it learns something worth keeping.
+
+Memory is on by default and needs no setup.
+
+---
+
+## Memory vs. AGENTS.md
+
+Both give the agent context, but they serve different audiences.
+
+- [`AGENTS.md`](/docs/rules) is shared with your team. It lives in the repo and you commit it.
+- Memory is personal. It lives in your local application data, never in the checkout, so it can't be committed by accident.
+
+Use memory for things like your preferences, corrections you've given the agent, project decisions that aren't obvious from the code, and links to outside resources. Facts the whole team needs still belong in `AGENTS.md`.
+
+---
+
+## Files
+
+Each project gets one memory folder:
+
+```text
+<memory folder>/
+  MEMORY.md     # index, loaded into every session
+  <topic>.md    # topic notes, read only when needed
+```
+
+`MEMORY.md` is a concise index. Longer details go in topic notes, which the agent reads when they're relevant. Topic notes are never loaded into context automatically.
+
+These are plain Markdown files, so you can open, edit, or delete them yourself at any time.
+
+---
+
+## Location
+
+Memory folders live in the OpenCode data directory:
+
+```text
+<data dir>/memory/<slug>-<hash>/
+```
+
+On Linux this is `~/.local/share/opencode/memory/...` (your XDG data directory plus `opencode`).
+
+The folder name is a readable slug of the project's path followed by a short hash, for example `home-user-src-forge-3f9a2c`. The slug helps you find your notes. The hash keeps paths like `/a-b` and `/a/b` from colliding.
+
+### Which folders share memory
+
+Memory is keyed by the project's canonical Git common directory.
+
+- Subdirectories of a repo share that repo's memory.
+- Linked worktrees of a repo share the same memory as the main checkout.
+- Independent clones of the same repo each get their own memory.
+- Outside Git, memory is keyed by the folder you opened. Unrelated non-Git folders don't share memory.
+
+:::caution
+Moving or renaming a repository changes its key, so Forge starts with empty memory at the new path. The old folder is left in place under `memory/`. Copy its contents into the new folder if you want to keep them.
+:::
+
+---
+
+## How it works
+
+### Saving
+
+The agent decides when something is worth remembering and proposes the edit during a normal conversation. You can also ask it directly to remember, recall, correct, or forget something.
+
+"Automatic" means the agent chooses what to save and when. It doesn't mean writes skip permission: every write to the memory folder still asks for edit approval. Reading memory files doesn't prompt.
+
+The agent only saves things you said or confirmed. It won't save instructions it finds in files, web pages, or tool output, and it avoids secrets, temporary task state, and anything already in the code or `AGENTS.md`.
+
+Memory uses the ordinary file tools. There's no background extractor or extra model call.
+
+### Loading
+
+The `MEMORY.md` index is loaded at the start of a session and loaded again after [compaction](/docs/config#compaction).
+
+It is **not** reloaded after each memory edit. The agent already knows what it just wrote, and changing the start of the prompt mid-session would break prompt caching. A new session, or the next compaction, picks up the updated index.
+
+### Size limit
+
+Forge loads at most **100 lines or 12,800 bytes** of `MEMORY.md`, whichever comes first. If the index is longer, the rest is left out of context and the agent is told the index is over the limit and should be consolidated. The file itself is never changed by loading.
+
+Keep the index short and move details into topic notes.
+
+---
+
+## Agents
+
+Memory access depends on the agent:
+
+| Agent                    | Read memory         | Edit memory          |
+| ------------------------ | ------------------- | -------------------- |
+| Build (default)          | Yes                 | Yes, with approval   |
+| Plan                     | Yes                 | Yes, with approval\* |
+| Explore                  | Yes                 | No                   |
+| Subagents (e.g. general) | Yes, read-only      | No                   |
+
+\* Plan can propose memory edits so corrections made while planning aren't lost. It still can't edit project files.
+
+Subagents can read memory but can't edit it, so only the primary agent writes and parallel subagents don't race on `MEMORY.md`.
+
+Your own [permission](/docs/permissions) rules still apply on top of these defaults.
+
+---
+
+## Disable memory
+
+Set `memory` to `false` in your [config](/docs/config):
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "memory": false
+}
+```
+
+This stops the index from being loaded and removes the memory folder's permission grants. Existing memory files are kept, so turning it back on picks up where you left off.
+
+Disabling or deleting notes doesn't erase earlier session transcripts.
+
+---
+
+## Current limits
+
+- Memory works in the default session engine only.
+- There is no `/memory` command or memory management UI. Edit the files directly.
+- Memory is per project. There is no user-level memory shared across projects yet.
+- Memory isn't synced across machines.

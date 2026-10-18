@@ -1923,6 +1923,7 @@ export type Config = {
     ignore?: Array<string>
   }
   snapshot?: boolean
+  memory?: boolean
   plugin?: Array<
     | string
     | [

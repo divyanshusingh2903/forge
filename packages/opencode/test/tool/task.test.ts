@@ -623,6 +623,11 @@ describe("tool.task", () => {
             action: "deny",
           },
           {
+            permission: "edit",
+            pattern: expect.stringMatching(/memory[\\/][^\\/]+[\\/]\*$/),
+            action: "deny",
+          },
+          {
             permission: "bash",
             pattern: "*",
             action: "deny",

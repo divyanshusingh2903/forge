@@ -87,6 +87,14 @@ describe("Config", () => {
     }),
   )
 
+  it.effect("migrates the v1 memory toggle", () =>
+    Effect.sync(() => {
+      expect(ConfigMigrateV1.migrate({ memory: false }).memory).toBe(false)
+      expect(ConfigMigrateV1.migrate({}).memory).toBeUndefined()
+      expect(Schema.decodeUnknownSync(Config.Info)({ memory: false }).memory).toBe(false)
+    }),
+  )
+
   it.effect("migrates v1 provider setup options into AISDK settings", () =>
     Effect.sync(() => {
       const migrated = ConfigMigrateV1.migrate({

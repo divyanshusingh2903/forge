@@ -165,6 +165,12 @@ OpenCode permissions are keyed by tool name, plus a couple of safety guards:
 
 ---
 
+## Memory
+
+Forge's [local memory](/docs/memory) folder is outside your project, so it's granted `external_directory` access by default and reads don't prompt. Writes still follow your `edit` rule, which asks by default. Your own rules take precedence.
+
+---
+
 ## Defaults
 
 If you don’t specify anything, OpenCode starts from permissive defaults:

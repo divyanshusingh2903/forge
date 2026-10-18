@@ -158,3 +158,42 @@ it.effect("subagent inherits parent session deny rules as hard runtime ceilings"
     expect(Permission.evaluate("bash", "git status", effective).action).toBe("deny")
   }),
 )
+
+it.instance("subagents cannot edit memory notes but keep other edits", () =>
+  Effect.gen(function* () {
+    const general = yield* Agent.use.get("general")
+    const memory = yield* Agent.use.memory()
+    expect(memory).toBeDefined()
+    if (!general || !memory) return
+    const effective = Permission.merge(
+      general.permission,
+      deriveSubagentSessionPermission({
+        parentSessionPermission: [],
+        subagent: general,
+        memoryEditPattern: memory.editPattern,
+      }),
+    )
+
+    expect(Permission.evaluate("edit", memory.editPattern.replace(/\*$/, "MEMORY.md"), effective).action).toBe("deny")
+    expect(Permission.evaluate("edit", "src/index.ts", effective).action).toBe("ask")
+    expect(Permission.disabled(["edit"], effective)).toEqual(new Set())
+  }),
+)
+
+it.instance("memory deny does not un-hide edit for read-only subagents", () =>
+  Effect.gen(function* () {
+    const explore = yield* Agent.use.get("explore")
+    const memory = yield* Agent.use.memory()
+    if (!explore || !memory) throw new Error("expected explore agent and memory location")
+    const effective = Permission.merge(
+      explore.permission,
+      deriveSubagentSessionPermission({
+        parentSessionPermission: [],
+        subagent: explore,
+        memoryEditPattern: memory.editPattern,
+      }),
+    )
+
+    expect(Permission.disabled(["edit"], effective)).toEqual(new Set(["edit"]))
+  }),
+)
