@@ -57,7 +57,6 @@ export type ReviewPanelV2Props = {
   onDiffStyleChange?: (style: SessionReviewDiffStyle) => void
   state: ReviewPanelV2State
   gitChangesEnabled?: boolean
-  branch?: string
   sessionID?: () => string | undefined
   activeModel?: () => { providerID: string; modelID: string; variant?: string | null } | undefined
   onGitChange?: () => void
@@ -247,7 +246,7 @@ export function ReviewPanelV2(props: ReviewPanelV2Props) {
           <span class="flex min-w-0 items-center gap-1.5 text-12-medium text-text-base">
             <Icon name="branch" size="small" class="shrink-0 text-v2-icon-icon-muted" />
             <bdi dir="ltr" class="min-w-0 truncate">
-              {git.info.branch ?? props.branch}
+              {git.info.branch}
             </bdi>
           </span>
           <SplitButtonV2 data-variant="outline">

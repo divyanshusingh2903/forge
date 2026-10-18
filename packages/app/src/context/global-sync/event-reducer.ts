@@ -114,6 +114,7 @@ export function applyDirectoryEvent(input: {
   directory: string
   loadLsp: () => void
   loadReferences?: () => void
+  loadVcs?: () => void
   vcsCache?: VcsCache
   setSessionTodo?: (sessionID: string, todos: Todo[] | undefined) => void
   retainedLimit?: number
@@ -386,7 +387,12 @@ export function applyDirectoryEvent(input: {
       )
       break
     }
+    case "vcs.changed": {
+      input.loadVcs?.()
+      break
+    }
     case "vcs.branch.updated": {
+      input.loadVcs?.()
       const props = event.properties as { branch?: string }
       if (input.store.vcs?.branch === props.branch) break
       const next = { ...input.store.vcs, branch: props.branch }
