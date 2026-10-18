@@ -762,6 +762,21 @@ You can control context compaction behavior through the `compaction` option.
 
 ---
 
+### Memory
+
+Forge keeps local auto memory for each project. It's enabled by default; set `memory` to `false` to turn it off.
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "memory": false
+}
+```
+
+[Learn more about memory here](/docs/memory).
+
+---
+
 ### Watcher
 
 You can configure file watcher ignore patterns through the `watcher` option.
