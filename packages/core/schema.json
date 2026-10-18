@@ -1,8 +1,8 @@
 {
   "version": "7",
   "dialect": "sqlite",
-  "id": "f14a9b18-8207-487e-a3d3-227e629ba9ad",
-  "prevIds": ["169a0f0f-d58f-479f-b024-fa1c7b9a09db"],
+  "id": "be80cdaf-2cae-4521-a990-3526780510a4",
+  "prevIds": ["f14a9b18-8207-487e-a3d3-227e629ba9ad"],
   "ddl": [
     {
       "name": "workspace",
@@ -46,6 +46,10 @@
     },
     {
       "name": "project",
+      "entityType": "tables"
+    },
+    {
+      "name": "server_instance",
       "entityType": "tables"
     },
     {
@@ -769,6 +773,56 @@
       "name": "commands",
       "entityType": "columns",
       "table": "project"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "id",
+      "entityType": "columns",
+      "table": "server_instance"
+    },
+    {
+      "type": "text",
+      "notNull": false,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "boot_id",
+      "entityType": "columns",
+      "table": "server_instance"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "pid",
+      "entityType": "columns",
+      "table": "server_instance"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_started",
+      "entityType": "columns",
+      "table": "server_instance"
+    },
+    {
+      "type": "integer",
+      "notNull": true,
+      "autoincrement": false,
+      "default": null,
+      "generated": null,
+      "name": "time_heartbeat",
+      "entityType": "columns",
+      "table": "server_instance"
     },
     {
       "type": "text",
@@ -1710,6 +1764,13 @@
     {
       "columns": ["id"],
       "nameExplicit": false,
+      "name": "server_instance_pk",
+      "table": "server_instance",
+      "entityType": "pks"
+    },
+    {
+      "columns": ["id"],
+      "nameExplicit": false,
       "name": "message_pk",
       "table": "message",
       "entityType": "pks"
@@ -1817,6 +1878,20 @@
       "name": "permission_project_action_resource_idx",
       "entityType": "indexes",
       "table": "permission"
+    },
+    {
+      "columns": [
+        {
+          "value": "time_heartbeat",
+          "isExpression": false
+        }
+      ],
+      "isUnique": false,
+      "where": null,
+      "origin": "manual",
+      "name": "server_instance_heartbeat_idx",
+      "entityType": "indexes",
+      "table": "server_instance"
     },
     {
       "columns": [

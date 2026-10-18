@@ -125,6 +125,15 @@ export default {
         );
       `)
       yield* tx.run(`
+        CREATE TABLE \`server_instance\` (
+          \`id\` text PRIMARY KEY,
+          \`boot_id\` text,
+          \`pid\` integer NOT NULL,
+          \`time_started\` integer NOT NULL,
+          \`time_heartbeat\` integer NOT NULL
+        );
+      `)
+      yield* tx.run(`
         CREATE TABLE \`message\` (
           \`id\` text PRIMARY KEY,
           \`session_id\` text NOT NULL,
@@ -241,6 +250,7 @@ export default {
       yield* tx.run(
         `CREATE UNIQUE INDEX \`permission_project_action_resource_idx\` ON \`permission\` (\`project_id\`,\`action\`,\`resource\`);`,
       )
+      yield* tx.run(`CREATE INDEX \`server_instance_heartbeat_idx\` ON \`server_instance\` (\`time_heartbeat\`);`)
       yield* tx.run(
         `CREATE INDEX \`message_session_time_created_id_idx\` ON \`message\` (\`session_id\`,\`time_created\`,\`id\`);`,
       )

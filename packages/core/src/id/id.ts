@@ -9,6 +9,7 @@ const prefixes = {
   question: "que",
   part: "prt",
   pty: "pty",
+  server: "srv",
   tool: "tool",
   workspace: "wrk",
 } as const
