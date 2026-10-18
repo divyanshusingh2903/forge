@@ -300,6 +300,9 @@ function cmd(shell: string, command: string, cwd: string, env: NodeJS.ProcessEnv
     })
   }
 
+  const guard = Shell.guarded(shell, command)
+  if (guard) return ChildProcess.make(guard.file, guard.args, { cwd, env, stdin: "ignore", detached: true })
+
   return ChildProcess.make(command, [], {
     shell,
     cwd,

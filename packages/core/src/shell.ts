@@ -7,6 +7,7 @@ import { statSync } from "fs"
 import { setTimeout as sleep } from "node:timers/promises"
 import { Flag } from "./flag/flag"
 import { FSUtil } from "./fs-util"
+import { lazy } from "./util/lazy"
 import { which } from "./util/which"
 
 const SIGKILL_TIMEOUT_MS = 200
@@ -197,6 +198,23 @@ export function args(file: string, command: string, cwd: string) {
   if (n === "cmd") return ["/c", command]
   if (ps(file)) return ["-NoProfile", "-Command", command]
   return ["-c", command]
+}
+
+// PR_SET_PDEATHSIG is not inherited by grandchildren, so the group leader traps it and kills its whole group.
+// The command runs in the background because sh defers traps until a foreground job finishes; `wait` returns at once.
+const GUARD = `trap 'kill -KILL 0' TERM; "$0" -c "$1" & wait $!`
+
+const setpriv = lazy(() => (process.platform === "linux" ? which("setpriv") : null))
+
+/**
+ * Wraps `<shell> -c <command>` so its process group dies with this process, even on SIGKILL or OOM.
+ * Spawn the result `detached` so the wrapper leads its own group. Returns undefined when unsupported
+ * (non-Linux, or `setpriv` missing); callers then spawn the command directly.
+ */
+export function guarded(shell: string, command: string) {
+  const file = setpriv()
+  if (!file) return
+  return { file, args: ["--pdeathsig", "TERM", "--", "/bin/sh", "-c", GUARD, shell, command] }
 }
 
 let defaultPreferred: string | undefined
