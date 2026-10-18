@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { createVcsSync } from "./vcs"
 import type { Message, Part, PermissionRequest, Project, QuestionRequest, Session } from "@opencode-ai/sdk/v2/client"
 import { createStore } from "solid-js/store"
 import type { State } from "./types"
@@ -555,11 +556,43 @@ describe("applyDirectoryEvent", () => {
     expect(store.question[sessionID]?.map((x) => x.id)).toEqual(["q_1", "q_3"])
   })
 
+  test("refreshes branch metadata on current invalidation events without a review panel", async () => {
+    const [store, setStore] = createStore(baseState({ vcs: { branch: "old", default_branch: "main" } }))
+    const [cache, persist] = createStore({ value: store.vcs })
+    const sync = createVcsSync({
+      missingResponseMessage: "VCS metadata response is missing",
+      read: async () => ({ branch: "new", default_branch: "trunk" }),
+      target: () => ({
+        identity: store,
+        apply: (info) => {
+          setStore("vcs", info)
+          persist("value", info)
+        },
+      }),
+    })
+    const refreshed = Promise.withResolvers<void>()
+    applyDirectoryEvent({
+      event: { type: "vcs.changed", properties: {} },
+      store,
+      setStore,
+      directory: "/repo",
+      push() {},
+      loadLsp() {},
+      loadVcs: () => {
+        void sync.refresh("/repo").then(refreshed.resolve, refreshed.reject)
+      },
+    })
+    await refreshed.promise
+    expect(store.vcs).toEqual({ branch: "new", default_branch: "trunk" })
+    expect(cache.value).toEqual(store.vcs)
+  })
+
   test("updates vcs branch in store and cache", () => {
     const [store, setStore] = createStore(baseState({ vcs: { branch: "main", default_branch: "main" } }))
     const [cacheStore, setCacheStore] = createStore({
       value: { branch: "main", default_branch: "main" } as State["vcs"],
     })
+    const refreshes: string[] = []
 
     applyDirectoryEvent({
       event: { type: "vcs.branch.updated", properties: { branch: "feature/test" } },
@@ -568,6 +601,9 @@ describe("applyDirectoryEvent", () => {
       push() {},
       directory: "/tmp",
       loadLsp() {},
+      loadVcs: () => {
+        refreshes.push("vcs")
+      },
       vcsCache: {
         store: cacheStore,
         setStore: setCacheStore,
@@ -577,6 +613,7 @@ describe("applyDirectoryEvent", () => {
 
     expect(store.vcs).toEqual({ branch: "feature/test", default_branch: "main" })
     expect(cacheStore.value).toEqual({ branch: "feature/test", default_branch: "main" })
+    expect(refreshes).toEqual(["vcs"])
   })
 
   test("routes disposal and lsp events to side-effect handlers", () => {

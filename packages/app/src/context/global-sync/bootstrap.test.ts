@@ -14,7 +14,7 @@ import {
   loadProvidersQuery,
   loadReferencesQuery,
 } from "./bootstrap"
-import type { State, VcsCache } from "./types"
+import type { State } from "./types"
 import { ServerScope } from "@/utils/server-scope"
 import type { ServerApi } from "@/utils/server"
 
@@ -129,7 +129,9 @@ describe("bootstrapDirectory", () => {
       api,
       store,
       setStore,
-      vcsCache: { setStore() {} } as unknown as VcsCache,
+      refreshVcs: async () => {
+        mcpReads.push("vcs")
+      },
       loadSessions() {},
       translate: (key) => key,
       queryClient: new QueryClient(),
@@ -142,11 +144,12 @@ describe("bootstrapDirectory", () => {
 
     expect(store.status).toBe("complete")
     expect(legacyConfigReads).toEqual(["directory"])
-    expect(mcpReads.sort()).toEqual(["command", "resource", "status"])
+    expect(mcpReads.sort()).toEqual(["command", "resource", "status", "vcs"])
   })
 
   test("skips legacy config while refreshing a v2 directory", async () => {
     const [store, setStore] = directoryState()
+    const refreshed = Promise.withResolvers<void>()
 
     await bootstrapDirectory({
       directory: "/project",
@@ -168,7 +171,9 @@ describe("bootstrapDirectory", () => {
       api,
       store,
       setStore,
-      vcsCache: { setStore() {} } as unknown as VcsCache,
+      refreshVcs: async () => {
+        refreshed.resolve()
+      },
       loadSessions() {},
       translate: (key) => key,
       queryClient: new QueryClient(),
@@ -177,6 +182,7 @@ describe("bootstrapDirectory", () => {
 
     expect(store.status).toBe("partial")
 
+    await refreshed.promise
     await new Promise((resolve) => setTimeout(resolve, 80))
 
     expect(store.status).toBe("complete")

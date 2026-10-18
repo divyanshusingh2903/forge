@@ -1429,9 +1429,6 @@ export default function Page() {
     get gitChangesEnabled() {
       return reviewMode() === "git" && sync().project?.vcs === "git"
     },
-    get branch() {
-      return sync().data.vcs?.branch
-    },
     sessionID: () => params.id,
     activeModel: () => prompt.model.current(),
     onGitChange: refreshVcs,

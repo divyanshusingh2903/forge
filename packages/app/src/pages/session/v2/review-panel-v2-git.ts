@@ -1,6 +1,6 @@
 import { createEffect, on, onCleanup } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
-import type { VcsChangeStatus, VcsRemoteStatus, VcsInfo } from "@opencode-ai/sdk/v2"
+import type { VcsChangeStatus, VcsRemoteStatus } from "@opencode-ai/sdk/v2"
 import type { Vcs } from "@opencode-ai/schema/vcs"
 import { useSDK } from "@/context/sdk"
 import { useSync } from "@/context/sync"
@@ -21,7 +21,9 @@ export function createReviewGit(input: { enabled: () => boolean; changed: () => 
     stashError: "",
     changes: [] as VcsChangeStatus[],
     remote: { upstream: false, ahead: 0, behind: 0 } as VcsRemoteStatus,
-    info: {} as VcsInfo,
+    get info() {
+      return sync().data.vcs ?? {}
+    },
     targets: { remotes: [], branches: [] } as Vcs.Targets,
     stashes: [] as readonly Vcs.Stash[],
   })
@@ -83,12 +85,7 @@ export function createReviewGit(input: { enabled: () => boolean; changed: () => 
       receive(current.client.instance.vcsRemote({ directory: current.directory }, { throwOnError: true }), (result) => {
         if (result.data) set("remote", reconcile(result.data))
       }),
-      receive(current.client.vcs.get({ directory: current.directory }, { throwOnError: true }), (result) => {
-        if (result.data) {
-          set("info", reconcile(result.data))
-          sync().set("vcs", reconcile(result.data))
-        }
-      }),
+      receive(sync().vcs.refresh(), () => {}),
       ...(choicesLoaded ? [loadTargets()] : []),
       ...(stashesLoaded ? [loadStashes()] : []),
     ])
@@ -165,21 +162,18 @@ export function createReviewGit(input: { enabled: () => boolean; changed: () => 
         refresh.reset()
         choicesLoaded = false
         stashesLoaded = false
-        set(
-          reconcile({
-            message: "",
-            busy: false,
-            error: "",
-            loadError: "",
-            choicesError: "",
-            stashError: "",
-            changes: [],
-            remote: { upstream: false, ahead: 0, behind: 0 },
-            info: {},
-            targets: { remotes: [], branches: [] },
-            stashes: [],
-          }),
-        )
+        set({
+          message: "",
+          busy: false,
+          error: "",
+          loadError: "",
+          choicesError: "",
+          stashError: "",
+          changes: [],
+          remote: { upstream: false, ahead: 0, behind: 0 },
+          targets: { remotes: [], branches: [] },
+          stashes: [],
+        })
         const off = sdk().event.on("vcs.changed", request)
         const connected = serverSDK().event.on("global", (event) => {
           if (event.type === "server.connected") request()

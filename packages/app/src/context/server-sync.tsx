@@ -60,6 +60,7 @@ import type {
 } from "@opencode-ai/client/promise"
 import { toggleMcp } from "./global-sync/mcp"
 import { createServerSession, type ServerSession } from "./server-session"
+import { createVcsSync } from "./global-sync/vcs"
 
 type GlobalStore = {
   ready: boolean
@@ -380,6 +381,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
       queue.clear(key)
       sessionMeta.delete(key)
       sdkCache.delete(key)
+      vcs.clear(key)
       clearProviderRev(serverSDK.scope, key)
     },
     translate: language.t,
@@ -388,6 +390,25 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
       provider: globalStore.provider,
     },
   })
+
+  const vcs = createVcsSync({
+    missingResponseMessage: language.t("error.chain.unknown"),
+    read: (directory) => sdkFor(directory).vcs.get().then((result) => result.data),
+    target: (directory) => {
+      const child = children.children[directory]
+      const cache = children.vcsCache.get(directory)
+      if (!child || !cache) return
+      return {
+        identity: child,
+        apply: (info) =>
+          batch(() => {
+            child[1]("vcs", reconcile(info))
+            cache.setStore("value", reconcile(info))
+          }),
+      }
+    },
+  })
+  onCleanup(vcs.dispose)
 
   async function loadSessions(directory: string, options?: { limit?: number }) {
     const key = directoryKey(directory)
@@ -496,7 +517,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
         api: serverSDK.api,
         store: child[0],
         setStore: child[1],
-        vcsCache: cache,
+        refreshVcs: () => (children.children[key] === child ? vcs.refresh(key) : Promise.resolve()),
         loadSessions,
         translate: language.t,
         queryClient,
@@ -629,6 +650,9 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
       sessionContent: false,
       permission: session.data.permission,
       vcsCache: children.vcsCache.get(key),
+      loadVcs: () => {
+        void vcs.refresh(key).catch((error) => console.debug("Failed to refresh VCS metadata", { directory, error }))
+      },
       loadLsp: () => {
         if (!children.active(key)) return
         void queryClient.fetchQuery(queryOptionsApi.lsp(key))
@@ -704,6 +728,7 @@ export function createServerSyncContextInner(serverSDK: ServerSDK) {
     disableMcp: children.disableMcp,
     queryOptions: queryOptionsApi,
     refreshProviders,
+    vcs: { refresh: (directory: string) => vcs.refresh(directoryKey(directory)) },
     // bootstrap,
     updateConfig: updateConfigMutation.mutateAsync,
     project: projectApi,
