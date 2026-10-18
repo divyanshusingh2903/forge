@@ -1,7 +1,9 @@
 import { DESKTOP_NATIVE_ENGLISH } from "./desktop-native"
+import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 export const dict = {
   ...DESKTOP_NATIVE_ENGLISH,
+  ...MANUAL_UPDATE_ENGLISH,
   "command.category.suggested": "Suggested",
   "command.category.view": "View",
   "command.category.project": "Project",

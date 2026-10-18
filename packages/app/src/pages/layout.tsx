@@ -162,9 +162,14 @@ export default function LegacyLayout(props: ParentProps) {
     return state.version
   }
   const installUpdate = () => void platform.updater?.install()
+  const manualUpdate = () => {
+    const state = platform.updater?.state()
+    return state?.status === "ready" && !!state.manualUrl
+  }
   const titlebarUpdate: TitlebarUpdate = {
     version: updateVersion,
     installing: () => platform.updater?.state().status === "installing",
+    actionLabel: () => language.t(manualUpdate() ? "toast.update.action.download" : "toast.update.action.installRestart"),
     install: installUpdate,
   }
 
@@ -2260,7 +2265,12 @@ export default function LegacyLayout(props: ParentProps) {
         }
       />
       <Show when={updateVersion() !== undefined}>
-        <UpdateAvailableToast version={updateVersion() ?? ""} install={installUpdate} language={language} />
+        <UpdateAvailableToast
+          version={updateVersion() ?? ""}
+          manual={manualUpdate()}
+          install={installUpdate}
+          language={language}
+        />
       </Show>
       <div class="flex-1 min-h-0 min-w-0 flex">
         <div class="flex-1 min-h-0 relative">
@@ -2414,6 +2424,7 @@ export default function LegacyLayout(props: ParentProps) {
 
 function UpdateAvailableToast(props: {
   version: string
+  manual: boolean
   install: () => void
   language: ReturnType<typeof useLanguage>
 }) {
@@ -2424,10 +2435,12 @@ function UpdateAvailableToast(props: {
       persistent: true,
       icon: "download",
       title: props.language.t("toast.update.title"),
-      description: props.language.t("toast.update.description", { version: props.version }),
+      description: props.language.t(props.manual ? "toast.update.manual.description" : "toast.update.description", {
+        version: props.version,
+      }),
       actions: [
         {
-          label: props.language.t("toast.update.action.installRestart"),
+          label: props.language.t(props.manual ? "toast.update.action.download" : "toast.update.action.installRestart"),
           onClick: props.install,
         },
         {

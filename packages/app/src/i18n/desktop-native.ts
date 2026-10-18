@@ -1,3 +1,5 @@
+import { MANUAL_UPDATE_ENGLISH } from "./updater"
+
 export const DESKTOP_NATIVE_LOCALES = [
   "en",
   "zh",
@@ -274,6 +276,8 @@ export const DESKTOP_NATIVE_ENGLISH = {
   "desktop.updater.dialog.upToDate.title": "No Updates",
   "desktop.updater.dialog.ready.message": "Update {{version}} downloaded. Restart now?",
   "desktop.updater.dialog.ready.title": "Update Ready",
+  "desktop.updater.dialog.manual.message": MANUAL_UPDATE_ENGLISH["desktop.updater.dialog.manual.message"],
+  "desktop.updater.dialog.download": MANUAL_UPDATE_ENGLISH["desktop.updater.dialog.download"],
   "desktop.updater.dialog.restart": "Restart",
   "desktop.updater.dialog.later": "Later",
 

@@ -22,6 +22,8 @@ export function createUpdaterController(input: {
   backend: UpdaterBackend
   persistence: UpdaterPersistence
   stop: () => Promise<void>
+  manualUrl?: (version: string) => Promise<string | undefined>
+  openExternal: (url: string) => Promise<void>
   log?: (message: string, data?: object) => void
 }) {
   let state: UpdaterState = input.enabled ? { status: "idle" } : { status: "disabled" }
@@ -47,6 +49,12 @@ export function createUpdaterController(input: {
       if (!result?.isUpdateAvailable || !version || version === input.currentVersion) {
         await input.persistence.clear()
         return transition({ status: "up-to-date" })
+      }
+
+      const manualUrl = await input.manualUrl?.(version)
+      if (manualUrl) {
+        await input.persistence.clear()
+        return transition({ status: "ready", version, manualUrl })
       }
 
       transition({ status: "downloading", version })
@@ -78,6 +86,10 @@ export function createUpdaterController(input: {
     check,
     async install() {
       if (state.status !== "ready") throw new Error("Update is not ready to install")
+      if (state.manualUrl) {
+        await input.openExternal(state.manualUrl)
+        return
+      }
       const version = state.version
       transition({ status: "installing", version })
       await input
