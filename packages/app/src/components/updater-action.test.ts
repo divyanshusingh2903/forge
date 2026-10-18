@@ -6,6 +6,16 @@ describe("updaterAction", () => {
     expect(updaterAction(undefined)).toEqual({ label: "settings.updates.action.checkNow" })
   })
 
+  test("offers manual download for a ready release page", () => {
+    expect(
+      updaterAction({
+        status: "ready",
+        version: "1.19.0-v0.4.0",
+        manualUrl: "https://github.com/divyanshusingh2903/forge/releases/tag/v1.19.0-v0.4.0",
+      }),
+    ).toEqual({ label: "toast.update.action.download", run: "install" })
+  })
+
   test("projects updater transitions into one settings action", () => {
     expect(updaterAction({ status: "idle" })).toEqual({
       label: "settings.updates.action.checkNow",

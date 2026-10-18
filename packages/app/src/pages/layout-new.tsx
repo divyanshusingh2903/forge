@@ -5,6 +5,7 @@ import { DelayedLoadingState } from "@opencode-ai/ui/loading-state"
 import { DebugBar } from "@/components/debug-bar"
 import { TabsInfoPopup } from "@/components/help-button"
 import { Titlebar, type TitlebarUpdate } from "@/components/titlebar"
+import { updaterAction } from "@/components/updater-action"
 import { usePlatform } from "@/context/platform"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
@@ -59,6 +60,7 @@ export default function NewLayout(props: ParentProps) {
       return state.version
     },
     installing: () => platform.updater?.state().status === "installing",
+    actionLabel: () => language.t(updaterAction(platform.updater?.state()).label),
     install: () => void platform.updater?.install(),
   }
 

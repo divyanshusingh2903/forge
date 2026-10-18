@@ -601,6 +601,9 @@ export const dict = {
   "toast.update.title": "Update available",
   "toast.update.description": "A new version of Forge ({{version}}) is now available to install.",
   "toast.update.action.installRestart": "Install and restart",
+  "toast.update.action.download": "Download update",
+  "toast.update.manual.description":
+    "Forge {{version}} is available. Open the release page to download and install it manually.",
   "toast.update.action.notYet": "Not yet",
 
   "error.page.title": "Something went wrong",
