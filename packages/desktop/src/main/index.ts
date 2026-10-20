@@ -200,7 +200,9 @@ const main = Effect.gen(function* () {
     return
   }
 
-  const shellEnv = preferAppEnv(app.getPath("userData"))
+  // The login-shell probe takes ~2 s. Start it now so it overlaps Electron startup and window
+  // creation; only the sidecar (and its proxy setup) needs the result.
+  const shellEnvReady = preferAppEnv(app.getPath("userData"))
 
   app.on("second-instance", (_event: Event, argv: string[]) => {
     const urls = argv.filter((arg: string) => arg.startsWith("forge://"))
@@ -327,6 +329,8 @@ const main = Effect.gen(function* () {
   const loadingTask = yield* Effect.gen(function* () {
     logger.log("sidecar connection started", { version: SIDECAR_VERSION })
 
+    const shellEnv = yield* Effect.promise(() => shellEnvReady)
+
     ensureLoopbackNoProxy()
     useEnvProxy()
 
@@ -406,8 +410,6 @@ const main = Effect.gen(function* () {
     logger.log("loading task finished")
   }).pipe(forwardInitializationFailure(serverReady), Effect.forkChild)
 
-  yield* Fiber.await(loadingTask)
-
   app.on("window-all-closed", () => {
     if (process.platform === "darwin") return
     app.quit()
@@ -417,8 +419,13 @@ const main = Effect.gen(function* () {
     restoreMainWindows()
   })
 
+  // Windows don't wait for the sidecar health check: the renderer already awaits the
+  // sidecar credentials over IPC, so it can paint its loading state while the server boots.
   const windows = restoreMainWindows()
   if (windows.length) createMenu(menuDeps)
+
+  // Keep the program alive until the loading task ends; the forked child dies with its parent.
+  yield* Fiber.await(loadingTask)
 })
 
 Effect.runFork(main)
