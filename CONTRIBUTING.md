@@ -1,6 +1,6 @@
-# Contributing to OpenCode
+# Contributing to Forge
 
-We want to make it easy for you to contribute to OpenCode. Here are the most common type of changes that get merged:
+Forge is a personal fork of [OpenCode](https://github.com/anomalyco/opencode). Changes that only make sense upstream (new providers, LSPs, formatters, general bug fixes) are best sent to OpenCode directly. Here are the most common types of changes that get merged here:
 
 - Bug fixes
 - Additional LSPs / Formatters
@@ -10,44 +10,90 @@ We want to make it easy for you to contribute to OpenCode. Here are the most com
 - Missing standard behavior
 - Documentation improvements
 
-However, any UI or core product feature must go through a design review with the core team before implementation.
+However, any UI or core product feature must go through a design discussion with the maintainer before implementation.
 
-If you are unsure if a PR would be accepted, feel free to ask a maintainer or look for issues with any of the following labels:
-
-- [`help wanted`](https://github.com/anomalyco/opencode/issues?q=is%3Aissue%20state%3Aopen%20label%3Ahelp-wanted)
-- [`good first issue`](https://github.com/anomalyco/opencode/issues?q=is%3Aissue%20state%3Aopen%20label%3A%22good%20first%20issue%22)
-- [`bug`](https://github.com/anomalyco/opencode/issues?q=is%3Aissue%20state%3Aopen%20label%3Abug)
-- [`perf`](https://github.com/anomalyco/opencode/issues?q=is%3Aopen%20is%3Aissue%20label%3A%22perf%22)
+If you are unsure if a PR would be accepted, open an issue first or look at the [open issues](https://github.com/divyanshusingh2903/forge/issues).
 
 > [!NOTE]
 > PRs that ignore these guardrails will likely be closed.
 
-Want to take on an issue? Leave a comment and a maintainer may assign it to you unless it is something we are already working on.
+Want to take on an issue? Leave a comment and the maintainer may assign it to you unless it is something already in progress.
+
+The default branch is `main`, and every PR targets it. Ignore `dev`: it is leftover upstream history. See [MAINTAINING.md](MAINTAINING.md) for how releases and upstream syncs work.
 
 ## Adding New Providers
 
 New providers shouldn't require many if ANY code changes, but if you want to add support for a new provider first make a PR to:
 https://github.com/anomalyco/models.dev
 
-## Developing OpenCode
+## Developing Forge
 
-- Requirements: Bun 1.3+
-- Install dependencies and start the dev server from the repo root:
+Requirements: Bun 1.4.2 (the version pinned in `package.json`), Git, and the platform tools below.
 
-  ```bash
-  bun install
-  bun dev
-  ```
+### Setup by platform
+
+<details open>
+<summary>Linux</summary>
+
+```bash
+curl -fsSL https://bun.sh/install | bash
+git clone git@github.com:divyanshusingh2903/forge.git
+cd forge
+bun install
+bun dev
+```
+
+</details>
+
+<details>
+<summary>macOS</summary>
+
+```bash
+xcode-select --install          # Git and the C toolchain
+curl -fsSL https://bun.sh/install | bash   # or: brew install oven-sh/bun/bun
+git clone git@github.com:divyanshusingh2903/forge.git
+cd forge
+bun install
+bun dev
+```
+
+Unsigned local builds are blocked by Gatekeeper on first launch. Run `xattr -dr com.apple.quarantine /Applications/Forge.app` after installing, or use System Settings → Privacy & Security → **Open Anyway**.
+
+</details>
+
+<details>
+<summary>Windows</summary>
+
+Use PowerShell, or [WSL](https://learn.microsoft.com/windows/wsl/install) if you prefer a Linux workflow (the repo then lives in the WSL filesystem, not `/mnt/c`).
+
+```powershell
+winget install Git.Git
+powershell -c "irm bun.sh/install.ps1 | iex"
+git clone git@github.com:divyanshusingh2903/forge.git
+cd forge
+bun install
+bun dev
+```
+
+Notes:
+
+- Install the [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) ("Desktop development with C++") if a native dependency fails to build.
+- Enable long paths if `bun install` fails with path-length errors: `git config --global core.longpaths true`, and turn on `LongPathsEnabled` in the registry.
+- `bun install` can intermittently fail on Windows from a patch-cache race (oven-sh/bun#28147). Re-run it.
+- Run the `./script/*.ts` and `./packages/opencode/script/build.ts` commands below with `bun <path>` instead of executing them directly.
+- Some tests are skipped on Windows because they hang under Bun 1.4.x. Run tests from a package directory, never the repo root.
+
+</details>
 
 ### Running against a different directory
 
-By default, `bun dev` runs OpenCode in the `packages/opencode` directory. To run it against a different directory or repository:
+By default, `bun dev` runs Forge in the `packages/opencode` directory. To run it against a different directory or repository:
 
 ```bash
 bun dev <directory>
 ```
 
-To run OpenCode in the root of the opencode repo itself:
+To run it in the root of this repo itself:
 
 ```bash
 bun dev .
@@ -58,19 +104,20 @@ bun dev .
 To compile a standalone executable:
 
 ```bash
-./packages/opencode/script/build.ts --single
+bun ./packages/opencode/script/build.ts --single
 ```
 
 Then run it with:
 
 ```bash
-./packages/opencode/dist/opencode-<platform>/bin/opencode
+./packages/opencode/dist/opencode-<platform>/bin/opencode        # macOS / Linux
+.\packages\opencode\dist\opencode-windows-x64\bin\opencode.exe  # Windows
 ```
 
-Replace `<platform>` with your platform (e.g., `darwin-arm64`, `linux-x64`).
+Replace `<platform>` with your platform (e.g., `darwin-arm64`, `linux-x64`, `windows-x64`).
 
 - Core pieces:
-  - `packages/opencode`: OpenCode core business logic & server.
+  - `packages/opencode`: core business logic & server (the package keeps its upstream name).
   - `packages/opencode/src/cli/cmd/run/`: The minimal terminal interface (`--mini`), written in SolidJS with [opentui](https://github.com/sst/opentui)
   - `packages/app`: The shared web UI components, written in SolidJS
   - `packages/desktop`: The native desktop app, built with Electron (wraps `packages/app`)
@@ -78,7 +125,7 @@ Replace `<platform>` with your platform (e.g., `darwin-arm64`, `linux-x64`).
 
 ### Understanding bun dev vs opencode
 
-During development, `bun dev` is the local equivalent of the built `opencode` command. Both run the same CLI interface:
+During development, `bun dev` is the local equivalent of the built `opencode` binary (Forge has not renamed it). Both run the same CLI interface:
 
 ```bash
 # Development (from project root)
@@ -96,7 +143,7 @@ opencode --mini <directory> # Start minimal terminal interface in specific direc
 
 ### Running the API Server
 
-To start the OpenCode headless API server:
+To start the headless API server:
 
 ```bash
 bun dev serve
@@ -112,7 +159,7 @@ bun dev serve --port 8080
 
 To test UI changes during development:
 
-1. **First, start the OpenCode server** (see [Running the API Server](#running-the-api-server) section above)
+1. **First, start the server** (see [Running the API Server](#running-the-api-server) section above)
 2. **Then run the web app:**
 
 ```bash
@@ -131,16 +178,35 @@ To run the desktop app in development:
 bun run --cwd packages/desktop dev
 ```
 
-To create a production build and package the app:
+To create a production build and package the app, run from the repo root. `OPENCODE_CHANNEL` selects which icons/app id/product name get baked in (`dev`, `beta`, or `prod`, defaulting to `dev`), and `build` must run with the same channel you package.
+
+Linux:
 
 ```bash
 NODE_OPTIONS=--max-old-space-size=8192 OPENCODE_CHANNEL=prod bun run --cwd packages/desktop build
 OPENCODE_CHANNEL=prod bun run --cwd packages/desktop package:linux
 ```
 
-- `OPENCODE_CHANNEL` selects which icons/app id/product name get baked in (`dev`, `beta`, or `prod` — defaults to `dev` if omitted). `build` must run with the same channel you intend to package, since it copies that channel's resources.
-- `NODE_OPTIONS=--max-old-space-size=8192` raises Node's default heap limit; the `electron-vite build` step for the renderer bundle can exceed Node's default ~2GB ceiling and crash with an out-of-memory error otherwise. Lower it if you don't have 8GB free, or drop it entirely if your build doesn't hit the limit.
-- Swap `package:linux` for `package:mac` / `package:win` depending on your platform (or plain `package` to build for the current platform using electron-builder's defaults). Artifacts land in `packages/desktop/dist/`.
+macOS:
+
+```bash
+NODE_OPTIONS=--max-old-space-size=8192 OPENCODE_CHANNEL=prod bun run --cwd packages/desktop build
+OPENCODE_CHANNEL=prod bun run --cwd packages/desktop package:mac
+```
+
+Windows (PowerShell):
+
+```powershell
+$env:NODE_OPTIONS = "--max-old-space-size=8192"
+$env:OPENCODE_CHANNEL = "prod"
+bun run --cwd packages/desktop build
+bun run --cwd packages/desktop package:win
+```
+
+- `NODE_OPTIONS=--max-old-space-size=8192` raises Node's default heap limit; the `electron-vite build` step for the renderer bundle can exceed the default ~2GB ceiling and crash with an out-of-memory error. Lower it if you don't have 8GB free, or drop it if your build doesn't hit the limit.
+- Use plain `package` to build for the current platform with electron-builder's defaults.
+- Artifacts land in `packages/desktop/dist/`: `.dmg` and `.zip` on macOS, an NSIS `.exe` installer on Windows, and `.AppImage`, `.deb` and `.rpm` on Linux.
+- Local builds are unsigned. Expect the Gatekeeper and SmartScreen prompts described in the [README](README.md#download).
 
 To install a Linux build locally:
 
@@ -156,21 +222,23 @@ chmod +x packages/desktop/dist/forge-desktop-linux-x86_64.AppImage
 ./packages/desktop/dist/forge-desktop-linux-x86_64.AppImage
 ```
 
-> [!NOTE]
-> If you make changes to the API or SDK (e.g. `packages/opencode/src/server/server.ts`), run `./script/generate.ts` to regenerate the SDK and related files.
+On macOS, open the `.dmg` and drag Forge to Applications. On Windows, run the generated `forge-desktop-win-*.exe` installer.
 
-Please try to follow the [style guide](./AGENTS.md)
+> [!NOTE]
+> If you change the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. To regenerate the legacy JavaScript SDK, run `./packages/sdk/js/script/build.ts`. Never edit `src/generated` or `src/generated-effect` by hand. On Windows, prefix the script with `bun`.
+
+Please try to follow the [style guide](./AGENTS.md). Run `bun typecheck` and tests from a package directory (e.g. `packages/opencode`), never from the repo root.
 
 ### Setting up a Debugger
 
 Bun debugging is currently rough around the edges. We hope this guide helps you get set up and avoid some pain points.
 
-The most reliable way to debug OpenCode is to run it manually in a terminal via `bun run --inspect=<url> dev ...` and attach
+The most reliable way to debug Forge is to run it manually in a terminal via `bun run --inspect=<url> dev ...` and attach
 your debugger via that URL. Other methods can result in breakpoints being mapped incorrectly, at least in VSCode (YMMV).
 
 Caveats:
 
-- If you want to run the OpenCode server and have breakpoints triggered in the server code, you might need to run `bun dev spawn` instead of
+- If you want to run the server and have breakpoints triggered in the server code, you might need to run `bun dev spawn` instead of
   the usual `bun dev`.
 - If `spawn` does not work for you, you can debug the server separately:
   - Debug server: `bun run --inspect=ws://localhost:6499/ --cwd packages/opencode ./src/index.ts serve --port 4096`,
@@ -183,12 +251,12 @@ Other tips and tricks:
 
 #### VSCode Setup
 
-If you use VSCode, you can use our example configurations [.vscode/settings.example.json](.vscode/settings.example.json) and [.vscode/launch.example.json](.vscode/launch.example.json).
+If you use VSCode, attach the debugger to the `--inspect` URL from the steps above (VSCode's "Attach" configuration works best).
 
 Some debug methods that can be problematic:
 
 - Debug configurations with `"request": "launch"` can have breakpoints incorrectly mapped and thus unusable
-- The same problem arises when running OpenCode in the VSCode `JavaScript Debug Terminal`
+- The same problem arises when running Forge in the VSCode `JavaScript Debug Terminal`
 
 With that said, you may want to try these methods, as they might work for you.
 
@@ -198,7 +266,7 @@ With that said, you may want to try these methods, as they might work for you.
 
 **All PRs must reference an existing issue.** Before opening a PR, open an issue describing the bug or feature. This helps maintainers triage and prevents duplicate work. PRs without a linked issue may be closed without review.
 
-- Use `Fixes #123` or `Closes #123` in your PR description to link the issue
+- Use `Fixes #123` or `Closes #123` in your PR description to link the issue, and fill in the [PR template](.github/pull_request_template.md)
 - For small fixes, a brief issue is fine - just enough context for maintainers to understand the problem
 
 ### General Requirements
@@ -226,6 +294,10 @@ Long, AI-generated PR descriptions and issues are not acceptable and may be igno
 - Explain what changed and why in your own words
 - If you can't explain it briefly, your PR might be too large
 
+### Branch Names
+
+Use a short branch name of at most three words separated by hyphens, with no slashes or type prefixes (`session-recovery`, not `feat/session-recovery`).
+
 ### PR Titles
 
 PR titles should follow conventional commit standards:
@@ -237,7 +309,7 @@ PR titles should follow conventional commit standards:
 - `refactor:` code refactoring without changing behavior
 - `test:` adding or updating tests
 
-You can optionally include a scope to indicate which package is affected:
+You can optionally include a scope to indicate which package or area is affected (`core`, `opencode`, `app`, `desktop`, `sdk`, `plugin`):
 
 - `feat(app):` feature in the app package
 - `fix(desktop):` bug fix in the desktop package
@@ -267,17 +339,16 @@ These are not strictly enforced, they are just general guidelines:
 
 ## Feature Requests
 
-For net-new functionality, start with a design conversation. Open an issue describing the problem, your proposed approach (optional), and why it belongs in OpenCode. The core team will help decide whether it should move forward; please wait for that approval instead of opening a feature PR directly.
+For net-new functionality, start with a design conversation. Open an issue describing the problem, your proposed approach (optional), and why it belongs in Forge. The maintainer will help decide whether it should move forward; please wait for that approval instead of opening a feature PR directly.
 
 ## Issue Requirements
 
-All issues **must** use one of our issue templates:
+All issues must use one of the issue templates:
 
 - **Bug report** — for reporting bugs (requires a description)
 - **Feature request** — for suggesting enhancements (requires verification checkbox and description)
-- **Question** — for asking questions (requires the question)
 
-Blank issues are not allowed. When a new issue is opened, an automated check verifies that it follows a template and meets our contributing guidelines. If an issue doesn't meet the requirements, you'll receive a comment explaining what needs to be fixed and have **72 hours** to edit the issue. After that, it will be automatically closed.
+Blank issues are not allowed.
 
 Issues may be flagged for:
 

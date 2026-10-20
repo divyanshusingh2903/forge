@@ -1,6 +1,6 @@
-# OpenCode Desktop
+# Forge Desktop
 
-The OpenCode Desktop app, built with Electron.
+The Forge Desktop app, built with Electron.
 
 ## Development
 
