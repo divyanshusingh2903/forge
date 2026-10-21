@@ -1,3 +1,4 @@
+import { readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { app, utilityProcess } from "electron"
@@ -41,9 +42,9 @@ export function setDefaultServerUrl(url: string | null) {
   getStore().delete(DEFAULT_SERVER_URL_KEY)
 }
 
-export function preferAppEnv(userDataPath: string) {
+export async function preferAppEnv(userDataPath: string) {
   const shell = process.platform === "win32" ? null : getUserShell()
-  const shellEnv = shell ? loadShellEnv(shell, getLogger()) : null
+  const shellEnv = shell ? await resolveShellEnv(shell, userDataPath) : null
   Object.assign(process.env, {
     ...shellEnv,
     OPENCODE_EXPERIMENTAL_ICON_DISCOVERY: "true",
@@ -56,6 +57,35 @@ export function preferAppEnv(userDataPath: string) {
     XDG_STATE_HOME: process.env.XDG_STATE_HOME ?? userDataPath,
   })
   return shellEnv
+}
+
+// Probing the login shell takes ~2 s, which the sidecar would otherwise wait for on every launch. Reuse
+// the environment resolved last time and refresh it in the background; changes to the shell
+// profile therefore apply from the following launch. The first launch (no cache) still waits.
+async function resolveShellEnv(shell: string, userDataPath: string) {
+  const file = join(userDataPath, "shell-env.json")
+  const cached = await readShellEnvCache(file, shell)
+  const fresh = loadShellEnv(shell, getLogger()).then(async (env) => {
+    if (env) await writeFile(file, JSON.stringify({ shell, env }), { mode: 0o600 }).catch(() => undefined)
+    return env
+  })
+  if (!cached) return fresh
+  getLogger().log("[server] Using cached shell environment", { vars: Object.keys(cached).length })
+  void fresh.catch(() => undefined)
+  return cached
+}
+
+async function readShellEnvCache(file: string, shell: string) {
+  const text = await readFile(file, "utf8").catch(() => undefined)
+  if (!text) return null
+  try {
+    const value = JSON.parse(text) as { shell?: unknown; env?: unknown }
+    if (value.shell !== shell || !value.env || typeof value.env !== "object") return null
+    const entries = Object.entries(value.env).filter((entry): entry is [string, string] => typeof entry[1] === "string")
+    return entries.length ? Object.fromEntries(entries) : null
+  } catch {
+    return null
+  }
 }
 
 export async function spawnLocalServer(

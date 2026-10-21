@@ -86,21 +86,32 @@ export const Info = Schema.Struct({
 })
   .annotate({ identifier: "ModelV2.Info" })
   .pipe(
-    statics((schema) => ({
-      empty: (providerID: Provider.ID, modelID: ID) =>
-        schema.make({
-          id: modelID,
-          providerID,
-          name: modelID,
-          api: { id: modelID, type: "native", settings: {} },
-          capabilities: { tools: false, input: [], output: [] },
-          request: { headers: {}, body: {} },
-          variants: [],
-          time: { released: 0 },
-          cost: [],
-          status: "active",
-          enabled: true,
-          limit: { context: 0, output: 0 },
-        }),
-    })),
+    statics((schema) => {
+      // The catalog creates one of these for every model of every provider in every project location (thousands at
+      // startup), and validating the same fixed shape each time dominated catalog builds. Validate it once, then build
+      // the identical literal directly.
+      let validated = false
+      return {
+        empty: (providerID: Provider.ID, modelID: ID): typeof schema.Type => {
+          const value = {
+            id: modelID,
+            providerID,
+            name: modelID,
+            api: { id: modelID, type: "native" as const, settings: {} },
+            capabilities: { tools: false, input: [], output: [] },
+            request: { headers: {}, body: {} },
+            variants: [],
+            time: { released: 0 },
+            cost: [],
+            status: "active" as const,
+            enabled: true,
+            limit: { context: 0, output: 0 },
+          }
+          if (validated) return value
+          const made = schema.make(value)
+          validated = true
+          return made
+        },
+      }
+    }),
   )

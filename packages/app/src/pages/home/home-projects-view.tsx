@@ -6,6 +6,7 @@ import { AutoScroller, Feedback, PointerActivationConstraints } from "@dnd-kit/d
 import { RestrictToVerticalAxis } from "@dnd-kit/abstract/modifiers"
 import { RestrictToElement } from "@dnd-kit/dom/modifiers"
 import type { Session } from "@opencode-ai/sdk/v2/client"
+import { skipToken, useQuery } from "@tanstack/solid-query"
 import { SessionLoadingState } from "@opencode-ai/ui/loading-state"
 import { ScrollView } from "@opencode-ai/ui/scroll-view"
 import { ProjectAvatar } from "@opencode-ai/ui/v2/project-avatar-v2"
@@ -21,7 +22,8 @@ import { ServerConnection } from "@/context/server"
 import { useGlobal } from "@/context/global"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
-import { compareSessionTime, displayName, getProjectAvatarSource, sortedRootSessions } from "@/pages/layout/helpers"
+import { compareSessionTime, displayName, getProjectAvatarSource, roots, sortedRootSessions } from "@/pages/layout/helpers"
+import type { HomeSessionEvents, HomeSessionIndex } from "@/context/global-sync/home-session-index"
 import { ServerRowMenuView, serverMenuLabels } from "@/components/server/server-row-menu"
 import { ServerHealthIndicator } from "@/components/server/server-row"
 import { type ServerHealth } from "@/utils/server-health"
@@ -519,11 +521,30 @@ function HomeProjectSessions(props: {
   const serverCtx = createMemo(() => global.ensureServerCtx(props.server))
   const [store, setStore] = serverCtx().sync.child(props.directory, { bootstrap: true })
   const sessions = createMemo(() => sortedRootSessions(store, 0))
+  // The project's own bootstrap fetches its sessions alongside agents, config, providers and MCP, and only
+  // completes when all of them do, seconds after startup. The home session index (already fetched for the
+  // main list) holds the same sessions, so show those until the project's own list arrives.
+  const homeSessions = serverCtx().sync.homeSessions
+  const homeIndex = useQuery(() => ({ queryKey: homeSessions.indexKey, queryFn: skipToken }))
+  const homeEvents = useQuery(() => ({ queryKey: homeSessions.eventsKey, queryFn: skipToken }))
+  const indexedSessions = createMemo(() =>
+    roots({
+      session: homeSessions.sessions(
+        homeIndex.data as HomeSessionIndex | undefined,
+        homeEvents.data as HomeSessionEvents | undefined,
+      ),
+      path: { directory: props.directory },
+    })
+      .sort(compareSessionTime)
+      .slice(0, store.limit || 5),
+  )
   // status goes "loading" -> "partial" -> "complete"; sessions are fetched as
   // one of several "slow" bootstrap tasks awaited before the "complete" flip,
   // so the actual loading window is spent in "partial", not "loading" --
   // checking only for "loading" would miss almost the whole fetch.
-  const loading = createMemo(() => store.status !== "complete")
+  const bootstrapping = createMemo(() => store.status !== "complete")
+  const shown = createMemo(() => (bootstrapping() && sessions().length === 0 ? indexedSessions() : sessions()))
+  const loading = createMemo(() => bootstrapping() && shown().length === 0)
   // Session lists are capped at SESSION_RECENT_LIMIT server-side; sessionTotal
   // (an estimate -- see estimateRootSessionTotal) tells us whether there's more
   // beyond what's currently loaded, mirroring sidebar-workspace.tsx's v1 pattern.
@@ -546,10 +567,10 @@ function HomeProjectSessions(props: {
         }
       >
         <Show
-          when={sessions().length > 0}
+          when={shown().length > 0}
           fallback={<div class="px-1.5 py-1 text-v2-text-text-faint">{props.language.t("home.sessions.empty")}</div>}
         >
-          <For each={sessions()}>
+          <For each={shown()}>
             {(session) => (
               <HomeSessionRow
                 server={props.server}

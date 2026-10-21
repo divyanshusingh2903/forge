@@ -140,6 +140,15 @@ const layer = Layer.effect(
     ) {
       const session = yield* sessions.get(sessionID)
       if (!session) return yield* new SessionV2.NotFoundError({ sessionID })
+      // Agents are registered by plugins that boot in the background; resolving before they load would find no agent
+      // and deny everything.
+      // Imported lazily because the plugin module reaches this one through skill.
+      const { PluginV2 } = yield* EffectRuntime.promise(() => import("./plugin"))
+      const plugins = yield* EffectRuntime.serviceOption(PluginV2.Service)
+      if (plugins._tag === "Some") {
+        yield* plugins.value.wait(PluginV2.ID.make("agent"))
+        yield* plugins.value.wait(PluginV2.ID.make("config-agent"))
+      }
       const agent = yield* agents.resolve(agentID ?? session.agent)
       return agent?.permissions ?? missingAgentPermissions
     })

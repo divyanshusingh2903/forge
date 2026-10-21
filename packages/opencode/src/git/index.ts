@@ -1,6 +1,6 @@
 import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { AppProcess } from "@opencode-ai/core/process"
-import { Effect, Layer, Context, Stream } from "effect"
+import { Deferred, Effect, Layer, Context, Stream } from "effect"
 import { ChildProcess } from "effect/unstable/process"
 
 const cfg = [
@@ -101,6 +101,16 @@ export interface Interface {
   readonly stagedStat: (cwd: string) => Effect.Effect<Result>
 }
 
+// Invocations that only read repository state, safe to share between concurrent callers.
+function readOnly(args: string[]) {
+  const positional = args.filter((arg) => !arg.startsWith("-"))
+  if (args[0] === "rev-parse" || args[0] === "for-each-ref") return true
+  if (args[0] === "symbolic-ref") return positional.length === 2
+  if (args[0] === "remote") return args.length === 1 || args[1] === "get-url"
+  if (args[0] === "config") return positional.length === 2
+  return false
+}
+
 const kind = (code: string): Kind => {
   if (code === "??") return "added"
   if (code.includes("U")) return "modified"
@@ -118,7 +128,26 @@ const layer = Layer.effect(
     const encoder = new TextEncoder()
     const stdin = (text: string) => Stream.make(encoder.encode(text))
 
-    const run = Effect.fn("Git.run")(
+    // At startup every project asks for its branch, remotes and default branch from several routes at once, and each
+    // git process forked from the large server process blocks its event loop for ~10 ms. Concurrent identical
+    // read-only invocations share one process; nothing is cached once it finishes, so results are never stale.
+    const inflight = new Map<string, Deferred.Deferred<Result>>()
+    const run = Effect.fn("Git.run")(function* (args: string[], opts: Options) {
+      if (opts.stdin !== undefined || opts.env !== undefined || !readOnly(args)) return yield* spawn(args, opts)
+      const key = [opts.cwd, opts.maxOutputBytes ?? "", ...args].join("\0")
+      const pending = inflight.get(key)
+      if (pending) return yield* Deferred.await(pending)
+      const result = yield* Deferred.make<Result>()
+      inflight.set(key, result)
+      return yield* Effect.uninterruptible(
+        spawn(args, opts).pipe(
+          Effect.tap((value) => Deferred.succeed(result, value)),
+          Effect.ensuring(Effect.sync(() => inflight.delete(key))),
+        ),
+      )
+    })
+
+    const spawn = Effect.fn("Git.spawn")(
       function* (args: string[], opts: Options) {
         const result = yield* appProcess.run(
           ChildProcess.make("git", [...cfg, ...args], {

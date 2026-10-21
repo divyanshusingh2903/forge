@@ -1,5 +1,4 @@
 import "@/index.css"
-import * as Sentry from "@sentry/solid"
 import { I18nProvider } from "@opencode-ai/ui/context"
 import { DialogProvider } from "@opencode-ai/ui/context/dialog"
 import { FileComponentProvider } from "@opencode-ai/ui/context/file"
@@ -408,7 +407,7 @@ export function AppBaseProviders(
           <UiI18nBridge>
             <ErrorBoundary
               fallback={(error) => {
-                Sentry.captureException(error)
+                if (import.meta.env.VITE_SENTRY_DSN) void import("@sentry/solid").then(({ captureException }) => captureException(error))
                 return <ErrorPage error={error} />
               }}
             >

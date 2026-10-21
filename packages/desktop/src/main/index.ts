@@ -147,7 +147,6 @@ const main = Effect.gen(function* () {
   if (onboardingTestRoot) app.setPath("sessionData", join(onboardingTestRoot, "session"))
   initializeOldLayoutEligibility(app.getPath("userData"))
   logger = initLogging()
-  initCrashReporter()
 
   const wslServers = createWslServersController(
     app.getVersion(),
@@ -200,7 +199,9 @@ const main = Effect.gen(function* () {
     return
   }
 
-  const shellEnv = preferAppEnv(app.getPath("userData"))
+  // The login-shell probe takes ~2 s. Start it now so it overlaps Electron startup and window
+  // creation; only the sidecar (and its proxy setup) needs the result.
+  const shellEnvReady = preferAppEnv(app.getPath("userData"))
 
   app.on("second-instance", (_event: Event, argv: string[]) => {
     const urls = argv.filter((arg: string) => arg.startsWith("forge://"))
@@ -255,19 +256,6 @@ const main = Effect.gen(function* () {
   yield* Effect.promise(() => app.whenReady())
 
   if (!TEST_ONBOARDING) migrate()
-  yield* Effect.promise(() => cleanupStoreFiles(app.getPath("userData"))).pipe(
-    Effect.tap((result) =>
-      Effect.sync(() => {
-        if (result.deleted.length === 0) return
-        logger.log("cleaned scoped store files", { count: result.deleted.length, scanned: result.scanned })
-      }),
-    ),
-    Effect.catch((error) =>
-      Effect.sync(() => {
-        logger.warn("failed to clean scoped store files", error)
-      }),
-    ),
-  )
   app.setAsDefaultProtocolClient("forge")
   registerRendererProtocol()
   setDockIcon()
@@ -316,16 +304,10 @@ const main = Effect.gen(function* () {
   const updateTimer = setInterval(() => void updater.check(), 10 * 60 * 1000)
   updateTimer.unref()
   app.once("will-quit", () => clearInterval(updateTimer))
-  yield* Effect.promise(() => startNetLog()).pipe(
-    Effect.catch((error) =>
-      Effect.sync(() => {
-        logger.warn("failed to start net log", error)
-      }),
-    ),
-  )
-
   const loadingTask = yield* Effect.gen(function* () {
     logger.log("sidecar connection started", { version: SIDECAR_VERSION })
+
+    const shellEnv = yield* Effect.promise(() => shellEnvReady)
 
     ensureLoopbackNoProxy()
     useEnvProxy()
@@ -406,8 +388,6 @@ const main = Effect.gen(function* () {
     logger.log("loading task finished")
   }).pipe(forwardInitializationFailure(serverReady), Effect.forkChild)
 
-  yield* Fiber.await(loadingTask)
-
   app.on("window-all-closed", () => {
     if (process.platform === "darwin") return
     app.quit()
@@ -417,8 +397,39 @@ const main = Effect.gen(function* () {
     restoreMainWindows()
   })
 
+  // Windows don't wait for the sidecar health check: the renderer already awaits the
+  // sidecar credentials over IPC, so it can paint its loading state while the server boots.
   const windows = restoreMainWindows()
   if (windows.length) createMenu(menuDeps)
+
+  // None of this is needed to paint the first window: crashpad spawns a handler process, the net log
+  // opens a file, and the store cleanup lists and stats userData.
+  yield* Effect.sleep("500 millis")
+  initCrashReporter()
+  yield* Effect.promise(() => startNetLog()).pipe(
+    Effect.catch((error) =>
+      Effect.sync(() => {
+        logger.warn("failed to start net log", error)
+      }),
+    ),
+  )
+
+  yield* Effect.promise(() => cleanupStoreFiles(app.getPath("userData"))).pipe(
+    Effect.tap((result) =>
+      Effect.sync(() => {
+        if (result.deleted.length === 0) return
+        logger.log("cleaned scoped store files", { count: result.deleted.length, scanned: result.scanned })
+      }),
+    ),
+    Effect.catch((error) =>
+      Effect.sync(() => {
+        logger.warn("failed to clean scoped store files", error)
+      }),
+    ),
+  )
+
+  // Keep the program alive until the loading task ends; the forked child dies with its parent.
+  yield* Fiber.await(loadingTask)
 })
 
 Effect.runFork(main)

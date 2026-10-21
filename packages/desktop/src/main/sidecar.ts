@@ -1,4 +1,6 @@
 import * as http from "node:http"
+import { enableCompileCache, flushCompileCache } from "node:module"
+import * as path from "node:path"
 import * as tls from "node:tls"
 
 type NodeHttpWithEnvProxy = typeof http & {
@@ -51,6 +53,8 @@ parentPort.on("message", (event) => {
 async function start(command: StartCommand) {
   try {
     prepareSidecarEnv(command.password, command.userDataPath)
+    // The server bundle is ~39 MB of JS; V8 bytecode persisted between launches skips most of its compile time.
+    enableCompileCache(path.join(command.userDataPath, "compile-cache", "sidecar"))
     ensureLoopbackNoProxy()
     useSystemCertificates()
     useEnvProxy()
@@ -64,6 +68,8 @@ async function start(command: StartCommand) {
       cors: ["oc://renderer"],
     })
     parentPort.postMessage({ type: "ready" })
+    // Bytecode is normally written at exit, which a killed or crashed sidecar never reaches.
+    setImmediate(() => flushCompileCache())
   } catch (error) {
     parentPort.postMessage({ type: "error", error: serializeError(error) })
     setImmediate(() => process.exit(1))
