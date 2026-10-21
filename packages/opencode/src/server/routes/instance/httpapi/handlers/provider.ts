@@ -32,6 +32,29 @@ function mapProviderAuthError<A, R>(self: Effect.Effect<A, ProviderAuth.Error, R
   )
 }
 
+// Converting the models.dev catalog (thousands of models) and validating it into public form costs hundreds of
+// milliseconds on the single server thread, and every project directory asks for it again at startup. The
+// models.dev provider objects are stable until the catalog refreshes, so keep the conversion per object.
+const catalogEntries = new WeakMap<object, { info: Provider.Info; public: Provider.Info; defaultModel: string }>()
+
+function catalogEntry(item: Parameters<typeof Provider.fromModelsDevProvider>[0]) {
+  const cached = catalogEntries.get(item)
+  if (cached) return cached
+  const info = Provider.fromModelsDevProvider(item)
+  const entry = {
+    info,
+    public: Provider.toPublicInfo(info),
+    defaultModel: Provider.defaultModelIDs({ [info.id]: info })[info.id],
+  }
+  catalogEntries.set(item, entry)
+  return entry
+}
+
+// The encoded response (about 7 MB) only changes when the catalog, the provider filters, the connected
+// providers or the stored credentials do. Keep the last few serialized bodies per catalog snapshot.
+const encodedResponses = new WeakMap<object, Map<string, string>>()
+const encodedResponseLimit = 4
+
 export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider", (handlers) =>
   Effect.gen(function* () {
     const cfg = yield* Config.Service
@@ -39,7 +62,30 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
     const svc = yield* ProviderAuth.Service
     const authStore = yield* Auth.Service
 
-    const list = Effect.fn("ProviderHttpApi.list")(function* () {
+    const listRaw = Effect.fn("ProviderHttpApi.listRaw")(function* () {
+      const entries = yield* listEntries()
+      const bodies = encodedResponses.get(entries.catalog) ?? new Map<string, string>()
+      encodedResponses.set(entries.catalog, bodies)
+      const cached = bodies.get(entries.key)
+      if (cached) return HttpServerResponse.text(cached, { contentType: "application/json" })
+      // Encode provider by provider (same field order as ListResult) so the event loop can run other work between.
+      const encodeInfo = Schema.encodeUnknownEffect(Provider.Info)
+      const providers: string[] = []
+      for (const info of entries.result.all) {
+        providers.push(JSON.stringify(yield* encodeInfo(info).pipe(Effect.orDie)))
+        yield* Effect.yieldNow
+      }
+      const rest = yield* Schema.encodeUnknownEffect(Schema.Struct({ default: Provider.ListResult.fields.default, connected: Provider.ListResult.fields.connected }))({
+        default: entries.result.default,
+        connected: entries.result.connected,
+      }).pipe(Effect.orDie)
+      const body = `{"all":[${providers.join(",")}],"default":${JSON.stringify(rest.default)},"connected":${JSON.stringify(rest.connected)}}`
+      if (bodies.size >= encodedResponseLimit) bodies.delete(bodies.keys().next().value!)
+      bodies.set(entries.key, body)
+      return HttpServerResponse.text(body, { contentType: "application/json" })
+    })
+
+    const listEntries = Effect.fn("ProviderHttpApi.listEntries")(function* () {
       const config = yield* cfg.get()
       const all = yield* ModelsDev.Service.use((s) => s.get())
       const disabled = new Set(config.disabled_providers ?? [])
@@ -50,14 +96,32 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       }
       const connected = yield* provider.list()
       const credentials = yield* authStore.all().pipe(Effect.orDie)
+      // Convert in slices: the first call does ~1.5 s of synchronous work, and other requests (the session
+      // list the sidebar waits on) should be answered between slices instead of queueing behind all of it.
+      const entries: Record<string, ReturnType<typeof catalogEntry>> = {}
+      for (const [key, value] of Object.entries(filtered)) {
+        entries[key] = catalogEntry(value)
+        yield* Effect.yieldNow
+      }
       const providers = Object.assign(
-        mapValues(filtered, (item) => Provider.fromModelsDevProvider(item)),
+        mapValues(entries, (entry) => entry.info),
         connected,
       )
-      return {
-        all: Object.values(providers).map(Provider.toPublicInfo),
-        default: Provider.defaultModelIDs(providers),
+      const connectedPublic = Object.fromEntries(Object.entries(connected).map(([id, info]) => [id, Provider.toPublicInfo(info)]))
+      const result = {
+        all: Object.keys(providers).map((id) => (id in connected ? connectedPublic[id] : entries[id].public)),
+        default: Object.fromEntries(
+          Object.entries(providers).map(([id, info]) => [
+            id,
+            id in connected ? Provider.defaultModelIDs({ [id]: info })[id] : entries[id].defaultModel,
+          ]),
+        ),
         connected: Object.keys(providers).filter((id) => id in connected || credentials[id]),
+      }
+      return {
+        result,
+        catalog: all as object,
+        key: JSON.stringify([config.enabled_providers, config.disabled_providers, connectedPublic, result.connected]),
       }
     })
 
@@ -108,7 +172,7 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
     })
 
     return handlers
-      .handle("list", list)
+      .handleRaw("list", listRaw)
       .handle("auth", auth)
       .handleRaw("authorize", authorizeRaw)
       .handle("callback", callback)
