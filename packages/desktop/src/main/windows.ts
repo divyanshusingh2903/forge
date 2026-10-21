@@ -1,15 +1,15 @@
-import windowState from "electron-window-state"
 import { resolveThemeVariant } from "@opencode-ai/ui/theme/resolve"
 import type { DesktopTheme } from "@opencode-ai/ui/theme/types"
 import oc2ThemeJson from "../../../ui/src/theme/themes/oc-2.json"
 import { randomUUID } from "node:crypto"
 import { rmSync } from "node:fs"
-import { app, BrowserWindow, dialog, net, nativeImage, nativeTheme, protocol, shell } from "electron"
+import { app, BrowserWindow, dialog, net, nativeImage, nativeTheme, protocol, screen, shell } from "electron"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { TitlebarTheme } from "../preload/types"
 import { exportDebugLogs, write as writeLog } from "./logging"
 import { getStore, removeStoreFile } from "./store"
+import { manageWindowState, readWindowState, resolveWindowState } from "./window-bounds"
 import { PINCH_ZOOM_ENABLED_KEY, WINDOW_IDS_KEY } from "./store-keys"
 import { createUnresponsiveSampler } from "./unresponsive"
 import { nativeT } from "./native-translations"
@@ -45,6 +45,12 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ])
+
+const displays = {
+  all: () => screen.getAllDisplays().map((display) => display.bounds),
+  primary: () => screen.getPrimaryDisplay().bounds,
+  matching: (bounds: Electron.Rectangle) => screen.getDisplayMatching(bounds).bounds,
+}
 
 let backgroundColor: string | undefined
 let relaunchHandler = () => {
@@ -168,11 +174,8 @@ export function setDockIcon() {
 }
 
 export function createMainWindow(id: string = randomUUID()) {
-  const state = windowState({
-    file: windowStateFile(id),
-    defaultWidth: 1280,
-    defaultHeight: 800,
-  })
+  const stateFile = join(app.getPath("userData"), windowStateFile(id))
+  const state = resolveWindowState(readWindowState(stateFile), { width: 1280, height: 800 }, displays)
 
   const mode = tone()
   const win = new BrowserWindow({
@@ -223,7 +226,7 @@ export function createMainWindow(id: string = randomUUID()) {
     callback({ responseHeaders })
   })
 
-  state.manage(win)
+  manageWindowState(win, stateFile, state, displays)
   registerWindow(win, id)
   wireFullscreen(win)
   wireMaximized(win)
