@@ -32,30 +32,20 @@ function mapProviderAuthError<A, R>(self: Effect.Effect<A, ProviderAuth.Error, R
   )
 }
 
-// Converting the models.dev catalog (thousands of models) and validating it into public form costs hundreds of
-// milliseconds on the single server thread, and every project directory asks for it again at startup. The
-// models.dev provider objects are stable until the catalog refreshes, so keep the conversion per object.
-type CatalogEntry = { serial: number; info: Provider.Info; public: Provider.Info; defaultModel: string }
-const catalogEntries = new WeakMap<object, CatalogEntry>()
-let catalogSerial = 0
+// The default model of a catalog provider never changes for the same converted entry.
+const catalogDefaults = new WeakMap<Provider.Info, string>()
 
-function catalogEntry(item: Parameters<typeof Provider.fromModelsDevProvider>[0]) {
-  const cached = catalogEntries.get(item)
-  if (cached) return cached
-  const info = Provider.fromModelsDevProvider(item)
-  const entry = {
-    serial: ++catalogSerial,
-    info,
-    public: Provider.toPublicInfo(info),
-    defaultModel: Provider.defaultModelIDs({ [info.id]: info })[info.id],
-  }
-  catalogEntries.set(item, entry)
-  return entry
+function catalogDefault(info: Provider.Info) {
+  const cached = catalogDefaults.get(info)
+  if (cached !== undefined) return cached
+  const value = Provider.defaultModelIDs({ [info.id]: info })[info.id]
+  catalogDefaults.set(info, value)
+  return value
 }
 
 // The encoded response (about 7 MB) only changes when the catalog, the provider filters, the connected
-// providers or the stored credentials do. The parsed catalog is shared across project instances, so the serials of
-// its converted entries identify the catalog part. Keep the last few serialized bodies.
+// providers or the stored credentials do. The converted catalog is shared with the provider state of every project
+// instance, so its serial identifies the catalog part. Keep the last few serialized bodies.
 const encodedResponses = new Map<string, string>()
 const encodedResponseLimit = 4
 // The desktop asks for the list globally and for every project at once on startup. Concurrent requests for the same
@@ -120,13 +110,12 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       }
       const connected = yield* provider.list()
       const credentials = yield* authStore.all().pipe(Effect.orDie)
-      // Convert in slices: the first call does ~1.5 s of synchronous work, and other requests (the session
-      // list the sidebar waits on) should be answered between slices instead of queueing behind all of it.
-      const entries: Record<string, ReturnType<typeof catalogEntry>> = {}
-      for (const [key, value] of Object.entries(filtered)) {
-        entries[key] = catalogEntry(value)
-        yield* Effect.yieldNow
-      }
+      // The provider state of this instance has already converted the shared catalog; reuse it read-only.
+      const converted = yield* Provider.convertedCatalog(all)
+      const entries = mapValues(filtered, (_, key) => ({
+        info: converted.catalog[key],
+        public: converted.database[key],
+      }))
       const providers = Object.assign(
         mapValues(entries, (entry) => entry.info),
         connected,
@@ -137,7 +126,7 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
         default: Object.fromEntries(
           Object.entries(providers).map(([id, info]) => [
             id,
-            id in connected ? Provider.defaultModelIDs({ [id]: info })[id] : entries[id].defaultModel,
+            id in connected ? Provider.defaultModelIDs({ [id]: info })[id] : catalogDefault(entries[id].info),
           ]),
         ),
         connected: Object.keys(providers).filter((id) => id in connected || credentials[id]),
@@ -145,7 +134,8 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       return {
         result,
         key: JSON.stringify([
-          Object.values(entries).map((entry) => entry.serial),
+          converted.serial,
+          Object.keys(entries),
           config.enabled_providers,
           config.disabled_providers,
           connectedPublic,

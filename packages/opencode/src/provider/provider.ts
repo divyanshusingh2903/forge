@@ -18,7 +18,7 @@ import { iife } from "@/util/iife"
 import { Global } from "@opencode-ai/core/global"
 import path from "path"
 import { pathToFileURL } from "url"
-import { Effect, Layer, Context, Schema, Types } from "effect"
+import { Deferred, Effect, Layer, Context, Schema, Types } from "effect"
 import { EffectBridge } from "@/effect/bridge"
 import { InstanceState } from "@/effect/instance-state"
 import { EffectPromise } from "@/effect/promise"
@@ -1440,16 +1440,39 @@ function modelSuggestions(provider: Info | undefined, modelID: ModelV2.ID, enabl
 // Converting the models.dev catalog (thousands of models) and validating it into public form takes a few hundred
 // milliseconds, and every project instance did it again at startup on the server's single thread. Convert once per
 // catalog snapshot: the catalog is only read afterwards, and instances clone the public database they mutate.
-const convertedCatalogs = new WeakMap<object, { catalog: Record<string, Info>; database: Record<string, Info> }>()
+// Shared by every instance and by the provider list route; callers must treat both records as read-only.
+export type ConvertedCatalog = { serial: number; catalog: Record<string, Info>; database: Record<string, Info> }
+const convertedCatalogs = new WeakMap<object, ConvertedCatalog>()
+let convertedSerial = 0
 
-function convertedCatalog(modelsDev: Record<string, ModelsDev.Provider>) {
+const convertingCatalogs = new WeakMap<object, Deferred.Deferred<ConvertedCatalog>>()
+
+// Converts in slices that yield to the event loop, so requests other than the first caller's keep being answered;
+// concurrent callers wait for the conversion already running.
+export const convertedCatalog = Effect.fnUntraced(function* (modelsDev: Record<string, ModelsDev.Provider>) {
   const cached = convertedCatalogs.get(modelsDev)
   if (cached) return cached
-  const catalog = mapValues(modelsDev, fromModelsDevProvider)
-  const value = { catalog, database: mapValues(catalog, toPublicInfo) }
-  convertedCatalogs.set(modelsDev, value)
-  return value
-}
+  const pending = convertingCatalogs.get(modelsDev)
+  if (pending) return yield* Deferred.await(pending)
+  const converting = yield* Deferred.make<ConvertedCatalog>()
+  convertingCatalogs.set(modelsDev, converting)
+  return yield* Effect.uninterruptible(
+    Effect.gen(function* () {
+      const catalog: Record<string, Info> = {}
+      const database: Record<string, Info> = {}
+      for (const [id, provider] of Object.entries(modelsDev)) {
+        catalog[id] = fromModelsDevProvider(provider)
+        database[id] = toPublicInfo(catalog[id])
+        yield* Effect.yieldNow
+      }
+      const value = { serial: ++convertedSerial, catalog, database }
+      convertedCatalogs.set(modelsDev, value)
+      convertingCatalogs.delete(modelsDev)
+      yield* Deferred.succeed(converting, value)
+      return value
+    }),
+  )
+})
 
 const layer = Layer.effect(
   Service,
@@ -1467,7 +1490,7 @@ const layer = Layer.effect(
         const bridge = yield* EffectBridge.make()
         const cfg = yield* config.get()
         const modelsDev = yield* modelsDevSvc.get()
-        const converted = convertedCatalog(modelsDev)
+        const converted = yield* convertedCatalog(modelsDev)
         const catalog = converted.catalog
         // Each instance mutates its own provider entries below, so it gets a private copy of the shared result.
         const database = structuredClone(converted.database)
