@@ -36,6 +36,7 @@ const layer = Layer.effect(
     const scope = yield* Scope.make()
     const active = new Map<ID, Scope.Closeable>()
     const loading = new Set<ID>()
+    const settling = new Set<ID>()
     const waiters = new Map<ID, Set<Deferred.Deferred<void>>>()
     const failures = new Map<ID, Exit.Exit<void, never>>()
     let host: Parameters<PluginRuntime["effect"]>[0]
@@ -61,12 +62,20 @@ const layer = Layer.effect(
                   Effect.withSpan("Plugin.load", { attributes: { "plugin.id": id } }),
                   Effect.onExit((exit) => (Exit.isFailure(exit) ? Scope.close(child, exit) : Effect.void)),
                 )
-                yield* events.publish(Event.Added, { id })
                 active.set(id, child)
-                yield* Effect.forEach(waiters.get(id) ?? [], (waiter) => Deferred.succeed(waiter, undefined), {
-                  discard: true,
-                })
-                waiters.delete(id)
+                settling.add(id)
+                // Release waiters only after the enclosing batch reloads the state this plugin transformed, so they
+                // never read state from before its transforms applied.
+                yield* State.afterBatch(
+                  Effect.gen(function* () {
+                    settling.delete(id)
+                    yield* events.publish(Event.Added, { id })
+                    yield* Effect.forEach(waiters.get(id) ?? [], (waiter) => Deferred.succeed(waiter, undefined), {
+                      discard: true,
+                    })
+                    waiters.delete(id)
+                  }),
+                )
               }),
             ),
           ),
@@ -101,7 +110,7 @@ const layer = Layer.effect(
       const waiter = yield* Deferred.make<void>()
       const pending = yield* locks.withLock(id)(
         Effect.sync(() => {
-          if (active.has(id)) return false
+          if (active.has(id) && !settling.has(id)) return false
           const failure = failures.get(id)
           if (failure) return failure
           const current = waiters.get(id) ?? new Set()

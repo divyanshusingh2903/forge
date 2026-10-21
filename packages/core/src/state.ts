@@ -26,18 +26,32 @@ export interface Transformable<DraftApi> {
   readonly reload: Reload
 }
 
-const CurrentBatch = Context.Reference<Set<Reload> | undefined>("@opencode/State/CurrentBatch", {
-  defaultValue: () => undefined,
-})
+const CurrentBatch = Context.Reference<{ reloads: Set<Reload>; settled: Effect.Effect<void>[] } | undefined>(
+  "@opencode/State/CurrentBatch",
+  { defaultValue: () => undefined },
+)
 
 export function batch<A, E, R>(effect: Effect.Effect<A, E, R>) {
   return Effect.gen(function* () {
     const current = yield* CurrentBatch
     if (current) return yield* effect
-    const reloads = new Set<Reload>()
-    const result = yield* effect.pipe(Effect.provideService(CurrentBatch, reloads))
-    yield* Effect.forEach(reloads, (reload) => reload(), { discard: true })
+    const next = { reloads: new Set<Reload>(), settled: [] as Effect.Effect<void>[] }
+    const result = yield* effect.pipe(Effect.provideService(CurrentBatch, next))
+    yield* Effect.forEach(next.reloads, (reload) => reload(), { discard: true })
+    yield* Effect.forEach(next.settled, (settle) => settle, { discard: true })
     return result
+  })
+}
+
+/** Runs the effect once the outermost batch has reloaded every state it touched, or now outside a batch. */
+export function afterBatch(effect: Effect.Effect<void>) {
+  return Effect.gen(function* () {
+    const current = yield* CurrentBatch
+    if (current) {
+      current.settled.push(effect)
+      return
+    }
+    yield* effect
   })
 }
 
@@ -101,7 +115,7 @@ export function create<State, DraftApi>(options: Options<State, DraftApi>): Inte
                 return Effect.gen(function* () {
                   const batch = yield* CurrentBatch
                   if (batch) {
-                    batch.add(reload)
+                    batch.reloads.add(reload)
                     return
                   }
                   yield* materialize()
@@ -116,7 +130,7 @@ export function create<State, DraftApi>(options: Options<State, DraftApi>): Inte
           )
           yield* Scope.addFinalizer(scope, dispose)
           const batch = yield* CurrentBatch
-          if (batch) batch.add(reload)
+          if (batch) batch.reloads.add(reload)
           else yield* reload()
           return { dispose }
         }),
