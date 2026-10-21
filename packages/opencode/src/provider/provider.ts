@@ -1437,6 +1437,20 @@ function modelSuggestions(provider: Info | undefined, modelID: ModelV2.ID, enabl
     .map((item) => item.id)
 }
 
+// Converting the models.dev catalog (thousands of models) and validating it into public form takes a few hundred
+// milliseconds, and every project instance did it again at startup on the server's single thread. Convert once per
+// catalog snapshot: the catalog is only read afterwards, and instances clone the public database they mutate.
+const convertedCatalogs = new WeakMap<object, { catalog: Record<string, Info>; database: Record<string, Info> }>()
+
+function convertedCatalog(modelsDev: Record<string, ModelsDev.Provider>) {
+  const cached = convertedCatalogs.get(modelsDev)
+  if (cached) return cached
+  const catalog = mapValues(modelsDev, fromModelsDevProvider)
+  const value = { catalog, database: mapValues(catalog, toPublicInfo) }
+  convertedCatalogs.set(modelsDev, value)
+  return value
+}
+
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
@@ -1453,8 +1467,10 @@ const layer = Layer.effect(
         const bridge = yield* EffectBridge.make()
         const cfg = yield* config.get()
         const modelsDev = yield* modelsDevSvc.get()
-        const catalog = mapValues(modelsDev, fromModelsDevProvider)
-        const database = mapValues(catalog, toPublicInfo)
+        const converted = convertedCatalog(modelsDev)
+        const catalog = converted.catalog
+        // Each instance mutates its own provider entries below, so it gets a private copy of the shared result.
+        const database = structuredClone(converted.database)
 
         const providers: Record<ProviderV2.ID, Info> = {} as Record<ProviderV2.ID, Info>
         const languages = new Map<string, LanguageModelV3>()

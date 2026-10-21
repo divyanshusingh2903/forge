@@ -140,6 +140,21 @@ export interface Interface {
   readonly refresh: (force?: boolean) => Effect.Effect<void>
 }
 
+// Every project instance on the server loads the catalog (~6 MB of JSON) for itself. Parse an unchanged file once and
+// share the result, as the bundled snapshot already is, so instances also share everything derived from it.
+let parsedCatalog: { text: string; value: Record<string, Provider> } | undefined
+
+function parseCatalog(text: string) {
+  if (parsedCatalog?.text === text) return parsedCatalog.value
+  try {
+    const value = JSON.parse(text) as Record<string, Provider>
+    parsedCatalog = { text, value }
+    return value
+  } catch {
+    return undefined
+  }
+}
+
 export class Service extends Context.Service<Service, Interface>()("@opencode/ModelsDev") {}
 
 const layer = Layer.effect(
@@ -181,18 +196,14 @@ const layer = Layer.effect(
       )
     })
 
-    const loadFromDisk = fs.readJson(Flag.OPENCODE_MODELS_PATH ?? filepath).pipe(
-      Effect.catch((error) => {
-        if (
-          Flag.OPENCODE_MODELS_PATH === undefined &&
-          error._tag === "FileSystemError" &&
-          error.method === "readJson"
-        ) {
-          return fs.remove(filepath, { force: true }).pipe(Effect.ignore, Effect.as(undefined))
-        }
-        return Effect.succeed(undefined)
+    const loadFromDisk = fs.readFileStringSafe(Flag.OPENCODE_MODELS_PATH ?? filepath).pipe(
+      Effect.catch(() => Effect.succeed(undefined)),
+      Effect.flatMap((text) => {
+        if (text === undefined) return Effect.succeed(undefined)
+        const parsed = parseCatalog(text)
+        if (parsed !== undefined || Flag.OPENCODE_MODELS_PATH !== undefined) return Effect.succeed(parsed)
+        return fs.remove(filepath, { force: true }).pipe(Effect.ignore, Effect.as(undefined))
       }),
-      Effect.map((v) => v as Record<string, Provider> | undefined),
     )
 
     const loadSnapshot = Effect.sync(() =>

@@ -35,13 +35,16 @@ function mapProviderAuthError<A, R>(self: Effect.Effect<A, ProviderAuth.Error, R
 // Converting the models.dev catalog (thousands of models) and validating it into public form costs hundreds of
 // milliseconds on the single server thread, and every project directory asks for it again at startup. The
 // models.dev provider objects are stable until the catalog refreshes, so keep the conversion per object.
-const catalogEntries = new WeakMap<object, { info: Provider.Info; public: Provider.Info; defaultModel: string }>()
+type CatalogEntry = { serial: number; info: Provider.Info; public: Provider.Info; defaultModel: string }
+const catalogEntries = new WeakMap<object, CatalogEntry>()
+let catalogSerial = 0
 
 function catalogEntry(item: Parameters<typeof Provider.fromModelsDevProvider>[0]) {
   const cached = catalogEntries.get(item)
   if (cached) return cached
   const info = Provider.fromModelsDevProvider(item)
   const entry = {
+    serial: ++catalogSerial,
     info,
     public: Provider.toPublicInfo(info),
     defaultModel: Provider.defaultModelIDs({ [info.id]: info })[info.id],
@@ -51,8 +54,9 @@ function catalogEntry(item: Parameters<typeof Provider.fromModelsDevProvider>[0]
 }
 
 // The encoded response (about 7 MB) only changes when the catalog, the provider filters, the connected
-// providers or the stored credentials do. Keep the last few serialized bodies per catalog snapshot.
-const encodedResponses = new WeakMap<object, Map<string, string>>()
+// providers or the stored credentials do. The parsed catalog is shared across project instances, so the serials of
+// its converted entries identify the catalog part. Keep the last few serialized bodies.
+const encodedResponses = new Map<string, string>()
 const encodedResponseLimit = 4
 
 export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider", (handlers) =>
@@ -64,8 +68,7 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
 
     const listRaw = Effect.fn("ProviderHttpApi.listRaw")(function* () {
       const entries = yield* listEntries()
-      const bodies = encodedResponses.get(entries.catalog) ?? new Map<string, string>()
-      encodedResponses.set(entries.catalog, bodies)
+      const bodies = encodedResponses
       const cached = bodies.get(entries.key)
       if (cached) return HttpServerResponse.text(cached, { contentType: "application/json" })
       // Encode provider by provider (same field order as ListResult) so the event loop can run other work between.
@@ -120,8 +123,13 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
       }
       return {
         result,
-        catalog: all as object,
-        key: JSON.stringify([config.enabled_providers, config.disabled_providers, connectedPublic, result.connected]),
+        key: JSON.stringify([
+          Object.values(entries).map((entry) => entry.serial),
+          config.enabled_providers,
+          config.disabled_providers,
+          connectedPublic,
+          result.connected,
+        ]),
       }
     })
 
