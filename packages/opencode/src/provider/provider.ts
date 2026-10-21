@@ -1492,8 +1492,17 @@ const layer = Layer.effect(
         const modelsDev = yield* modelsDevSvc.get()
         const converted = yield* convertedCatalog(modelsDev)
         const catalog = converted.catalog
-        // Each instance mutates its own provider entries below, so it gets a private copy of the shared result.
-        const database = structuredClone(converted.database)
+        // Each instance mutates the provider entries it touches below, so it works on private copies of the shared
+        // result. Most of the ~200 providers are never touched; copy each one on first access instead of all upfront.
+        const own: Record<string, Info> = {}
+        const database = new Proxy(own, {
+          get(target, key, receiver) {
+            if (typeof key === "string" && !(key in target) && key in converted.database) {
+              target[key] = structuredClone(converted.database[key])
+            }
+            return Reflect.get(target, key, receiver)
+          },
+        })
 
         const providers: Record<ProviderV2.ID, Info> = {} as Record<ProviderV2.ID, Info>
         const languages = new Map<string, LanguageModelV3>()
@@ -1671,7 +1680,9 @@ const layer = Layer.effect(
 
         // load env
         const envs = yield* env.all()
-        for (const [id, provider] of Object.entries(database)) {
+        // Reads only `env`, so look at entries without copying them; same order as the database itself.
+        for (const id of new Set([...Object.keys(converted.database), ...Object.keys(own)])) {
+          const provider = own[id] ?? converted.database[id]
           const providerID = ProviderV2.ID.make(id)
           if (disabled.has(providerID)) continue
           const apiKey = provider.env.map((item) => envs[item]).find(Boolean)
