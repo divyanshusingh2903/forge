@@ -210,14 +210,11 @@ const layer = Layer.effect(
     const locked = <A, E, R>(repository: Repository, effect: Effect.Effect<A, E, R>) =>
       locks.withLock(repository.gitDirectory)(effect)
 
-    const discover = Effect.fn("Git.repo.discover")(function* (input: AbsolutePath) {
-      const dotgit = yield* fs.up({ targets: [".git"], start: input }).pipe(
-        Effect.map((matches) => matches[0]),
-        Effect.catch(() => Effect.succeed(undefined)),
-      )
-      if (!dotgit) return undefined
-
-      const cwd = path.dirname(dotgit)
+    // The desktop discovers the same few repositories dozens of times while it starts (every location service and
+    // route asks), and each discovery forks three git processes, which blocks the event loop for ~10 ms apiece in a
+    // large process. Share one result per repository for a few seconds, including concurrent callers.
+    const identities = new Map<string, Effect.Effect<Repository | undefined>>()
+    const identify = Effect.fn("Git.repo.identify")(function* (cwd: string) {
       const git = run(cwd, proc)
       const topLevel = yield* git(["rev-parse", "--show-toplevel"])
       const gitDir = yield* git(["rev-parse", "--git-dir"])
@@ -229,6 +226,21 @@ const layer = Layer.effect(
         gitDirectory: AbsolutePath.make(resolvePath(cwd, gitDir.text)),
         commonDirectory: AbsolutePath.make(resolvePath(cwd, commonDir.text)),
       })
+    })
+
+    const discover = Effect.fn("Git.repo.discover")(function* (input: AbsolutePath) {
+      const dotgit = yield* fs.up({ targets: [".git"], start: input }).pipe(
+        Effect.map((matches) => matches[0]),
+        Effect.catch(() => Effect.succeed(undefined)),
+      )
+      if (!dotgit) return undefined
+
+      const cwd = path.dirname(dotgit)
+      const existing = identities.get(cwd)
+      if (existing) return yield* existing
+      const cached = yield* Effect.cachedWithTTL(identify(cwd), "5 seconds")
+      identities.set(cwd, cached)
+      return yield* cached
     })
 
     const remote = Effect.fn("Git.remote.get")(function* (repository: Repository, name = "origin") {
