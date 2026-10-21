@@ -133,13 +133,21 @@ const markBoundaryGesture = (input: {
 
 function TimelineThinkingRow(props: { reasoningHeading?: string; showReasoningSummaries: boolean }) {
   const language = useLanguage()
+  // Animate the heading only when the row mounts without one; a remount with a heading already set
+  // would replay the reveal.
+  const animateHeading = createMemo<boolean>((previous) => previous ?? !props.reasoningHeading)
 
   return (
     <div data-slot="session-turn-thinking">
       <SessionProgressIndicatorV2 />
       <TextShimmer text={language.t("ui.sessionTurn.status.thinking")} />
       <Show when={!props.showReasoningSummaries}>
-        <TextReveal text={props.reasoningHeading} class="session-turn-thinking-heading" travel={25} duration={700} />
+        <TextReveal
+          text={props.reasoningHeading}
+          class="session-turn-thinking-heading"
+          travel={animateHeading() ? 25 : 0}
+          duration={animateHeading() ? 700 : 0}
+        />
       </Show>
     </div>
   )
