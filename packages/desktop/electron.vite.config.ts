@@ -51,7 +51,21 @@ const require = __cjs_mod__.createRequire(import.meta.url);
 `,
         },
       },
-      externalizeDeps: { include: [nodePtyPkg] },
+      // Dependencies left external are resolved file by file at startup (package.json lookups for every module
+      // of effect alone cost hundreds of milliseconds), so bundle them. electron-updater stays external for
+      // its lazy requires.
+      externalizeDeps: {
+        include: [nodePtyPkg],
+        exclude: [
+          "effect",
+          "drizzle-orm",
+          "electron-store",
+          "electron-log",
+          "electron-context-menu",
+          "electron-window-state",
+          "@zip.js/zip.js",
+        ],
+      },
     },
     plugins: [
       {
