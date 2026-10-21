@@ -5,7 +5,7 @@ import { Provider } from "@/provider/provider"
 import { Auth } from "@/auth"
 
 import { mapValues } from "remeda"
-import { Effect, Schema } from "effect"
+import { Deferred, Effect, Schema } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
@@ -58,6 +58,9 @@ function catalogEntry(item: Parameters<typeof Provider.fromModelsDevProvider>[0]
 // its converted entries identify the catalog part. Keep the last few serialized bodies.
 const encodedResponses = new Map<string, string>()
 const encodedResponseLimit = 4
+// The desktop asks for the list globally and for every project at once on startup. Concurrent requests for the same
+// body wait for one encode instead of each encoding (and holding a browser connection) in parallel.
+const encodingResponses = new Map<string, Deferred.Deferred<string>>()
 
 export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider", (handlers) =>
   Effect.gen(function* () {
@@ -68,24 +71,42 @@ export const providerHandlers = HttpApiBuilder.group(InstanceHttpApi, "provider"
 
     const listRaw = Effect.fn("ProviderHttpApi.listRaw")(function* () {
       const entries = yield* listEntries()
-      const bodies = encodedResponses
-      const cached = bodies.get(entries.key)
+      const cached = encodedResponses.get(entries.key)
       if (cached) return HttpServerResponse.text(cached, { contentType: "application/json" })
-      // Encode provider by provider (same field order as ListResult) so the event loop can run other work between.
+      const pending = encodingResponses.get(entries.key)
+      if (pending) return HttpServerResponse.text(yield* Deferred.await(pending), { contentType: "application/json" })
+      const encoding = yield* Deferred.make<string>()
+      encodingResponses.set(entries.key, encoding)
+      // Finish and publish even if this request goes away, so requests waiting on it are never left hanging.
+      const body = yield* Effect.uninterruptible(
+        Effect.gen(function* () {
+          const exit = yield* Effect.exit(encodeList(entries.result))
+          encodingResponses.delete(entries.key)
+          yield* Deferred.done(encoding, exit)
+          const body = yield* exit
+          if (encodedResponses.size >= encodedResponseLimit) encodedResponses.delete(encodedResponses.keys().next().value!)
+          encodedResponses.set(entries.key, body)
+          return body
+        }),
+      )
+      return HttpServerResponse.text(body, { contentType: "application/json" })
+    })
+
+    // Encode provider by provider (same field order as ListResult) so the event loop can run other work between.
+    const encodeList = Effect.fn("ProviderHttpApi.encodeList")(function* (result: Provider.ListResult) {
       const encodeInfo = Schema.encodeUnknownEffect(Provider.Info)
       const providers: string[] = []
-      for (const info of entries.result.all) {
+      for (const info of result.all) {
         providers.push(JSON.stringify(yield* encodeInfo(info).pipe(Effect.orDie)))
         yield* Effect.yieldNow
       }
-      const rest = yield* Schema.encodeUnknownEffect(Schema.Struct({ default: Provider.ListResult.fields.default, connected: Provider.ListResult.fields.connected }))({
-        default: entries.result.default,
-        connected: entries.result.connected,
+      const rest = yield* Schema.encodeUnknownEffect(
+        Schema.Struct({ default: Provider.ListResult.fields.default, connected: Provider.ListResult.fields.connected }),
+      )({
+        default: result.default,
+        connected: result.connected,
       }).pipe(Effect.orDie)
-      const body = `{"all":[${providers.join(",")}],"default":${JSON.stringify(rest.default)},"connected":${JSON.stringify(rest.connected)}}`
-      if (bodies.size >= encodedResponseLimit) bodies.delete(bodies.keys().next().value!)
-      bodies.set(entries.key, body)
-      return HttpServerResponse.text(body, { contentType: "application/json" })
+      return `{"all":[${providers.join(",")}],"default":${JSON.stringify(rest.default)},"connected":${JSON.stringify(rest.connected)}}`
     })
 
     const listEntries = Effect.fn("ProviderHttpApi.listEntries")(function* () {
