@@ -1,0 +1,5 @@
+- Reads the page in a tab of the session's Browser panel as rendered right now, after JavaScript has run.
+- Formats: `markdown` (default), `text`, or `html`.
+- Reads the active tab unless `tabID` is given. Use `browser_navigate` first to load a page; its output lists the open tab IDs.
+- When no Browser panel is attached (or the live read fails), the tab's URL is fetched by the server instead. The output's `source` line says which happened; a server fetch has no JavaScript execution and no browser cookies.
+- Do NOT use it for general web fetching or documentation lookups; use `webfetch` for normal URLs.

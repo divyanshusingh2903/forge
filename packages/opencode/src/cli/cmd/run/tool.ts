@@ -30,6 +30,7 @@ import type { ReadTool } from "@/tool/read"
 import type { SkillTool } from "@/tool/skill"
 import type { TaskTool } from "@/tool/task"
 import type { TodoWriteTool } from "@/tool/todo"
+import type { BrowserNavigateTool, BrowserReadTool } from "@/tool/browser"
 import type { WebFetchTool } from "@/tool/webfetch"
 import { webSearchProviderLabel, type WebSearchTool } from "@/tool/websearch"
 import type { WriteTool } from "@/tool/write"
@@ -106,6 +107,8 @@ type ToolDefs = {
   grep: typeof GrepTool
   list: Tool.Info
   lsp: typeof LspTool
+  browser_navigate: typeof BrowserNavigateTool
+  browser_read: typeof BrowserReadTool
   webfetch: typeof WebFetchTool
   websearch: typeof WebSearchTool
   skill: typeof SkillTool
@@ -344,6 +347,23 @@ function runWebfetch(p: ToolProps<typeof WebFetchTool>): ToolInline {
   return {
     icon: "%",
     title: url ? `WebFetch ${url}` : "WebFetch",
+  }
+}
+
+function runBrowserNavigate(p: ToolProps<typeof BrowserNavigateTool>): ToolInline {
+  const url = p.metadata.url || p.input.url || ""
+  return {
+    icon: "%",
+    title: `Browser ${p.input.action ?? "goto"}${url ? ` ${url}` : ""}`,
+  }
+}
+
+function runBrowserRead(p: ToolProps<typeof BrowserReadTool>): ToolInline {
+  const url = p.metadata.url || ""
+  const source = p.metadata.source ? ` (${p.metadata.source})` : ""
+  return {
+    icon: "%",
+    title: `Browser read${url ? ` ${url}` : ""}${source}`,
   }
 }
 
@@ -917,6 +937,16 @@ function scrollWebfetchStart(p: ToolProps<typeof WebFetchTool>): string {
   return `% WebFetch ${url}`
 }
 
+function scrollBrowserNavigateStart(p: ToolProps<typeof BrowserNavigateTool>): string {
+  const url = p.metadata.url || p.input.url || ""
+  return `% Browser ${p.input.action ?? "goto"}${url ? ` ${url}` : ""}`
+}
+
+function scrollBrowserReadStart(p: ToolProps<typeof BrowserReadTool>): string {
+  const url = p.metadata.url || ""
+  return `% Browser read${url ? ` ${url}` : ""}`
+}
+
 function scrollWebSearchStart(p: ToolProps<typeof WebSearchTool>): string {
   const title = webSearchProviderLabel(p.metadata.provider)
   const query = p.input.query ?? ""
@@ -999,6 +1029,17 @@ function permWebfetch(p: ToolPermissionProps<typeof WebFetchTool>): ToolPermissi
   return {
     icon: "%",
     title: `WebFetch ${url}`,
+    lines: url ? [`URL: ${url}`] : [],
+  }
+}
+
+function permBrowser(
+  p: ToolPermissionProps<typeof BrowserNavigateTool> | ToolPermissionProps<typeof BrowserReadTool>,
+): ToolPermissionInfo {
+  const url = p.patterns[0] || ""
+  return {
+    icon: "%",
+    title: url ? `Browser ${url}` : "Browser",
     lines: url ? [`URL: ${url}`] : [],
   }
 }
@@ -1196,6 +1237,28 @@ const TOOL_RULES = {
       start: scrollLspStart,
     },
     permission: permLsp,
+  },
+  browser_navigate: {
+    view: {
+      output: false,
+      final: false,
+    },
+    run: runBrowserNavigate,
+    scroll: {
+      start: scrollBrowserNavigateStart,
+    },
+    permission: permBrowser,
+  },
+  browser_read: {
+    view: {
+      output: false,
+      final: false,
+    },
+    run: runBrowserRead,
+    scroll: {
+      start: scrollBrowserReadStart,
+    },
+    permission: permBrowser,
   },
   webfetch: {
     view: {

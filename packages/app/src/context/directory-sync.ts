@@ -13,6 +13,7 @@ const sessionFields = new Set([
   "session_working",
   "session_diff",
   "todo",
+  "browser",
   "permission",
   "question",
   "message",

@@ -12,6 +12,7 @@ import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
 import { getStore, removeStoreFileIfEmpty } from "./store"
 import {
+  clearBrowserStorageData,
   getPinchZoomEnabled,
   getWindowID,
   iconPath,
@@ -319,6 +320,7 @@ export function registerIpcHandlers(deps: Deps) {
       relaunch: deps.relaunch,
     })
   })
+  ipcMain.handle("clear-browser-data", () => clearBrowserStorageData())
 }
 
 export function sendMenuCommand(win: BrowserWindow, id: string) {

@@ -2,10 +2,12 @@ import { dict as en } from "./en"
 
 type Keys = keyof typeof en
 
+import { browserDict } from "./browser"
 import { gitDict } from "./git"
 import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 export const dict = {
+  ...browserDict("de"),
   ...gitDict("de"),
   ...MANUAL_UPDATE_ENGLISH,
   "command.category.suggested": "Vorgeschlagen",

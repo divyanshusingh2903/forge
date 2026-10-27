@@ -7,8 +7,70 @@ import DESCRIPTION from "./webfetch.txt"
 import { isImageAttachment } from "@/util/media"
 
 const MAX_RESPONSE_SIZE = 5 * 1024 * 1024 // 5MB
-const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
-const MAX_TIMEOUT = 120 * 1000 // 2 minutes
+export const DEFAULT_TIMEOUT = 30 * 1000 // 30 seconds
+export const MAX_TIMEOUT = 120 * 1000 // 2 minutes
+type Format = "text" | "markdown" | "html"
+
+function buildAcceptHeader(format: Format): string {
+  switch (format) {
+    case "markdown":
+      return "text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1"
+    case "text":
+      return "text/plain;q=1.0, text/markdown;q=0.9, text/html;q=0.8, */*;q=0.1"
+    case "html":
+      return "text/html;q=1.0, application/xhtml+xml;q=0.9, text/plain;q=0.8, text/markdown;q=0.7, */*;q=0.1"
+    default:
+      return "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
+  }
+}
+
+export function fetchUrlResponse(
+  httpOk: HttpClient.HttpClient,
+  url: string,
+  format: Format,
+  timeout: number,
+) {
+  const headers = {
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
+    Accept: buildAcceptHeader(format),
+    "Accept-Language": "en-US,en;q=0.9",
+  }
+  const request = HttpClientRequest.get(url).pipe(HttpClientRequest.setHeaders(headers))
+
+  // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
+  return Effect.gen(function* () {
+    const response = yield* httpOk.execute(request).pipe(
+      Effect.catchIf(
+        (err) =>
+          err.reason._tag === "StatusCodeError" &&
+          err.reason.response.status === 403 &&
+          err.reason.response.headers["cf-mitigated"] === "challenge",
+        () =>
+          httpOk.execute(
+            HttpClientRequest.get(url).pipe(
+              HttpClientRequest.setHeaders({ ...headers, "User-Agent": "opencode" }),
+            ),
+          ),
+      ),
+      Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
+    )
+
+    const contentLength = response.headers["content-length"]
+    if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
+      throw new Error("Response too large (exceeds 5MB limit)")
+    }
+
+    const arrayBuffer = yield* response.arrayBuffer
+    if (arrayBuffer.byteLength > MAX_RESPONSE_SIZE) {
+      throw new Error("Response too large (exceeds 5MB limit)")
+    }
+
+    const contentType = response.headers["content-type"] || ""
+    const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
+    return { arrayBuffer, contentType, mime }
+  })
+}
 
 export const Parameters = Schema.Struct({
   url: Schema.String.annotate({ description: "The URL to fetch content from" }),
@@ -48,67 +110,11 @@ export const WebFetchTool = Tool.define(
           })
 
           const timeout = Math.min((params.timeout ?? DEFAULT_TIMEOUT / 1000) * 1000, MAX_TIMEOUT)
+          const fetched = yield* fetchUrlResponse(httpOk, params.url, params.format, timeout)
+          const title = `${params.url} (${fetched.contentType})`
 
-          // Build Accept header based on requested format with q parameters for fallbacks
-          let acceptHeader = "*/*"
-          switch (params.format) {
-            case "markdown":
-              acceptHeader = "text/markdown;q=1.0, text/x-markdown;q=0.9, text/plain;q=0.8, text/html;q=0.7, */*;q=0.1"
-              break
-            case "text":
-              acceptHeader = "text/plain;q=1.0, text/markdown;q=0.9, text/html;q=0.8, */*;q=0.1"
-              break
-            case "html":
-              acceptHeader =
-                "text/html;q=1.0, application/xhtml+xml;q=0.9, text/plain;q=0.8, text/markdown;q=0.7, */*;q=0.1"
-              break
-            default:
-              acceptHeader =
-                "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8"
-          }
-          const headers = {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
-            Accept: acceptHeader,
-            "Accept-Language": "en-US,en;q=0.9",
-          }
-
-          const request = HttpClientRequest.get(params.url).pipe(HttpClientRequest.setHeaders(headers))
-
-          // Retry with honest UA if blocked by Cloudflare bot detection (TLS fingerprint mismatch)
-          const response = yield* httpOk.execute(request).pipe(
-            Effect.catchIf(
-              (err) =>
-                err.reason._tag === "StatusCodeError" &&
-                err.reason.response.status === 403 &&
-                err.reason.response.headers["cf-mitigated"] === "challenge",
-              () =>
-                httpOk.execute(
-                  HttpClientRequest.get(params.url).pipe(
-                    HttpClientRequest.setHeaders({ ...headers, "User-Agent": "opencode" }),
-                  ),
-                ),
-            ),
-            Effect.timeoutOrElse({ duration: timeout, orElse: () => Effect.die(new Error("Request timed out")) }),
-          )
-
-          // Check content length
-          const contentLength = response.headers["content-length"]
-          if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
-            throw new Error("Response too large (exceeds 5MB limit)")
-          }
-
-          const arrayBuffer = yield* response.arrayBuffer
-          if (arrayBuffer.byteLength > MAX_RESPONSE_SIZE) {
-            throw new Error("Response too large (exceeds 5MB limit)")
-          }
-
-          const contentType = response.headers["content-type"] || ""
-          const mime = contentType.split(";")[0]?.trim().toLowerCase() || ""
-          const title = `${params.url} (${contentType})`
-
-          if (isImageAttachment(mime)) {
-            const base64Content = Buffer.from(arrayBuffer).toString("base64")
+          if (isImageAttachment(fetched.mime)) {
+            const base64Content = Buffer.from(fetched.arrayBuffer).toString("base64")
             return {
               title,
               output: "Image fetched successfully",
@@ -116,19 +122,19 @@ export const WebFetchTool = Tool.define(
               attachments: [
                 {
                   type: "file" as const,
-                  mime,
-                  url: `data:${mime};base64,${base64Content}`,
+                  mime: fetched.mime,
+                  url: `data:${fetched.mime};base64,${base64Content}`,
                 },
               ],
             }
           }
 
-          const content = new TextDecoder().decode(arrayBuffer)
+          const content = new TextDecoder().decode(fetched.arrayBuffer)
 
           // Handle content based on requested format and actual content type
           switch (params.format) {
             case "markdown":
-              if (contentType.includes("text/html")) {
+              if (fetched.contentType.includes("text/html")) {
                 const markdown = convertHTMLToMarkdown(content)
                 return {
                   output: markdown,
@@ -139,7 +145,7 @@ export const WebFetchTool = Tool.define(
               return { output: content, title, metadata: {} }
 
             case "text":
-              if (contentType.includes("text/html")) {
+              if (fetched.contentType.includes("text/html")) {
                 return { output: extractTextFromHTML(content), title, metadata: {} }
               }
               return { output: content, title, metadata: {} }
@@ -155,7 +161,7 @@ export const WebFetchTool = Tool.define(
   }),
 )
 
-function extractTextFromHTML(html: string) {
+export function extractTextFromHTML(html: string) {
   let text = ""
   let skipDepth = 0
 
@@ -179,7 +185,7 @@ function extractTextFromHTML(html: string) {
   return text.trim()
 }
 
-function convertHTMLToMarkdown(html: string): string {
+export function convertHTMLToMarkdown(html: string): string {
   const turndownService = new TurndownService({
     headingStyle: "atx",
     hr: "---",

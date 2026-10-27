@@ -221,6 +221,15 @@ import type {
   QuestionV2Reply,
   SessionAbortErrors,
   SessionAbortResponses,
+  SessionBrowserAttachErrors,
+  SessionBrowserAttachResponses,
+  SessionBrowserErrors,
+  SessionBrowserResponses,
+  SessionBrowserResultErrors,
+  SessionBrowserResultResponses,
+  SessionBrowserTab,
+  SessionBrowserUpdateErrors,
+  SessionBrowserUpdateResponses,
   SessionChildrenErrors,
   SessionChildrenResponses,
   SessionCommandErrors,
@@ -4397,6 +4406,185 @@ export class Session2 extends HeyApiClient {
       url: "/session/{sessionID}/todo",
       ...options,
       ...params,
+    })
+  }
+
+  /**
+   * Get session browser state
+   *
+   * Retrieve the open tabs and attach status of the session-attached browser.
+   */
+  public browser<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).get<SessionBrowserResponses, SessionBrowserErrors, ThrowOnError>({
+      url: "/session/{sessionID}/browser",
+      ...options,
+      ...params,
+    })
+  }
+
+  /**
+   * Update session browser tabs
+   *
+   * Sync the open tabs (URL and title) and the active tab from the session browser panel.
+   */
+  public browserUpdate<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      activeTabID?: string
+      tabs?: Array<SessionBrowserTab>
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "activeTabID" },
+            { in: "body", key: "tabs" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionBrowserUpdateResponses,
+      SessionBrowserUpdateErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/browser",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Attach or detach session browser panel
+   *
+   * Acquire, renew, or release a client's session browser panel lease.
+   */
+  public browserAttach<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      clientID?: string
+      attached?: boolean
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "clientID" },
+            { in: "body", key: "attached" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionBrowserAttachResponses,
+      SessionBrowserAttachErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/browser/attach",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
+    })
+  }
+
+  /**
+   * Reply to a session browser command
+   *
+   * Deliver the result of a `session.browser.command` executed by the session browser panel.
+   */
+  public browserResult<ThrowOnError extends boolean = false>(
+    parameters: {
+      sessionID: string
+      directory?: string
+      workspace?: string
+      requestID?: string
+      ok?: boolean
+      error?: string
+      tabID?: string
+      url?: string
+      title?: string
+      html?: string
+      text?: string
+    },
+    options?: Options<never, ThrowOnError>,
+  ) {
+    const params = buildClientParams(
+      [parameters],
+      [
+        {
+          args: [
+            { in: "path", key: "sessionID" },
+            { in: "query", key: "directory" },
+            { in: "query", key: "workspace" },
+            { in: "body", key: "requestID" },
+            { in: "body", key: "ok" },
+            { in: "body", key: "error" },
+            { in: "body", key: "tabID" },
+            { in: "body", key: "url" },
+            { in: "body", key: "title" },
+            { in: "body", key: "html" },
+            { in: "body", key: "text" },
+          ],
+        },
+      ],
+    )
+    return (options?.client ?? this.client).post<
+      SessionBrowserResultResponses,
+      SessionBrowserResultErrors,
+      ThrowOnError
+    >({
+      url: "/session/{sessionID}/browser/result",
+      ...options,
+      ...params,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+        ...params.headers,
+      },
     })
   }
 

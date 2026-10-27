@@ -1544,6 +1544,79 @@ const scenarios: Scenario[] = [
       check(stable(body) === stable(ctx.state.todos), "todos should match seeded state")
     }),
   http.protected
+    .get("/session/{sessionID}/browser", "session.browser")
+    .seeded((ctx) => ctx.session({ title: "Browser session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/browser", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+    }))
+    .json(200, (body) => {
+      object(body)
+      check(body.attached === false, "a new session should not have an attached browser panel")
+    }),
+  http.protected
+    .post("/session/{sessionID}/browser", "session.browserUpdate")
+    .mutating()
+    .seeded((ctx) => ctx.session({ title: "Browser update session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/browser", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: {
+        activeTabID: "tab-1",
+        tabs: [{ tabID: "tab-1", url: "https://example.com", title: "Example Domain" }],
+      },
+    }))
+    .json(
+      200,
+      (body) => {
+        object(body)
+        check(body.activeTabID === "tab-1", "browserUpdate should return the active tab")
+        check(Array.isArray(body.tabs) && body.tabs.length === 1, "browserUpdate should return the synced tabs")
+      },
+      "status",
+    ),
+  http.protected
+    .post("/session/{sessionID}/browser/attach", "session.browserAttach")
+    .mutating()
+    .seeded((ctx) => ctx.session({ title: "Browser attach session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/browser/attach", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: {
+        clientID: "exercise-client",
+        attached: true,
+      },
+    }))
+    .json(
+      200,
+      (body) => {
+        object(body)
+        check(body.attached === true, "browserAttach should mark the session browser as attached")
+      },
+      "status",
+    ),
+  http.protected
+    .post("/session/{sessionID}/browser/result", "session.browserResult")
+    .mutating()
+    .seeded((ctx) => ctx.session({ title: "Browser result session" }))
+    .at((ctx) => ({
+      path: route("/session/{sessionID}/browser/result", { sessionID: ctx.state.id }),
+      headers: ctx.headers(),
+      body: {
+        requestID: "unknown-request",
+        ok: true,
+        url: "https://example.com",
+      },
+    }))
+    .json(
+      200,
+      (body) => {
+        object(body)
+        check(body.attached === false, "an unknown browser result should be dropped without attaching")
+      },
+      "status",
+    ),
+  http.protected
     .get("/session/{sessionID}/plan", "session.plan")
     .seeded((ctx) => ctx.session({ title: "Plan session" }))
     .at((ctx) => ({ path: route("/session/{sessionID}/plan", { sessionID: ctx.state.id }), headers: ctx.headers() }))

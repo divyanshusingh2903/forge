@@ -96,9 +96,11 @@ const desktop = [
   "Pasirinkti priedai viršija {{limit}} MB ribą",
 ]
 
+import { browserDict } from "./browser"
 import { gitDict } from "./git"
 
 export const dict = {
+  ...browserDict("lt"),
   ...gitDict("lt"),
   ...MANUAL_UPDATE_ENGLISH,
   ...Object.fromEntries(DESKTOP_NATIVE_KEYS.map((key, index) => [key, desktop[index]])),
