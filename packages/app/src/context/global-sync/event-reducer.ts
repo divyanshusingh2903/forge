@@ -7,6 +7,7 @@ import type {
   Project,
   QuestionRequest,
   Session,
+  SessionBrowserCommand,
   SessionStatus,
   Todo,
 } from "@opencode-ai/sdk/v2/client"
@@ -21,6 +22,7 @@ const SKIP_PARTS = new Set(["patch", "step-start", "step-finish"])
 const SESSION_CONTENT_EVENTS = new Set([
   "session.diff",
   "todo.updated",
+  "session.browser.command",
   "session.status",
   "message.updated",
   "message.removed",
@@ -263,6 +265,24 @@ export function applyDirectoryEvent(input: {
       const props = event.properties as { sessionID: string; todos: Todo[] }
       input.setStore("todo", props.sessionID, reconcile(props.todos, { key: "id" }))
       input.setSessionTodo?.(props.sessionID, props.todos)
+      break
+    }
+    case "session.browser.command": {
+      const props = event.properties as {
+        sessionID: string
+        requestID: string
+        tabID?: string
+        timeoutMs: number
+        command: SessionBrowserCommand
+      }
+      input.setStore("browser", props.sessionID, {
+        command: {
+          requestID: props.requestID,
+          tabID: props.tabID,
+          command: props.command,
+          expiresAt: Date.now() + props.timeoutMs,
+        },
+      })
       break
     }
     case "session.status": {

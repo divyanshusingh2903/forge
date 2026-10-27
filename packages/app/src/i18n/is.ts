@@ -96,9 +96,11 @@ const desktop = [
   "Valin viðhengi fara yfir {{limit}} MB hámarkið",
 ]
 
+import { browserDict } from "./browser"
 import { gitDict } from "./git"
 
 export const dict = {
+  ...browserDict("is"),
   ...gitDict("is"),
   ...MANUAL_UPDATE_ENGLISH,
   ...Object.fromEntries(DESKTOP_NATIVE_KEYS.map((key, index) => [key, desktop[index]])),

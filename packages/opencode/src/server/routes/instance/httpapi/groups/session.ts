@@ -9,6 +9,7 @@ import { SessionRevert } from "@/session/revert"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
+import { Browser } from "@/browser"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { Snapshot } from "@/snapshot"
 import { Schema, Struct } from "effect"
@@ -20,7 +21,7 @@ import {
   WorkspaceRoutingQuery,
   WorkspaceRoutingQueryFields,
 } from "../middleware/workspace-routing"
-import { ApiNotFoundError, PermissionNotFoundError, SessionBusyError } from "../errors"
+import { ApiNotFoundError, PayloadTooLargeError, PermissionNotFoundError, SessionBusyError } from "../errors"
 import { described } from "./metadata"
 import { QueryBoolean } from "./query"
 import { ProviderV2 } from "@opencode-ai/core/provider"
@@ -87,6 +88,9 @@ export const RevertPayload = Schema.Struct(Struct.omit(SessionRevert.RevertInput
 export const PermissionResponsePayload = Schema.Struct({
   response: PermissionV1.Reply,
 })
+export const BrowserStatePayload = Schema.Struct(Browser.StateInput.fields)
+export const BrowserAttachPayload = Schema.Struct(Browser.AttachInput.fields)
+export const BrowserResultPayload = Schema.Struct(Browser.ResultInput.fields)
 
 export const SessionPaths = {
   list: root,
@@ -94,6 +98,9 @@ export const SessionPaths = {
   get: `${root}/:sessionID`,
   children: `${root}/:sessionID/children`,
   todo: `${root}/:sessionID/todo`,
+  browser: `${root}/:sessionID/browser`,
+  browserAttach: `${root}/:sessionID/browser/attach`,
+  browserResult: `${root}/:sessionID/browser/result`,
   diff: `${root}/:sessionID/diff`,
   plan: `${root}/:sessionID/plan`,
   planRecover: `${root}/:sessionID/plan/recover`,
@@ -178,6 +185,57 @@ export const SessionApi = HttpApi.make("session")
             identifier: "session.todo",
             summary: "Get session todos",
             description: "Retrieve the todo list associated with a specific session, showing tasks and action items.",
+          }),
+        ),
+        HttpApiEndpoint.get("browser", SessionPaths.browser, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          success: described(Browser.Info, "Session browser state"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.browser",
+            summary: "Get session browser state",
+            description: "Retrieve the open tabs and attach status of the session-attached browser.",
+          }),
+        ),
+        HttpApiEndpoint.post("browserUpdate", SessionPaths.browser, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: BrowserStatePayload,
+          success: described(Browser.Info, "Updated session browser state"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.browserUpdate",
+            summary: "Update session browser tabs",
+            description: "Sync the open tabs (URL and title) and the active tab from the session browser panel.",
+          }),
+        ),
+        HttpApiEndpoint.post("browserAttach", SessionPaths.browserAttach, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: BrowserAttachPayload,
+          success: described(Browser.Info, "Updated session browser attach state"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.browserAttach",
+            summary: "Attach or detach session browser panel",
+            description: "Acquire, renew, or release a client's session browser panel lease.",
+          }),
+        ),
+        HttpApiEndpoint.post("browserResult", SessionPaths.browserResult, {
+          params: { sessionID: SessionID },
+          query: WorkspaceRoutingQuery,
+          payload: BrowserResultPayload,
+          success: described(Browser.Info, "Session browser state"),
+          error: [HttpApiError.BadRequest, ApiNotFoundError, PayloadTooLargeError],
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "session.browserResult",
+            summary: "Reply to a session browser command",
+            description: "Deliver the result of a `session.browser.command` executed by the session browser panel.",
           }),
         ),
         HttpApiEndpoint.get("diff", SessionPaths.diff, {

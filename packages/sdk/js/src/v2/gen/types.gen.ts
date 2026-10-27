@@ -69,6 +69,7 @@ export type Event =
   | EventQuestionV2Rejected
   | EventVcsChanged
   | EventTodoUpdated
+  | EventSessionBrowserCommand
   | EventLspUpdated
   | EventPermissionAsked
   | EventPermissionReplied
@@ -670,6 +671,20 @@ export type Todo = {
    */
   priority: string
 }
+
+export type SessionBrowserNavigateCommand = {
+  type: "navigate"
+  action: "goto" | "back" | "forward" | "reload"
+  url?: string
+  newTab?: boolean
+}
+
+export type SessionBrowserReadCommand = {
+  type: "read"
+  format: "markdown" | "text" | "html"
+}
+
+export type SessionBrowserCommand = SessionBrowserNavigateCommand | SessionBrowserReadCommand
 
 export type SessionStatus =
   | {
@@ -1376,6 +1391,17 @@ export type GlobalEvent = {
       }
     | {
         id: string
+        type: "session.browser.command"
+        properties: {
+          sessionID: string
+          requestID: string
+          tabID?: string
+          timeoutMs: number | "NaN" | "Infinity" | "-Infinity" | "Infinity" | "-Infinity" | "NaN"
+          command: SessionBrowserCommand
+        }
+      }
+    | {
+        id: string
         type: "lsp.updated"
         properties: {
           [key: string]: unknown
@@ -1685,6 +1711,7 @@ export type PermissionConfig =
       question?: PermissionActionConfig
       webfetch?: PermissionActionConfig
       websearch?: PermissionActionConfig
+      browser?: PermissionRuleConfig
       lsp?: PermissionRuleConfig
       doom_loop?: PermissionActionConfig
       skill?: PermissionRuleConfig
@@ -2634,6 +2661,23 @@ export type NotFoundError = {
   }
 }
 
+export type SessionBrowserTab = {
+  tabID: string
+  url: string
+  title?: string
+}
+
+export type SessionBrowserInfo = {
+  attached: boolean
+  activeTabID?: string
+  tabs: Array<SessionBrowserTab>
+}
+
+export type PayloadTooLargeError = {
+  _tag: "PayloadTooLargeError"
+  message: string
+}
+
 export type SessionBusyError = {
   _tag: "SessionBusyError"
   sessionID: string
@@ -2884,6 +2928,27 @@ export type OutputFormat1 =
       retryCount?: number
     }
 
+export type SessionBrowserCommand2 = {
+  id: string
+  metadata?: {
+    [key: string]: unknown
+  }
+  type: "session.browser.command"
+  durable?: {
+    aggregateID: string
+    seq: number
+    version: number
+  }
+  location?: LocationRef
+  data: {
+    sessionID: string
+    requestID: string
+    tabID?: string
+    timeoutMs: number | "NaN" | "Infinity" | "-Infinity"
+    command: SessionBrowserCommand
+  }
+}
+
 export type SessionStatus2 = {
   id: string
   metadata?: {
@@ -3004,6 +3069,7 @@ export type V2Event =
   | QuestionV2Rejected
   | VcsChanged
   | TodoUpdated
+  | SessionBrowserCommand2
   | LspUpdated
   | PermissionAsked
   | PermissionReplied
@@ -7000,6 +7066,18 @@ export type EventTodoUpdated = {
   }
 }
 
+export type EventSessionBrowserCommand = {
+  id: string
+  type: "session.browser.command"
+  properties: {
+    sessionID: string
+    requestID: string
+    tabID?: string
+    timeoutMs: number | "NaN" | "Infinity" | "-Infinity"
+    command: SessionBrowserCommand
+  }
+}
+
 export type EventLspUpdated = {
   id: string
   type: "lsp.updated"
@@ -10559,6 +10637,161 @@ export type SessionTodoResponses = {
 }
 
 export type SessionTodoResponse = SessionTodoResponses[keyof SessionTodoResponses]
+
+export type SessionBrowserData = {
+  body?: never
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/browser"
+}
+
+export type SessionBrowserErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionBrowserError = SessionBrowserErrors[keyof SessionBrowserErrors]
+
+export type SessionBrowserResponses = {
+  /**
+   * Session browser state
+   */
+  200: SessionBrowserInfo
+}
+
+export type SessionBrowserResponse = SessionBrowserResponses[keyof SessionBrowserResponses]
+
+export type SessionBrowserUpdateData = {
+  body?: {
+    activeTabID?: string
+    tabs: Array<SessionBrowserTab>
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/browser"
+}
+
+export type SessionBrowserUpdateErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionBrowserUpdateError = SessionBrowserUpdateErrors[keyof SessionBrowserUpdateErrors]
+
+export type SessionBrowserUpdateResponses = {
+  /**
+   * Updated session browser state
+   */
+  200: SessionBrowserInfo
+}
+
+export type SessionBrowserUpdateResponse = SessionBrowserUpdateResponses[keyof SessionBrowserUpdateResponses]
+
+export type SessionBrowserAttachData = {
+  body?: {
+    clientID: string
+    attached: boolean
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/browser/attach"
+}
+
+export type SessionBrowserAttachErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+}
+
+export type SessionBrowserAttachError = SessionBrowserAttachErrors[keyof SessionBrowserAttachErrors]
+
+export type SessionBrowserAttachResponses = {
+  /**
+   * Updated session browser attach state
+   */
+  200: SessionBrowserInfo
+}
+
+export type SessionBrowserAttachResponse = SessionBrowserAttachResponses[keyof SessionBrowserAttachResponses]
+
+export type SessionBrowserResultData = {
+  body?: {
+    requestID: string
+    ok: boolean
+    error?: string
+    tabID?: string
+    url?: string
+    title?: string
+    html?: string
+    text?: string
+  }
+  path: {
+    sessionID: string
+  }
+  query?: {
+    directory?: string
+    workspace?: string
+  }
+  url: "/session/{sessionID}/browser/result"
+}
+
+export type SessionBrowserResultErrors = {
+  /**
+   * BadRequest | InvalidRequestError
+   */
+  400: EffectHttpApiErrorBadRequest | InvalidRequestError
+  /**
+   * NotFoundError
+   */
+  404: NotFoundError
+  /**
+   * PayloadTooLargeError
+   */
+  413: PayloadTooLargeError
+}
+
+export type SessionBrowserResultError = SessionBrowserResultErrors[keyof SessionBrowserResultErrors]
+
+export type SessionBrowserResultResponses = {
+  /**
+   * Session browser state
+   */
+  200: SessionBrowserInfo
+}
+
+export type SessionBrowserResultResponse = SessionBrowserResultResponses[keyof SessionBrowserResultResponses]
 
 export type SessionDiffData = {
   body?: never

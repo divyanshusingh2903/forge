@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { FileSystem, Integration, Permission, Project, Reference, Session, Workspace } from "../src"
 import { EventManifest } from "../src/event-manifest"
 import { IdeEvent } from "../src/ide-event"
+import { SessionBrowser } from "../src/session-browser"
 import { SessionEvent } from "../src/session-event"
 import { SessionTodo } from "../src/session-todo"
 import { SessionV1 } from "../src/session-v1"
@@ -11,7 +12,7 @@ import { VcsEvent } from "../src/vcs-event"
 describe("public event manifest", () => {
   test("owns the complete public event surface", () => {
     expect(EventManifest.ServerDefinitions.length).toBe(59)
-    expect(EventManifest.Definitions.length).toBe(89)
+    expect(EventManifest.Definitions.length).toBe(90)
     expect(SessionV1.Event.Definitions).toEqual([
       SessionV1.Event.Created,
       SessionV1.Event.Updated,
@@ -24,7 +25,7 @@ describe("public event manifest", () => {
       SessionV1.Event.Diff,
       SessionV1.Event.Error,
     ])
-    expect(EventManifest.Latest.size).toBe(89)
+    expect(EventManifest.Latest.size).toBe(90)
     expect(EventManifest.Durable.size).toBe(35)
   })
 
@@ -35,6 +36,7 @@ describe("public event manifest", () => {
     expect(Workspace.Event.Definitions).toBe(WorkspaceEvent.Definitions)
     expect(EventManifest.Latest.get("session.next.step.ended")).toBe(SessionEvent.Step.Ended)
     expect(EventManifest.Latest.get("todo.updated")).toBe(SessionTodo.Event.Updated)
+    expect(EventManifest.Latest.get("session.browser.command")).toBe(SessionBrowser.Event.Command)
     expect(EventManifest.Latest.get("project.updated")).toBe(Project.Event.Updated)
     expect(Project.Event.Definitions).toEqual([Project.Event.Updated])
     expect(FileSystem.Event.Definitions).toEqual([FileSystem.Event.Edited])

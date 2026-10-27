@@ -96,9 +96,11 @@ const desktop = [
   "A kiválasztott mellékletek meghaladják a(z) {{limit}} MB-os korlátot",
 ]
 
+import { browserDict } from "./browser"
 import { gitDict } from "./git"
 
 export const dict = {
+  ...browserDict("hu"),
   ...gitDict("hu"),
   ...MANUAL_UPDATE_ENGLISH,
   ...Object.fromEntries(DESKTOP_NATIVE_KEYS.map((key, index) => [key, desktop[index]])),

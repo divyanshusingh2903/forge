@@ -1,7 +1,9 @@
+import { browserDict } from "./browser"
 import { gitDict } from "./git"
 import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 export const dict = {
+  ...browserDict("it"),
   ...gitDict("it"),
   ...MANUAL_UPDATE_ENGLISH,
   "command.category.suggested": "Suggeriti",
