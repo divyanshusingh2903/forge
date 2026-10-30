@@ -90,6 +90,30 @@ function formatTabLabel(tab: BrowserTab, newTabLabel: string): string {
   return tab.url
 }
 
+export function resolveBrowserGotoTab(input: {
+  url: string
+  tabID?: string
+  newTab?: boolean
+  tabs: BrowserTab[]
+  activeTab?: BrowserTab
+  addTab: (url?: string) => string
+}): string {
+  const { url, tabID, newTab, tabs, activeTab, addTab } = input
+  if (tabID && tabs.some((tab) => tab.id === tabID)) return tabID
+  const candidatePool = activeTab ? [activeTab, ...tabs] : tabs
+  if (newTab) {
+    const empty = candidatePool.find((tab) => !tab.url)
+    return empty?.id ?? addTab("")
+  }
+  const exact = tabs.find((tab) => tab.url === url)
+  if (exact) return exact.id
+  const origin = URL.parse(url)?.origin
+  const sameOrigin =
+    candidatePool.find((tab) => tab.url && URL.parse(tab.url)?.origin === origin) ??
+    candidatePool.find((tab) => !tab.url)
+  return sameOrigin?.id ?? addTab("")
+}
+
 export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
   const language = useLanguage()
   const platform = usePlatform()
@@ -240,7 +264,14 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
     if (command.action === "goto") {
       const url = command.url ? normalizeBrowserUrl(command.url) : undefined
       if (!url) return reply(id, requestID, { ok: false, error: "Invalid URL" })
-      const tabId = resolveGotoTab(url, tabID, command.newTab)
+      const tabId = resolveGotoTab({
+        url,
+        tabID,
+        newTab: command.newTab,
+        tabs: tabs(),
+        activeTab: activeTab(),
+        addTab: () => view().browser.addTab(""),
+      })
       view().browser.setActiveTab(tabId)
       return navigateTab(tabId, url, { requestID, sessionID: id })
     }
@@ -261,18 +292,14 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
   }
 
   // Prefer a tab already on this URL or origin, then an empty tab, so the agent leaves unrelated tabs alone.
-  const resolveGotoTab = (url: string, tabID: string | undefined, newTab: boolean | undefined) => {
-    const open = tabs()
-    if (tabID && open.some((tab) => tab.id === tabID)) return tabID
-    if (newTab) return view().browser.addTab("")
-    const exact = open.find((tab) => tab.url === url)
-    if (exact) return exact.id
-    const origin = URL.parse(url)?.origin
-    const sameOrigin =
-      [activeTab(), ...open].find((tab) => tab.url && URL.parse(tab.url)?.origin === origin) ??
-      [activeTab(), ...open].find((tab) => !tab.url)
-    return sameOrigin?.id ?? view().browser.addTab("")
-  }
+  const resolveGotoTab = (input: {
+    url: string
+    tabID?: string
+    newTab?: boolean
+    tabs: BrowserTab[]
+    activeTab?: BrowserTab
+    addTab: (url?: string) => string
+  }) => resolveBrowserGotoTab(input)
 
   const whenIdle = (tabId: string) =>
     new Promise<void>((resolve) => {
