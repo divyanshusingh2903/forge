@@ -144,6 +144,7 @@ export const dict: Record<string, string> = {
   "ui.tool.task": "Tasca",
   "ui.tool.browser.navigate": "Navega",
   "ui.tool.browser.read": "Llegeix la pàgina",
+  "ui.tool.browser.screenshot": "Screenshot",
   "ui.tool.browser.source.live": "en directe",
   "ui.tool.browser.source.fetched": "baixada",
   "ui.tool.webfetch": "Webfetch",

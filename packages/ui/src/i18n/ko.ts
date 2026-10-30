@@ -124,6 +124,7 @@ export const dict = {
   "ui.tool.grep": "Grep",
   "ui.tool.browser.navigate": "이동",
   "ui.tool.browser.read": "페이지 읽기",
+  "ui.tool.browser.screenshot": "스크린샷",
   "ui.tool.browser.source.live": "실시간",
   "ui.tool.browser.source.fetched": "가져옴",
   "ui.tool.webfetch": "웹 가져오기",

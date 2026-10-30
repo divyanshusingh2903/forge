@@ -140,6 +140,7 @@ export const dict = {
   "ui.tool.task": "ວຽກງານ",
   "ui.tool.browser.navigate": "ໄປຫາ",
   "ui.tool.browser.read": "ອ່ານໜ້າ",
+  "ui.tool.browser.screenshot": "Screenshot",
   "ui.tool.browser.source.live": "ສົດ",
   "ui.tool.browser.source.fetched": "ດຶງແລ້ວ",
   "ui.tool.webfetch": "Webfetch",

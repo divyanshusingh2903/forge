@@ -145,6 +145,7 @@ export const dict: Record<string, string> = {
   "ui.tool.task": "Zadatak",
   "ui.tool.browser.navigate": "Idi na",
   "ui.tool.browser.read": "Pročitaj stranicu",
+  "ui.tool.browser.screenshot": "Screenshot",
   "ui.tool.browser.source.live": "uživo",
   "ui.tool.browser.source.fetched": "dohvaćeno",
   "ui.tool.webfetch": "Webfetch",

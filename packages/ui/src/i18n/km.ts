@@ -141,6 +141,7 @@ export const dict = {
   "ui.tool.task": "កិច្ចការ",
   "ui.tool.browser.navigate": "រុករក",
   "ui.tool.browser.read": "អានទំព័រ",
+  "ui.tool.browser.screenshot": "Screenshot",
   "ui.tool.browser.source.live": "ផ្ទាល់",
   "ui.tool.browser.source.fetched": "បានទាញយក",
   "ui.tool.webfetch": "Webfetch",

@@ -140,6 +140,7 @@ export const dict: Record<string, string> = {
   "ui.tool.task": "Εργασία",
   "ui.tool.browser.navigate": "Πλοήγηση",
   "ui.tool.browser.read": "Ανάγνωση σελίδας",
+  "ui.tool.browser.screenshot": "Στιγμιότυπο οθόνης",
   "ui.tool.browser.source.live": "ζωντανά",
   "ui.tool.browser.source.fetched": "ελήφθη",
   "ui.tool.webfetch": "Webfetch",

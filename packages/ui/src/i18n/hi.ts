@@ -142,6 +142,7 @@ export const dict: Record<string, string> = {
   "ui.tool.task": "टास्क",
   "ui.tool.browser.navigate": "नेविगेट करें",
   "ui.tool.browser.read": "पेज पढ़ें",
+  "ui.tool.browser.screenshot": "स्क्रीनशॉट",
   "ui.tool.browser.source.live": "लाइव",
   "ui.tool.browser.source.fetched": "फ़ेच किया गया",
   "ui.tool.webfetch": "वेबफ़ेच",

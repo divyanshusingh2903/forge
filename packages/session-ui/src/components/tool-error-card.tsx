@@ -54,6 +54,7 @@ export function ToolErrorCard(props: ToolErrorCardProps) {
       task: "ui.tool.task",
       browser_navigate: "ui.tool.browser.navigate",
       browser_read: "ui.tool.browser.read",
+      browser_screenshot: "ui.tool.browser.screenshot",
       webfetch: "ui.tool.webfetch",
       websearch: "ui.tool.websearch",
       bash: "ui.tool.shell",

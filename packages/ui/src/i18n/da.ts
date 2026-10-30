@@ -127,6 +127,7 @@ export const dict = {
   "ui.tool.grep": "Grep",
   "ui.tool.browser.navigate": "Naviger",
   "ui.tool.browser.read": "Læs side",
+  "ui.tool.browser.screenshot": "Skærmbillede",
   "ui.tool.browser.source.live": "live",
   "ui.tool.browser.source.fetched": "hentet",
   "ui.tool.webfetch": "Webhentning",

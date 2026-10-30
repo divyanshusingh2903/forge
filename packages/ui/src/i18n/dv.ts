@@ -141,6 +141,7 @@ export const dict: Record<string, string> = {
   "ui.tool.task": "މަސައްކަތެއް",
   "ui.tool.browser.navigate": "ދޭ",
   "ui.tool.browser.read": "ސަފްޙާ ކިޔާ",
+  "ui.tool.browser.screenshot": "Screenshot",
   "ui.tool.browser.source.live": "ލައިވް",
   "ui.tool.browser.source.fetched": "ގެނެވުނު",
   "ui.tool.webfetch": "ވެބްފެޗް އެވެ",

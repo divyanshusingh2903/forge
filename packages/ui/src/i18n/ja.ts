@@ -147,6 +147,7 @@ export const dict = {
   "ui.tool.grep": "Grep",
   "ui.tool.browser.navigate": "移動",
   "ui.tool.browser.read": "ページを読み取り",
+  "ui.tool.browser.screenshot": "スクリーンショット",
   "ui.tool.browser.source.live": "ライブ",
   "ui.tool.browser.source.fetched": "取得済み",
   "ui.tool.webfetch": "Webfetch",

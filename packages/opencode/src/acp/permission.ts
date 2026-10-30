@@ -145,6 +145,7 @@ function permissionTitle(toolName: string, input: ToolInput) {
     case "webfetch":
     case "browser_navigate":
     case "browser_read":
+    case "browser_screenshot":
       return stringValue(input.url)
 
     case "websearch":

@@ -140,6 +140,7 @@ export const dict = {
   "ui.tool.task": "Вазифа",
   "ui.tool.browser.navigate": "Гузаштан",
   "ui.tool.browser.read": "Хондани саҳифа",
+  "ui.tool.browser.screenshot": "Screenshot",
   "ui.tool.browser.source.live": "зинда",
   "ui.tool.browser.source.fetched": "гирифташуда",
   "ui.tool.webfetch": "Webfetch",
