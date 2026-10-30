@@ -19,6 +19,7 @@ import { MessageID, SessionID } from "@/session/schema"
 import { RuntimeFlags } from "@/effect/runtime-flags"
 import { ProviderV2 } from "@opencode-ai/core/provider"
 import { ModelV2 } from "@opencode-ai/core/model"
+import { Provider } from "@/provider/provider"
 import { MCP } from "@/mcp"
 import type { Tool as MCPToolDef } from "@modelcontextprotocol/sdk/types.js"
 
@@ -94,6 +95,45 @@ const withEmptyCodeMode = testEffect(
   ]),
 )
 const withBrokenPlugin = testEffect(LayerNode.compile(root, [...replacements, [Plugin.node, brokenPluginLayer]]))
+const withVisionModels = testEffect(
+  LayerNode.compile(root, [
+    ...replacements,
+    [
+      Provider.node,
+      Layer.mock(Provider.Service, {
+        getModel: (_providerID, modelID) =>
+          Effect.succeed({
+            id: modelID,
+            providerID: ProviderV2.ID.opencode,
+            api: { id: String(modelID), url: "", npm: "@ai-sdk/openai" },
+            name: String(modelID),
+            capabilities: {
+              temperature: true,
+              reasoning: false,
+              attachment: true,
+              toolcall: true,
+              input: {
+                text: true,
+                audio: false,
+                image: String(modelID) === "vision-model",
+                video: false,
+                pdf: true,
+              },
+              output: { text: true, audio: false, image: false, video: false, pdf: false },
+              interleaved: false,
+            },
+            cost: { input: 0, output: 0, cache: { read: 0, write: 0 } },
+            limit: { context: 128000, output: 4096 },
+            status: "active",
+            options: {},
+            headers: {},
+            release_date: "",
+            variants: {},
+          } as Provider.Model),
+      }),
+    ],
+  ]),
+)
 
 afterEach(async () => {
   await disposeAllInstances()
@@ -115,6 +155,31 @@ describe("tool.registry", () => {
       const ids = yield* registry.ids()
 
       expect(ids).not.toContain("execute")
+    }),
+  )
+
+  withVisionModels.instance("exposes browser_screenshot only for models with capabilities.input.image", () =>
+    Effect.gen(function* () {
+      const registry = yield* ToolRegistry.Service
+      const agents = yield* Agent.Service
+      const agent = yield* agents.defaultInfo()
+
+      const visionTools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("vision-model"),
+        agent,
+      })
+      expect(visionTools.map((tool) => tool.id)).toContain("browser_screenshot")
+
+      // Even when capabilities.attachment is true (e.g. PDF-only), capabilities.input.image === false hides browser_screenshot.
+      const textOnlyTools = yield* registry.tools({
+        providerID: ProviderV2.ID.opencode,
+        modelID: ModelV2.ID.make("text-only-model"),
+        agent,
+      })
+      expect(textOnlyTools.map((tool) => tool.id)).not.toContain("browser_screenshot")
+      expect(textOnlyTools.map((tool) => tool.id)).toContain("browser_navigate")
+      expect(textOnlyTools.map((tool) => tool.id)).toContain("browser_read")
     }),
   )
 

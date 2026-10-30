@@ -1,0 +1,5 @@
+- Captures a screenshot of the visible viewport of a tab in the session's Browser panel.
+- Captures the active tab unless `tabID` is given. Use `browser_navigate` first to load a page; its output lists the open tab IDs.
+- Returns the screenshot as an image attachment along with the tab ID, URL and title.
+- Use this tool when you need to visually inspect layout, styling, canvas/SVG rendering, or visual regressions that text/markdown reads (`browser_read`) cannot show.
+- Fails when no Browser panel is available (web app, CLI, or the panel is not open).

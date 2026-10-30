@@ -12,6 +12,7 @@ import { setForceFocus } from "./debug"
 import { assertAttachmentBudget, createPickedFileAuthorizations } from "./attachment-picker"
 import { getStore, removeStoreFileIfEmpty } from "./store"
 import {
+  captureBrowserTab,
   clearBrowserStorageData,
   getPinchZoomEnabled,
   getWindowID,
@@ -321,6 +322,9 @@ export function registerIpcHandlers(deps: Deps) {
     })
   })
   ipcMain.handle("clear-browser-data", () => clearBrowserStorageData())
+  ipcMain.handle("capture-browser-tab", (event: IpcMainInvokeEvent, webContentsId: number) =>
+    captureBrowserTab(event.sender, webContentsId),
+  )
 }
 
 export function sendMenuCommand(win: BrowserWindow, id: string) {

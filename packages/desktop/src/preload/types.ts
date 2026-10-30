@@ -124,4 +124,5 @@ export type ElectronAPI = {
   recordFatalRendererError: (error: FatalRendererError) => Promise<void>
   setNativeTranslations: (bundle: DesktopNativeBundle) => Promise<void>
   clearBrowserData: () => Promise<void>
+  captureBrowserTab: (webContentsId: number) => Promise<{ image: string; mime: string }>
 }

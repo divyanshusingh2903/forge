@@ -14,7 +14,14 @@ import { EventV2Bridge } from "@/event-v2-bridge"
 import { InstanceBootstrap } from "@/project/bootstrap"
 import { InstanceStore } from "@/project/instance-store"
 import { MessageID, SessionID } from "@/session/schema"
-import { BrowserNavigateTool, BrowserReadTool, type NavigateMetadata, type ReadMetadata } from "@/tool/browser"
+import {
+  BrowserNavigateTool,
+  BrowserReadTool,
+  BrowserScreenshotTool,
+  type NavigateMetadata,
+  type ReadMetadata,
+  type ScreenshotMetadata,
+} from "@/tool/browser"
 import { Tool } from "@/tool/tool"
 import { Truncate } from "@/tool/truncate"
 import { testEffect } from "../lib/effect"
@@ -219,6 +226,70 @@ describe("tool.browser_navigate", () => {
       expect(Exit.isFailure(yield* Effect.exit(tool.execute({ action: "goto" }, ctx)))).toBe(true)
       expect(Exit.isFailure(yield* Effect.exit(tool.execute({ action: "back" }, ctx)))).toBe(true)
       expect(Exit.isFailure(yield* Effect.exit(tool.execute({ action: "goto", url: "file:///etc/passwd" }, ctx)))).toBe(true)
+    }),
+  )
+})
+
+describe("tool.browser_screenshot", () => {
+  it.instance("captures a tab screenshot from the panel and returns an image attachment", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const asks: Ask[] = []
+      const sessionID = SessionID.make("ses_tool_browser_screenshot")
+      const ctx = makeCtx<ScreenshotMetadata>(sessionID, asks)
+      yield* browser.setState(sessionID, {
+        activeTabID: "tab-1",
+        tabs: [{ tabID: "tab-1", url: "http://localhost:3000/dashboard", title: "Dashboard" }],
+      })
+      const sent: Browser.Command[] = []
+      yield* fakePanel(sessionID, (command, tabID) => {
+        sent.push(command)
+        return {
+          ok: true,
+          tabID,
+          url: "http://localhost:3000/dashboard",
+          title: "Dashboard",
+          image: "AAAA",
+          mime: "image/jpeg",
+        }
+      })
+      const tool = yield* (yield* BrowserScreenshotTool).init()
+
+      const result = yield* tool.execute({}, ctx)
+      expect(sent).toEqual([{ type: "screenshot" }])
+      expect(result.metadata).toMatchObject({
+        url: "http://localhost:3000/dashboard",
+        title: "Dashboard",
+        tabID: "tab-1",
+      })
+      expect(result.output).toContain("URL: http://localhost:3000/dashboard")
+      expect(result.output).toContain("Title: Dashboard")
+      expect(result.output).toContain("Tab: tab-1")
+      expect(result.attachments).toEqual([
+        {
+          type: "file",
+          mime: "image/jpeg",
+          url: "data:image/jpeg;base64,AAAA",
+        },
+      ])
+      expect(asks[0]?.permission).toBe("browser")
+      expect(asks[0]?.patterns).toEqual(["http://localhost:3000/dashboard"])
+      expect(asks[0]?.always).toEqual(["http://localhost:3000/*"])
+    }),
+  )
+
+  it.instance("fails clearly when no page is open or no panel is attached", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_screenshot_fail")
+      const ctx = makeCtx<ScreenshotMetadata>(sessionID)
+      const tool = yield* (yield* BrowserScreenshotTool).init()
+
+      expect(Exit.isFailure(yield* Effect.exit(tool.execute({}, ctx)))).toBe(true)
+
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "https://example.com" }] })
+      expect(Exit.isFailure(yield* Effect.exit(tool.execute({ tabID: "missing" }, ctx)))).toBe(true)
+      expect(Exit.isFailure(yield* Effect.exit(tool.execute({ timeout: 0.05 }, ctx)))).toBe(true)
     }),
   )
 })

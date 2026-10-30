@@ -12,7 +12,7 @@ import { ReadTool } from "./read"
 import { TaskTool } from "./task"
 import { Database } from "@opencode-ai/core/database/database"
 import { TodoWriteTool } from "./todo"
-import { BrowserNavigateTool, BrowserReadTool } from "./browser"
+import { BrowserNavigateTool, BrowserReadTool, BrowserScreenshotTool } from "./browser"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
@@ -34,7 +34,7 @@ import { Browser } from "@/browser"
 import { Glob } from "@opencode-ai/core/util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
-import { Effect, Layer, Context } from "effect"
+import { Effect, Layer, Context, Option } from "effect"
 import { ChildProcessSpawner } from "effect/unstable/process/ChildProcessSpawner"
 import { CrossSpawnSpawner } from "@opencode-ai/core/cross-spawn-spawner"
 import { Format } from "../format"
@@ -99,6 +99,7 @@ const layer = Layer.effect(
     const truncate = yield* Truncate.Service
     const flags = yield* RuntimeFlags.Service
     const mcp = yield* MCP.Service
+    const provider = yield* Provider.Service
 
     const invalid = yield* InvalidTool
     const task = yield* TaskTool
@@ -110,6 +111,7 @@ const layer = Layer.effect(
     const planEnter = yield* PlanEnterTool
     const browserNavigate = yield* BrowserNavigateTool
     const browserRead = yield* BrowserReadTool
+    const browserScreenshot = yield* BrowserScreenshotTool
     const webfetch = yield* WebFetchTool
     const websearch = yield* WebSearchTool
     const shell = yield* ShellTool
@@ -222,6 +224,7 @@ const layer = Layer.effect(
           task: Tool.init(task),
           browserNavigate: Tool.init(browserNavigate),
           browserRead: Tool.init(browserRead),
+          browserScreenshot: Tool.init(browserScreenshot),
           fetch: Tool.init(webfetch),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
@@ -248,6 +251,7 @@ const layer = Layer.effect(
             tool.task,
             tool.browserNavigate,
             tool.browserRead,
+            tool.browserScreenshot,
             tool.fetch,
             tool.todo,
             tool.search,
@@ -301,9 +305,13 @@ const layer = Layer.effect(
     })
 
     const tools: Interface["tools"] = Effect.fn("ToolRegistry.tools")(function* (input) {
+      const model = Option.getOrUndefined(yield* Effect.option(provider.getModel(input.providerID, input.modelID)))
       const filtered = (yield* all()).filter((tool) => {
         if (tool.id === WebSearchTool.id) {
           return webSearchEnabled(input.providerID, { exa: flags.enableExa, parallel: flags.enableParallel })
+        }
+        if (tool.id === BrowserScreenshotTool.id) {
+          return model?.capabilities.input.image === true
         }
 
         const usePatch =

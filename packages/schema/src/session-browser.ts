@@ -48,10 +48,17 @@ export const ReadCommand = Schema.Struct({
   format: ReadFormat,
 }).annotate({ identifier: "SessionBrowserReadCommand" })
 
-export const Command = Schema.Union([NavigateCommand, ReadCommand]).annotate({ identifier: "SessionBrowserCommand" })
+export const ScreenshotCommand = Schema.Struct({
+  type: Schema.Literal("screenshot"),
+}).annotate({ identifier: "SessionBrowserScreenshotCommand" })
+
+export const Command = Schema.Union([NavigateCommand, ReadCommand, ScreenshotCommand]).annotate({
+  identifier: "SessionBrowserCommand",
+})
 export type Command = Schema.Schema.Type<typeof Command>
 
-// One flat result shape for every command keeps the reply route simple; `html`/`text` are only set by reads.
+// One flat result shape for every command keeps the reply route simple; `html`/`text` are only set by reads
+// and `image`/`mime` are only set by screenshots.
 export const ResultInput = Schema.Struct({
   requestID: Schema.String,
   ok: Schema.Boolean,
@@ -61,6 +68,8 @@ export const ResultInput = Schema.Struct({
   title: Schema.optional(Schema.String),
   html: Schema.optional(Schema.String),
   text: Schema.optional(Schema.String),
+  image: Schema.optional(Schema.String),
+  mime: Schema.optional(Schema.String),
 }).annotate({ identifier: "SessionBrowserResultInput" })
 export type ResultInput = Schema.Schema.Type<typeof ResultInput>
 

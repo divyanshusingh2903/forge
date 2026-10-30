@@ -30,6 +30,7 @@ type WebviewElement = HTMLElement & {
   canGoForward: () => boolean
   getURL: () => string
   getTitle: () => string
+  getWebContentsId: () => number
   executeJavaScript: <T>(code: string, userGesture?: boolean) => Promise<T>
 }
 
@@ -48,6 +49,8 @@ type BrowserResult = {
   title?: string
   html?: string
   text?: string
+  image?: string
+  mime?: string
 }
 
 export function normalizeBrowserUrl(raw: string): string | undefined {
@@ -212,6 +215,25 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
         url: page.url,
         title: page.title || undefined,
         ...(command.format === "text" ? { text: content } : { html: content }),
+      })
+    }
+
+    if (command.type === "screenshot") {
+      const tabId = tabID ?? activeTabId()
+      if (!tabs().some((tab) => tab.id === tabId)) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not open` })
+      if (!platform.captureBrowserTab) return reply(id, requestID, { ok: false, error: "Screenshots are only supported in the desktop app" })
+      view().browser.setActiveTab(tabId)
+      await whenIdle(tabId)
+      const el = webviewRefs.get(tabId)
+      if (!el) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not loaded` })
+      const captured = await platform.captureBrowserTab(el.getWebContentsId())
+      return reply(id, requestID, {
+        ok: true,
+        tabID: tabId,
+        url: el.getURL(),
+        title: el.getTitle() || undefined,
+        image: captured.image,
+        mime: captured.mime,
       })
     }
 

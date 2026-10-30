@@ -5,6 +5,7 @@ import { Browser } from "@/browser"
 import { isImageAttachment } from "@/util/media"
 import NAVIGATE_DESCRIPTION from "./browser-navigate.txt"
 import READ_DESCRIPTION from "./browser-read.txt"
+import SCREENSHOT_DESCRIPTION from "./browser-screenshot.txt"
 import { Tool } from "./tool"
 import { convertHTMLToMarkdown, DEFAULT_TIMEOUT, extractTextFromHTML, fetchUrlResponse, MAX_TIMEOUT } from "./webfetch"
 
@@ -36,6 +37,11 @@ export const ReadParameters = Schema.Struct({
   timeout: Timeout,
 })
 
+export const ScreenshotParameters = Schema.Struct({
+  tabID: TabID,
+  timeout: Timeout,
+})
+
 export type NavigateMetadata = {
   action: SessionBrowser.NavigateAction
   url: string
@@ -49,6 +55,12 @@ export type ReadMetadata = {
   tabID?: string
   format: SessionBrowser.ReadFormat
   source: "live" | "fetched"
+}
+
+export type ScreenshotMetadata = {
+  url: string
+  title?: string
+  tabID?: string
 }
 
 export const BrowserNavigateTool = Tool.define(
@@ -169,6 +181,64 @@ export const BrowserReadTool = Tool.define(
             sourceLabel: `fetched by server (${live ? `live read failed: ${live.failure.message}` : "session browser not attached"})`,
             body: !isHtml || params.format === "html" ? content : params.format === "markdown" ? convertHTMLToMarkdown(content) : extractTextFromHTML(content),
           })
+        }).pipe(Effect.orDie),
+    }
+  }),
+)
+
+export const BrowserScreenshotTool = Tool.define(
+  "browser_screenshot",
+  Effect.gen(function* () {
+    const browser = yield* Browser.Service
+
+    return {
+      description: SCREENSHOT_DESCRIPTION,
+      parameters: ScreenshotParameters,
+      execute: (params: Schema.Schema.Type<typeof ScreenshotParameters>, ctx: Tool.Context<ScreenshotMetadata>) =>
+        Effect.gen(function* () {
+          const info = yield* browser.get(ctx.sessionID)
+          const tab = findTab(info, params.tabID)
+          if (!tab) {
+            throw new Error(
+              params.tabID
+                ? `Browser tab "${params.tabID}" was not found.${tabsHint(info)}`
+                : "No page is open in the session browser. Use browser_navigate to load a page first.",
+            )
+          }
+          const origin = requireHttpOrigin(tab.url)
+
+          yield* ctx.ask({
+            permission: "browser",
+            patterns: [tab.url],
+            always: [`${origin}/*`],
+            metadata: { url: tab.url, tabID: tab.tabID },
+          })
+
+          const result = yield* browser
+            .command(ctx.sessionID, { type: "screenshot" }, { tabID: tab.tabID, timeoutMs: timeoutMs(params.timeout) })
+            .pipe(Effect.mapError((error) => new Error(error.message)))
+
+          if (!result.image) throw new Error("Browser screenshot did not return an image")
+          const url = result.url ?? tab.url
+          const title = result.title ?? tab.title
+          const tabID = result.tabID ?? tab.tabID
+          const mime = result.mime ?? "image/jpeg"
+          return {
+            title: title || url,
+            output: [
+              `URL: ${url}`,
+              ...(title ? [`Title: ${title}`] : []),
+              ...(tabID ? [`Tab: ${tabID}`] : []),
+            ].join("\n"),
+            metadata: { url, title, tabID },
+            attachments: [
+              {
+                type: "file" as const,
+                mime,
+                url: `data:${mime};base64,${result.image}`,
+              },
+            ],
+          }
         }).pipe(Effect.orDie),
     }
   }),

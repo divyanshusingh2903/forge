@@ -258,6 +258,8 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
 
     clearBrowserData: () => window.api.clearBrowserData(),
 
+    captureBrowserTab: (webContentsId) => window.api.captureBrowserTab(webContentsId),
+
     restart: async () => {
       await window.api.killSidecar().catch(() => undefined)
       window.api.relaunch()

@@ -127,6 +127,9 @@ type PlatformBase = {
 
   /** Clear cookies and storage for the session browser partition (desktop only) */
   clearBrowserData?(): Promise<void>
+
+  /** Capture a JPEG screenshot of a session browser guest webContents (desktop only) */
+  captureBrowserTab?(webContentsId: number): Promise<{ image: string; mime: string }>
 }
 
 export type Platform = PlatformBase &

@@ -684,7 +684,14 @@ export type SessionBrowserReadCommand = {
   format: "markdown" | "text" | "html"
 }
 
-export type SessionBrowserCommand = SessionBrowserNavigateCommand | SessionBrowserReadCommand
+export type SessionBrowserScreenshotCommand = {
+  type: "screenshot"
+}
+
+export type SessionBrowserCommand =
+  | SessionBrowserNavigateCommand
+  | SessionBrowserReadCommand
+  | SessionBrowserScreenshotCommand
 
 export type SessionStatus =
   | {
@@ -10756,6 +10763,8 @@ export type SessionBrowserResultData = {
     title?: string
     html?: string
     text?: string
+    image?: string
+    mime?: string
   }
   path: {
     sessionID: string
