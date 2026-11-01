@@ -497,6 +497,25 @@ const TOOL_SAMPLES = {
       },
     ],
   },
+  browser_act: {
+    tool: "browser_act",
+    input: { action: "click", ref: "e3" },
+    output: [
+      "Action: click e3",
+      "URL: http://localhost:3000/dashboard",
+      "Title: Local Dev Dashboard",
+      "Tab: tab-1",
+    ].join("\n"),
+    title: "click e3",
+    metadata: {
+      action: "click",
+      ref: "e3",
+      url: "http://localhost:3000/dashboard",
+      title: "Local Dev Dashboard",
+      tabID: "tab-1",
+      navigated: false,
+    },
+  },
   websearch: {
     tool: "websearch",
     input: { query: "SolidJS createStore performance" },
@@ -1908,7 +1927,7 @@ function Playground() {
                 Never completes, so the activity indicator keeps animating
               </div>
               <div style={{ display: "flex", "flex-wrap": "wrap", gap: "4px" }}>
-                <For each={["bash", "edit", "browser_navigate", "browser_read", "browser_screenshot", "webfetch", "websearch"] as const}>
+                <For each={["bash", "edit", "browser_navigate", "browser_read", "browser_screenshot", "browser_act", "webfetch", "websearch"] as const}>
                   {(key) => (
                     <button style={btnStyle} onClick={() => addTool(key, "running")}>
                       {key}

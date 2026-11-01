@@ -153,6 +153,7 @@ export const dict = {
   "ui.tool.browser.navigate": "Navegar",
   "ui.tool.browser.read": "Ler página",
   "ui.tool.browser.screenshot": "Captura de tela",
+  "ui.tool.browser.act": "Etreoberiañ",
   "ui.tool.browser.source.live": "ao vivo",
   "ui.tool.browser.source.fetched": "buscada",
   "ui.tool.webfetch": "Busca na web",

@@ -151,6 +151,7 @@ export const dict = {
   "ui.tool.browser.navigate": "瀏覽",
   "ui.tool.browser.read": "讀取頁面",
   "ui.tool.browser.screenshot": "螢幕截圖",
+  "ui.tool.browser.act": "互動",
   "ui.tool.browser.source.live": "即時",
   "ui.tool.browser.source.fetched": "已擷取",
   "ui.tool.webfetch": "Webfetch",

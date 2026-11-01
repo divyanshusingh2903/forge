@@ -141,6 +141,7 @@ export const dict: Record<string, string> = {
   "ui.tool.browser.navigate": "Keç",
   "ui.tool.browser.read": "Səhifəni oxu",
   "ui.tool.browser.screenshot": "Screenshot",
+  "ui.tool.browser.act": "Qarşılıqlı əlaqə",
   "ui.tool.browser.source.live": "canlı",
   "ui.tool.browser.source.fetched": "əldə edildi",
   "ui.tool.webfetch": "Webfetch",

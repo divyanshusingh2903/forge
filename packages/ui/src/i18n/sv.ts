@@ -141,6 +141,7 @@ export const dict: Record<string, string> = {
   "ui.tool.browser.navigate": "Navigera",
   "ui.tool.browser.read": "Läs sida",
   "ui.tool.browser.screenshot": "Skärmbild",
+  "ui.tool.browser.act": "Interagera",
   "ui.tool.browser.source.live": "live",
   "ui.tool.browser.source.fetched": "hämtad",
   "ui.tool.webfetch": "Webbhämtning",

@@ -148,6 +148,9 @@ function permissionTitle(toolName: string, input: ToolInput) {
     case "browser_screenshot":
       return stringValue(input.url)
 
+    case "browser_act":
+      return [stringValue(input.action), stringValue(input.ref)].filter(Boolean).join(" ") || undefined
+
     case "websearch":
       return stringValue(input.query)
 

@@ -144,6 +144,7 @@ export const dict: Record<string, string> = {
   "ui.tool.browser.navigate": "O‘tish",
   "ui.tool.browser.read": "Sahifani o‘qish",
   "ui.tool.browser.screenshot": "Screenshot",
+  "ui.tool.browser.act": "Oʻzaro taʼsir",
   "ui.tool.browser.source.live": "jonli",
   "ui.tool.browser.source.fetched": "olingan",
   "ui.tool.webfetch": "Webfetch",

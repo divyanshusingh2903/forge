@@ -688,10 +688,21 @@ export type SessionBrowserScreenshotCommand = {
   type: "screenshot"
 }
 
+export type SessionBrowserActCommand = {
+  type: "act"
+  action: "click" | "type" | "fill" | "select" | "press" | "scroll" | "hover"
+  ref?: string
+  text?: string
+  value?: string
+  key?: string
+  direction?: "up" | "down" | "left" | "right"
+}
+
 export type SessionBrowserCommand =
   | SessionBrowserNavigateCommand
   | SessionBrowserReadCommand
   | SessionBrowserScreenshotCommand
+  | SessionBrowserActCommand
 
 export type SessionStatus =
   | {
@@ -1719,6 +1730,7 @@ export type PermissionConfig =
       webfetch?: PermissionActionConfig
       websearch?: PermissionActionConfig
       browser?: PermissionRuleConfig
+      browser_act?: PermissionRuleConfig
       lsp?: PermissionRuleConfig
       doom_loop?: PermissionActionConfig
       skill?: PermissionRuleConfig

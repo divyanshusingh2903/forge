@@ -15,9 +15,11 @@ import { InstanceBootstrap } from "@/project/bootstrap"
 import { InstanceStore } from "@/project/instance-store"
 import { MessageID, SessionID } from "@/session/schema"
 import {
+  BrowserActTool,
   BrowserNavigateTool,
   BrowserReadTool,
   BrowserScreenshotTool,
+  type ActMetadata,
   type NavigateMetadata,
   type ReadMetadata,
   type ScreenshotMetadata,
@@ -344,6 +346,124 @@ describe("tool.browser_screenshot", () => {
       yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "https://example.com" }] })
       expect(Exit.isFailure(yield* Effect.exit(tool.execute({ tabID: "missing" }, ctx)))).toBe(true)
       expect(Exit.isFailure(yield* Effect.exit(tool.execute({ timeout: 0.05 }, ctx)))).toBe(true)
+    }),
+  )
+})
+
+describe("tool.browser_act", () => {
+  it.instance("sends the action to the panel under the browser_act permission", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const asks: Ask[] = []
+      const sessionID = SessionID.make("ses_tool_browser_act")
+      const ctx = makeCtx<ActMetadata>(sessionID, asks)
+      yield* browser.setState(sessionID, {
+        activeTabID: "tab-1",
+        tabs: [{ tabID: "tab-1", url: "http://localhost:3000/form", title: "Form" }],
+      })
+      const sent: Browser.Command[] = []
+      yield* fakePanel(sessionID, (command, tabID) => {
+        sent.push(command)
+        return { ok: true, tabID, url: "http://localhost:3000/form", title: "Form" }
+      })
+      const tool = yield* (yield* BrowserActTool).init()
+
+      const result = yield* tool.execute({ action: "click", ref: "e3" }, ctx)
+      expect(sent).toEqual([{ type: "act", action: "click", ref: "e3" }])
+      expect(result.output).toContain("Action: click e3")
+      expect(result.output).toContain("URL: http://localhost:3000/form")
+      expect(result.output).not.toContain("Page changed")
+      expect(result.metadata).toMatchObject({ action: "click", ref: "e3", tabID: "tab-1", navigated: false })
+      expect(asks[0]?.permission).toBe("browser_act")
+      expect(asks[0]?.patterns).toEqual(["http://localhost:3000/form"])
+      expect(asks[0]?.always).toEqual(["http://localhost:3000/*"])
+    }),
+  )
+
+  it.instance("flags that refs are stale when the action changed the page", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_act_navigated")
+      const ctx = makeCtx<ActMetadata>(sessionID)
+      yield* browser.setState(sessionID, {
+        activeTabID: "tab-1",
+        tabs: [{ tabID: "tab-1", url: "http://localhost:3000/form" }],
+      })
+      yield* fakePanel(sessionID, (_command, tabID) => ({ ok: true, tabID, url: "http://localhost:3000/done", text: "Selected \"Large\"" }))
+      const tool = yield* (yield* BrowserActTool).init()
+
+      const result = yield* tool.execute({ action: "select", ref: "e2", value: "Large" }, ctx)
+      expect(result.metadata).toMatchObject({ url: "http://localhost:3000/done", navigated: true })
+      expect(result.output).toContain('Selected "Large"')
+      expect(result.output).toContain("Page changed from http://localhost:3000/form to http://localhost:3000/done")
+      expect(result.output).toContain('browser_read with format "interactive"')
+    }),
+  )
+
+  it.instance("rejects incomplete actions before asking permission or contacting the panel", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const asks: Ask[] = []
+      const sessionID = SessionID.make("ses_tool_browser_act_invalid")
+      const ctx = makeCtx<ActMetadata>(sessionID, asks)
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "http://localhost:3000/" }] })
+      const sent: Browser.Command[] = []
+      yield* fakePanel(sessionID, (command, tabID) => {
+        sent.push(command)
+        return { ok: true, tabID }
+      })
+      const tool = yield* (yield* BrowserActTool).init()
+
+      const cases = [
+        [{ action: "click" }, "ref"],
+        [{ action: "hover" }, "ref"],
+        [{ action: "fill", ref: "e1" }, "value"],
+        [{ action: "fill", value: "x" }, "ref"],
+        [{ action: "select", ref: "e1" }, "value"],
+        [{ action: "type" }, "text"],
+        [{ action: "press" }, "key"],
+        [{ action: "scroll" }, "direction"],
+      ] as const
+      for (const [params, missing] of cases) {
+        const exit = yield* Effect.exit(tool.execute(params, ctx))
+        expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain(`requires "${missing}"`)
+      }
+      // An empty value is a valid fill: it clears the field.
+      yield* tool.execute({ action: "fill", ref: "e1", value: "" }, ctx)
+
+      expect(sent).toEqual([{ type: "act", action: "fill", ref: "e1", value: "" }])
+      expect(asks).toHaveLength(1)
+    }),
+  )
+
+  it.instance("reports a panel failure as a browser action error", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_act_failed")
+      const ctx = makeCtx<ActMetadata>(sessionID)
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "https://example.com" }] })
+      yield* fakePanel(sessionID, () => ({
+        ok: false,
+        error: 'Ref "e9" is not on the current page. Run browser_read with format "interactive" to get fresh refs.',
+      }))
+      const tool = yield* (yield* BrowserActTool).init()
+
+      const exit = yield* Effect.exit(tool.execute({ action: "click", ref: "e9" }, ctx))
+      expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain("Browser action failed: Ref \"e9\" is not on the current page")
+    }),
+  )
+
+  it.instance("fails clearly when no page is open or the tab is unknown", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_act_empty")
+      const ctx = makeCtx<ActMetadata>(sessionID)
+      const tool = yield* (yield* BrowserActTool).init()
+
+      expect(Exit.isFailure(yield* Effect.exit(tool.execute({ action: "click", ref: "e1" }, ctx)))).toBe(true)
+
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "https://example.com" }] })
+      expect(Exit.isFailure(yield* Effect.exit(tool.execute({ action: "click", ref: "e1", tabID: "missing" }, ctx)))).toBe(true)
     }),
   )
 })

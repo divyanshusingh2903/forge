@@ -3,6 +3,7 @@ import { Effect, Schema } from "effect"
 import { HttpClient } from "effect/unstable/http"
 import { Browser } from "@/browser"
 import { isImageAttachment } from "@/util/media"
+import ACT_DESCRIPTION from "./browser-act.txt"
 import NAVIGATE_DESCRIPTION from "./browser-navigate.txt"
 import READ_DESCRIPTION from "./browser-read.txt"
 import SCREENSHOT_DESCRIPTION from "./browser-screenshot.txt"
@@ -12,6 +13,8 @@ import { convertHTMLToMarkdown, DEFAULT_TIMEOUT, extractTextFromHTML, fetchUrlRe
 const Timeout = Schema.Number.check(Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(MAX_TIMEOUT / 1000))
   .pipe(Schema.optional)
   .annotate({ description: `Optional timeout in seconds (max ${MAX_TIMEOUT / 1000}, default ${DEFAULT_TIMEOUT / 1000})` })
+
+const MAX_ACT_TEXT = 10_000
 
 const TabID = Schema.optional(Schema.String).annotate({
   description: "Optional ID of the browser tab to target (from the open tabs list).",
@@ -43,6 +46,30 @@ export const ScreenshotParameters = Schema.Struct({
   timeout: Timeout,
 })
 
+export const ActParameters = Schema.Struct({
+  action: SessionBrowser.ActAction.annotate({
+    description:
+      "click, hover, type (append text), fill (replace the field's text), select (choose a <select> option), press (a key or chord), or scroll.",
+  }),
+  ref: Schema.optional(Schema.String.check(Schema.isPattern(/^e\d{1,5}$/))).annotate({
+    description: 'Element ref from browser_read with format "interactive", e.g. e12. Required for click, hover, fill and select.',
+  }),
+  text: Schema.optional(Schema.String.check(Schema.isMaxLength(MAX_ACT_TEXT))).annotate({
+    description: "Text to insert. Required for type.",
+  }),
+  value: Schema.optional(Schema.String.check(Schema.isMaxLength(MAX_ACT_TEXT))).annotate({
+    description: "New field text for fill (empty clears it), or the option value or label for select.",
+  }),
+  key: Schema.optional(Schema.String.check(Schema.isMaxLength(32))).annotate({
+    description: "Key or chord for press, e.g. Enter, Tab, Escape, ArrowDown, Control+a. Required for press.",
+  }),
+  direction: Schema.optional(SessionBrowser.ScrollDirection).annotate({
+    description: "up, down, left or right. Required for scroll; scrolls about 80% of the viewport.",
+  }),
+  tabID: TabID,
+  timeout: Timeout,
+})
+
 export type NavigateMetadata = {
   action: SessionBrowser.NavigateAction
   url: string
@@ -56,6 +83,15 @@ export type ReadMetadata = {
   tabID?: string
   format: SessionBrowser.ReadFormat
   source: "live" | "fetched"
+}
+
+export type ActMetadata = {
+  action: SessionBrowser.ActAction
+  ref?: string
+  url: string
+  title?: string
+  tabID?: string
+  navigated: boolean
 }
 
 export type ScreenshotMetadata = {
@@ -262,6 +298,91 @@ export const BrowserScreenshotTool = Tool.define(
     }
   }),
 )
+
+export const BrowserActTool = Tool.define(
+  "browser_act",
+  Effect.gen(function* () {
+    const browser = yield* Browser.Service
+
+    return {
+      description: ACT_DESCRIPTION,
+      parameters: ActParameters,
+      execute: (params: Schema.Schema.Type<typeof ActParameters>, ctx: Tool.Context<ActMetadata>) =>
+        Effect.gen(function* () {
+          requireActInput(params)
+          const info = yield* browser.get(ctx.sessionID)
+          const tab = findTab(info, params.tabID)
+          if (!tab) {
+            throw new Error(
+              params.tabID
+                ? `Browser tab "${params.tabID}" was not found.${tabsHint(info)}`
+                : "No page is open in the session browser. Use browser_navigate to load a page first.",
+            )
+          }
+          const origin = requireHttpOrigin(tab.url)
+
+          yield* ctx.ask({
+            permission: "browser_act",
+            patterns: [tab.url],
+            always: [`${origin}/*`],
+            metadata: { url: tab.url, tabID: tab.tabID, action: params.action, ref: params.ref },
+          })
+
+          const result = yield* browser
+            .command(
+              ctx.sessionID,
+              {
+                type: "act",
+                action: params.action,
+                ...(params.ref === undefined ? {} : { ref: params.ref }),
+                ...(params.text === undefined ? {} : { text: params.text }),
+                ...(params.value === undefined ? {} : { value: params.value }),
+                ...(params.key === undefined ? {} : { key: params.key }),
+                ...(params.direction === undefined ? {} : { direction: params.direction }),
+              },
+              { tabID: tab.tabID, timeoutMs: timeoutMs(params.timeout) },
+            )
+            .pipe(Effect.mapError((error) => new Error(`Browser action failed: ${error.message}`)))
+
+          const url = result.url ?? tab.url
+          const title = result.title ?? tab.title
+          const tabID = result.tabID ?? tab.tabID
+          const navigated = url !== tab.url
+          return {
+            title: `${params.action}${params.ref ? ` ${params.ref}` : ""}`,
+            output: [
+              `Action: ${params.action}${params.ref ? ` ${params.ref}` : ""}`,
+              `URL: ${url}`,
+              ...(title ? [`Title: ${title}`] : []),
+              ...(tabID ? [`Tab: ${tabID}`] : []),
+              ...(result.text ? [result.text] : []),
+              ...(navigated
+                ? [
+                    `Page changed from ${tab.url} to ${url}. Earlier refs are no longer valid; run browser_read with format "interactive" for fresh refs.`,
+                  ]
+                : []),
+            ].join("\n"),
+            metadata: { action: params.action, ref: params.ref, url, title, tabID, navigated },
+          }
+        }).pipe(Effect.orDie),
+    }
+  }),
+)
+
+// Each action needs different inputs; failing here keeps a malformed call from reaching the permission prompt.
+function requireActInput(params: Schema.Schema.Type<typeof ActParameters>) {
+  const missing =
+    params.action === "type"
+      ? params.text === undefined && "text"
+      : params.action === "press"
+        ? !params.key && "key"
+        : params.action === "scroll"
+          ? !params.direction && "direction"
+          : params.action === "fill" || params.action === "select"
+            ? (!params.ref && "ref") || (params.value === undefined && "value")
+            : !params.ref && "ref"
+  if (missing) throw new Error(`browser_act ${params.action} requires "${missing}"`)
+}
 
 function readOutput(input: ReadMetadata & { sourceLabel: string; body: string }) {
   return {

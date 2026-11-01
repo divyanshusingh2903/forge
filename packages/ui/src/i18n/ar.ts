@@ -165,6 +165,7 @@ export const dict = {
   "ui.tool.browser.navigate": "تنقّل",
   "ui.tool.browser.read": "قراءة الصفحة",
   "ui.tool.browser.screenshot": "لقطة شاشة",
+  "ui.tool.browser.act": "تفاعل",
   "ui.tool.browser.source.live": "مباشر",
   "ui.tool.browser.source.fetched": "تم جلبها",
   "ui.tool.webfetch": "جلب الويب",

@@ -141,6 +141,7 @@ export const dict: Record<string, string> = {
   "ui.tool.browser.navigate": "Điều hướng",
   "ui.tool.browser.read": "Đọc trang",
   "ui.tool.browser.screenshot": "Ảnh chụp màn hình",
+  "ui.tool.browser.act": "Tương tác",
   "ui.tool.browser.source.live": "trực tiếp",
   "ui.tool.browser.source.fetched": "đã tải",
   "ui.tool.webfetch": "Webfetch",

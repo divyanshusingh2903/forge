@@ -145,6 +145,7 @@ export const dict: Record<string, string> = {
   "ui.tool.browser.navigate": "Pāriet",
   "ui.tool.browser.read": "Lasīt lapu",
   "ui.tool.browser.screenshot": "Screenshot",
+  "ui.tool.browser.act": "Mijiedarbība",
   "ui.tool.browser.source.live": "tiešraidē",
   "ui.tool.browser.source.fetched": "iegūta",
   "ui.tool.webfetch": "Webfetch",

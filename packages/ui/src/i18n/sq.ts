@@ -141,6 +141,7 @@ export const dict: Record<string, string> = {
   "ui.tool.browser.navigate": "Navigo",
   "ui.tool.browser.read": "Lexo faqen",
   "ui.tool.browser.screenshot": "Screenshot",
+  "ui.tool.browser.act": "Ndërvepro",
   "ui.tool.browser.source.live": "drejtpërdrejt",
   "ui.tool.browser.source.fetched": "marrë",
   "ui.tool.webfetch": "Tërheqja në ueb",

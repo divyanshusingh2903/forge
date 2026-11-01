@@ -1,0 +1,7 @@
+- Acts on a page in the session's Browser panel with real mouse and keyboard input: click, hover, type, fill, select, press, or scroll.
+- Get element refs first with `browser_read` using `format: interactive`, then pass a ref such as `e12`. Refs are only valid until the page navigates; the result says when the page changed. Read again for fresh refs.
+- Required inputs: `ref` for click, hover, fill and select; `text` for type; `value` for fill (empty clears the field) and select (an option's value or label); `key` for press (for example `Enter`, `Tab`, `Escape`, `ArrowDown`, `Control+a`); `direction` for scroll.
+- `type` appends text at the cursor; `fill` replaces the field's existing text. `select` only works on native `<select>` elements; use `click` for custom dropdowns.
+- `scroll` without a ref scrolls the page by about 80% of the viewport; with a ref it scrolls over that element.
+- Acts on the active tab unless `tabID` is given. Typical flow: `browser_navigate`, `browser_read` (interactive), `browser_act`, then `browser_read` again to see the result.
+- Needs the desktop Browser panel. Fails clearly when it is not open.

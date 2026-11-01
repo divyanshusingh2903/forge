@@ -13,10 +13,12 @@ import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useSessionLayout } from "@/pages/session/session-layout"
+import { runBrowserAction } from "./browser-actions"
 import { formatInteractiveElements } from "./browser-interactive"
 
 const LEASE_RENEW_INTERVAL_MS = 10_000
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024
+const ACTION_SETTLE_MS = 250
 // Chromium reports a superseded navigation (redirect, new load) as a failed load with this code.
 const ERR_ABORTED = -3
 
@@ -279,6 +281,32 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
         title: el.getTitle() || undefined,
         image: captured.image,
         mime: captured.mime,
+      })
+    }
+
+    if (command.type === "act") {
+      const tabId = tabID ?? activeTabId()
+      if (!tabs().some((tab) => tab.id === tabId)) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not open` })
+      const sendCdp = platform.sendBrowserCdpCommand
+      if (!sendCdp) return reply(id, requestID, { ok: false, error: "Browser actions are only supported in the desktop app" })
+      view().browser.setActiveTab(tabId)
+      await whenIdle(tabId)
+      const el = webviewRefs.get(tabId)
+      if (!el) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not loaded` })
+      const detail = await runBrowserAction(
+        (method, params) => sendCdp(el.getWebContentsId(), method, params),
+        command,
+        interactiveRefs.get(tabId),
+      )
+      // Give a click that starts a navigation time to begin loading, then wait for the page to settle.
+      await new Promise((resolve) => setTimeout(resolve, ACTION_SETTLE_MS))
+      await whenIdle(tabId)
+      return reply(id, requestID, {
+        ok: true,
+        tabID: tabId,
+        url: el.getURL(),
+        title: el.getTitle() || undefined,
+        text: detail,
       })
     }
 

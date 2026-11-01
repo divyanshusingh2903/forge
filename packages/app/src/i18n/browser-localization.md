@@ -1,6 +1,6 @@
 # Session browser terminology
 
-English source copy is defined in `en.ts` (app) and `packages/ui/src/i18n/en.ts` (`ui.tool.browser.*`). The shared dictionary in `browser.ts` supplies the app keys to every locale; the four timeline keys (`ui.tool.browser.navigate`, `.read`, `.source.live`, `.source.fetched`) are written directly into each UI locale file.
+English source copy is defined in `en.ts` (app) and `packages/ui/src/i18n/en.ts` (`ui.tool.browser.*`). The shared dictionary in `browser.ts` supplies the app keys to every locale; the five timeline keys (`ui.tool.browser.navigate`, `.read`, `.act`, `.source.live`, `.source.fetched`) are written directly into each UI locale file.
 
 **Status: draft, not corpus-verified.** These translations were written from model knowledge, not checked against the references the project requires (Unicode CLDR, Microsoft and Mozilla style guides and terminology, Firefox localization corpus, language authorities). They need a native-language review before release.
 

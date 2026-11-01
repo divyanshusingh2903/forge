@@ -12,7 +12,7 @@ import { ReadTool } from "./read"
 import { TaskTool } from "./task"
 import { Database } from "@opencode-ai/core/database/database"
 import { TodoWriteTool } from "./todo"
-import { BrowserNavigateTool, BrowserReadTool, BrowserScreenshotTool } from "./browser"
+import { BrowserActTool, BrowserNavigateTool, BrowserReadTool, BrowserScreenshotTool } from "./browser"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
@@ -112,6 +112,7 @@ const layer = Layer.effect(
     const browserNavigate = yield* BrowserNavigateTool
     const browserRead = yield* BrowserReadTool
     const browserScreenshot = yield* BrowserScreenshotTool
+    const browserAct = yield* BrowserActTool
     const webfetch = yield* WebFetchTool
     const websearch = yield* WebSearchTool
     const shell = yield* ShellTool
@@ -225,6 +226,7 @@ const layer = Layer.effect(
           browserNavigate: Tool.init(browserNavigate),
           browserRead: Tool.init(browserRead),
           browserScreenshot: Tool.init(browserScreenshot),
+          browserAct: Tool.init(browserAct),
           fetch: Tool.init(webfetch),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
@@ -252,6 +254,7 @@ const layer = Layer.effect(
             tool.browserNavigate,
             tool.browserRead,
             tool.browserScreenshot,
+            tool.browserAct,
             tool.fetch,
             tool.todo,
             tool.search,

@@ -42,6 +42,13 @@ describe("sendBrowserCdpCommand", () => {
     expect(fake.calls.send).toEqual([{ method: "Page.getLayoutMetrics", params: { a: 1 } }])
   })
 
+  test("allows focus emulation, which text input needs in an unfocused webview", async () => {
+    const fake = fakeDebugger()
+    await sendBrowserCdpCommand(fake.api, "Emulation.setFocusEmulationEnabled", { enabled: true })
+    expect(fake.calls.send).toEqual([{ method: "Emulation.setFocusEmulationEnabled", params: { enabled: true } }])
+    await expect(sendBrowserCdpCommand(fake.api, "Emulation.setDeviceMetricsOverride", {})).rejects.toThrow("is not allowed")
+  })
+
   test("does not reattach while attached", async () => {
     const fake = fakeDebugger()
     await sendBrowserCdpCommand(fake.api, "DOM.enable", undefined)

@@ -145,6 +145,7 @@ export const dict: Record<string, string> = {
   "ui.tool.browser.navigate": "Navighează",
   "ui.tool.browser.read": "Citește pagina",
   "ui.tool.browser.screenshot": "Captură de ecran",
+  "ui.tool.browser.act": "Interacționează",
   "ui.tool.browser.source.live": "în direct",
   "ui.tool.browser.source.fetched": "preluată",
   "ui.tool.webfetch": "Webfetch",

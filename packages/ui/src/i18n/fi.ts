@@ -123,6 +123,7 @@ export const dict: Record<string, string> = {
   "ui.tool.browser.navigate": "Siirry",
   "ui.tool.browser.read": "Lue sivu",
   "ui.tool.browser.screenshot": "Kuvakaappaus",
+  "ui.tool.browser.act": "Vuorovaikutus",
   "ui.tool.browser.source.live": "live",
   "ui.tool.browser.source.fetched": "noudettu",
   "ui.tool.webfetch": "Webfetch",

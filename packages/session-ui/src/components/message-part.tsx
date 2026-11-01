@@ -526,6 +526,14 @@ export function getToolInfo(
         title: i18n.t("ui.tool.browser.screenshot"),
         subtitle: (typeof metadata?.title === "string" && metadata.title) || (typeof metadata?.url === "string" ? metadata.url : undefined),
       }
+    case "browser_act":
+      return {
+        icon: "browser",
+        title: i18n.t("ui.tool.browser.act"),
+        subtitle:
+          [input.action, input.ref].filter((item) => typeof item === "string" && item).join(" ") ||
+          (typeof metadata?.url === "string" ? metadata.url : undefined),
+      }
     case "webfetch":
       return {
         icon: "window-cursor",

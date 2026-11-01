@@ -155,6 +155,7 @@ export const dict = {
   "ui.tool.browser.navigate": "Git",
   "ui.tool.browser.read": "Sayfayı oku",
   "ui.tool.browser.screenshot": "Ekran görüntüsü",
+  "ui.tool.browser.act": "Etkileşim",
   "ui.tool.browser.source.live": "canlı",
   "ui.tool.browser.source.fetched": "getirildi",
   "ui.tool.webfetch": "Web içeriğini getir",

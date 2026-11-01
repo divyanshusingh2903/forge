@@ -180,6 +180,8 @@ describe("tool.registry", () => {
       expect(textOnlyTools.map((tool) => tool.id)).not.toContain("browser_screenshot")
       expect(textOnlyTools.map((tool) => tool.id)).toContain("browser_navigate")
       expect(textOnlyTools.map((tool) => tool.id)).toContain("browser_read")
+      expect(textOnlyTools.map((tool) => tool.id)).toContain("browser_act")
+      expect(visionTools.map((tool) => tool.id)).toContain("browser_act")
     }),
   )
 

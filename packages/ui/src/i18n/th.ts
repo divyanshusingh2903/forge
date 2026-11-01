@@ -149,6 +149,7 @@ export const dict = {
   "ui.tool.browser.navigate": "ไปที่",
   "ui.tool.browser.read": "อ่านหน้า",
   "ui.tool.browser.screenshot": "Screenshot",
+  "ui.tool.browser.act": "โต้ตอบ",
   "ui.tool.browser.source.live": "สด",
   "ui.tool.browser.source.fetched": "ดึงข้อมูลแล้ว",
   "ui.tool.webfetch": "ดึงจากเว็บ",

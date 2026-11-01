@@ -18,6 +18,9 @@ export const browserCdpMethods = new Set([
   "Input.dispatchMouseEvent",
   "Input.dispatchKeyEvent",
   "Input.insertText",
+  // The embedded webview is never the focused OS surface, and Chromium drops text insertion for a page that
+  // reports no focus; emulation makes the page behave as focused without taking focus from the app.
+  "Emulation.setFocusEmulationEnabled",
   "Page.getLayoutMetrics",
   "Page.captureScreenshot",
 ])

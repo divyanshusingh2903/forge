@@ -121,6 +121,19 @@ it.instance("explore agent denies edit and write", () =>
   }),
 )
 
+it.instance("browser_act asks for build and general and is denied for plan and explore", () =>
+  Effect.gen(function* () {
+    for (const name of ["build", "general"]) {
+      expect(evalPerm(yield* load((svc) => svc.get(name)), "browser_act")).toBe("ask")
+    }
+    for (const name of ["plan", "explore"]) {
+      expect(evalPerm(yield* load((svc) => svc.get(name)), "browser_act")).toBe("deny")
+    }
+    // Reading stays available to the read-only agents; only acting is blocked.
+    expect(evalPerm(yield* load((svc) => svc.get("plan")), "browser")).toBe("ask")
+  }),
+)
+
 it.instance("explore agent asks for external directories and allows whitelisted external paths", () =>
   Effect.gen(function* () {
     const explore = yield* load((svc) => svc.get("explore"))
