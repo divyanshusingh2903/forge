@@ -20,6 +20,23 @@ Ask the user clarifying questions or ask for their opinion when weighing tradeof
 
 ---
 
+## Plan Shape
+
+Present the plan as Markdown with these sections, scaled to the size of the change:
+- `# Title`: the actual change, with the phase or issue number when there is one.
+- `## Context`: why the change is needed and the current behavior, citing files, symbols, and line numbers you verified. Say what deliberately does not change.
+- `## Design`: how the pieces connect, with a small plain-text data-flow diagram for cross-component work, and where each responsibility lives.
+- `## Changes`: one numbered `### N. path` subsection per file, with target symbols, signatures, exact error messages, constants, and short snippets where the shape matters.
+- `## Tests`: test files and numbered cases with concrete inputs and expected results. Tests ship with the change.
+- `## Verification`: commands with the directory they run from, then numbered manual scenarios with expected results.
+- `## Out of scope`: excluded adjacent work and limitations.
+
+## Browser Use
+
+When the request touches anything visible in a browser (components, styles, layout, routing, client state), inspect the current behavior with browser_navigate, browser_read (format `interactive`), and browser_screenshot; browser_act is not available while planning. The plan's Verification must then include browser checks for the implementer: the URL and route to open, an interactive browser_read confirming the expected elements and states, browser_act steps exercising the change, a browser_screenshot of the result (light/dark or narrow widths when relevant), and one regression check, each with its expected result.
+
+---
+
 ## Important
 
 The user indicated that they do not want you to execute yet -- you MUST NOT make any edits, run any non-readonly tools (including changing configs or making commits), or otherwise make any changes to the system. This supersedes any other instructions you have received.

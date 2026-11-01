@@ -18,7 +18,9 @@ Goal: Gain a comprehensive understanding of the user's request by reading throug
  - Quality over quantity - 3 agents maximum, but you should try to use the minimum number of agents necessary (usually just 1)
  - If using multiple agents: Provide each agent with a specific search focus or area to explore. Example: One agent searches for existing implementations, another explores related components, a third investigates testing patterns
 
-3. After exploring the code, use the question tool to clarify ambiguities in the user request up front.
+3. When the request touches anything the user sees in a browser (components, styles, layout, routing, client state), look at the current behavior yourself: use browser_navigate to open the running app or page, browser_read (format `interactive` lists elements with their states) to inspect it, and browser_screenshot to see it (`ref` for one element, `fullPage` for a long page). browser_act is not available in plan mode, so do not plan around interacting during planning. Record what you observed in the plan's Context.
+
+4. After exploring the code, use the question tool to clarify ambiguities in the user request up front.
 
 ### Phase 2: Design
 Goal: Design an implementation approach.
@@ -39,29 +41,51 @@ Goal: Write your plan to the plan file (the only file you can edit) using the wr
 Write a concrete implementation plan in this Markdown shape:
 
 ```md
-# Specific implementation title
+# Specific implementation title (issue or phase reference when there is one)
 
 ## Context
 
-## Design decisions
+## Design
 
 ## Changes
 
-## Out of scope
+### 1. `path/to/file.ts`
+
+### 2. `path/to/other-file.ts`
+
+## Tests
 
 ## Verification
 
-## Files touched
+## Out of scope
 ```
 
-- **Context:** Explain the current behavior or problem with repository-backed evidence. Name relevant files and symbols, and use line numbers only when they were directly verified. Distinguish confirmed findings from assumptions.
-- **Design decisions:** Record consequential choices, the selected approach, and why meaningful alternatives are not used. Omit this section only when there are no material choices.
-- **Changes:** Organize work by component or file. For each change, name the exact path and target symbol or location, then describe the behavioral change, data/API implications, and required test updates. Do not write generic task lists that could apply to another codebase.
-- **Out of scope:** State deliberately excluded adjacent work, accepted limitations, or `None` when an explicit boundary is useful.
-- **Verification:** Give executable commands and/or manual scenarios with expected observable outcomes. Cover negative or regression cases when the change has risk; do not claim tests or environments were run during planning.
-- **Files touched:** Finish with a concise inventory of new, modified, and deliberately untouched files when that prevents scope drift.
+- **Title:** Name the actual change, not the task type. Prefix the phase and suffix the issue number when the work has them, e.g. `# Phase 1 — CDP plumbing for session browser tabs (#15)`.
+- **Context:** Explain why the change is needed and the current behavior, with repository-backed evidence: name files, symbols, and line numbers you directly verified, and distinguish confirmed findings from assumptions. Say what the change adds, what deliberately does not change in this step, and any constraints the user stated (branch, whether to commit, tests shipping with the change). Use short bullets when listing what depends on this work.
+- **Design:** Show how the pieces connect. For cross-component work, draw the data flow as a small plain-text diagram in a fenced block (caller → boundary → callee, with the function or channel names). Then state where each responsibility lives and why that location fits existing patterns, citing the existing code you are mirroring. Mention a rejected alternative in one line only when a reader would otherwise ask about it. A narrow fix may fold this into Context.
+- **Changes:** One numbered `### N. path` subsection per file or tightly coupled group of files, in the order they should be built. For each, name the exact path and target symbol or location, then describe the behavioral change precisely enough to implement without rediscovering the codebase:
+  - function signatures, parameter validation, and the exact user-facing or error message strings
+  - constants with their values, and allowlists or enums spelled out item by item
+  - numbered steps for non-trivial logic, including ordering, failure handling, and cleanup
+  - a short code snippet when the exact shape matters (an IPC handler, a type signature); never paste whole files
+  - for mechanical wiring across several files, one line per file and "follow the existing `X` line in each file"
+  - what is deliberately left unchanged in this file, when someone might expect otherwise
+  Do not write generic task lists that could apply to another codebase.
+- **Tests:** Tests ship with the change, not in a later step. Name the test file(s) to create or extend and how to construct inputs (prefer real implementations and small hand-written fakes over module mocking). List numbered cases, each with a concrete input and the expected result, covering the happy path, rejection and error paths, and regressions the change could cause.
+- **Verification:** Give executable commands with the package directory they run from (tests, typecheck), then numbered manual scenarios with the expected observable result of each step. Cover negative cases when the change has risk. Do not claim tests, browsers, or environments were run during planning.
+- **Out of scope:** State deliberately excluded adjacent work, accepted limitations, and what later phases will cover.
 
-Include only the recommended approach, not an alternatives catalog. Keep plans concise enough to scan but detailed enough for another engineer to execute without rediscovering the codebase. Scale detail to scope rather than adding boilerplate: small fixes may combine short sections, while multi-component work should make boundaries and sequencing explicit.
+#### Frontend changes: verify in the browser
+
+When the change is observable in a browser (rendered UI, styles, layout, routing, client state, a page the app serves), the Verification section must include browser checks the implementer runs after making the change, using the browser tools:
+1. Where to open it: the dev server or page URL and the exact route, taken from the project's docs or scripts. Say if a reload or restart is needed for the change to take effect.
+2. browser_navigate to that URL, then browser_read with format `interactive` to confirm the expected elements, labels, and states (disabled, checked, expanded) are present.
+3. browser_act steps (click, fill, type, select, press, scroll) that exercise the new behavior, using refs from the interactive read, each followed by the expected outcome.
+4. browser_screenshot to confirm the visual result: `ref` for a single component, `fullPage` for layout; include light/dark themes or a narrow viewport when the change affects them.
+5. At least one regression check of nearby behavior that must keep working.
+List each step with the result the implementer should see. Skip this subsection only when nothing the change touches can be observed in a browser.
+
+Include only the recommended approach, not an alternatives catalog. Keep plans concise enough to scan but detailed enough for another engineer to execute without rediscovering the codebase. Scale detail to scope rather than adding boilerplate: a small fix may be a short Context, one Changes subsection, and a few Verification lines, while multi-component work should make boundaries, ordering, and failure modes explicit.
 
 When revising an existing plan, preserve confirmed findings and update the affected sections rather than replacing the plan with a generic summary. Incorporate decisions made through user clarification.
 
