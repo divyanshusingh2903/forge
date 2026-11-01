@@ -4,6 +4,7 @@ import type { SessionBrowserCommand } from "@opencode-ai/sdk/v2/client"
 import { Button } from "@opencode-ai/ui/button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { Spinner } from "@opencode-ai/ui/spinner"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { useLanguage } from "@/context/language"
@@ -612,14 +613,27 @@ export function SessionBrowserPanel(props: { stacked?: boolean; resizing?: boole
             />
           </Tooltip>
           <Tooltip value={language.t("browser.reload")} placement="bottom">
-            <IconButton
-              icon="reset"
-              variant="ghost"
-              class="h-6 w-6 shrink-0"
-              disabled={!storedUrl()}
-              onClick={() => activeWebview()?.reload()}
-              aria-label={language.t("browser.reload")}
-            />
+            <Show
+              when={loading()}
+              fallback={
+                <IconButton
+                  icon="reset"
+                  variant="ghost"
+                  class="h-6 w-6 shrink-0"
+                  disabled={!storedUrl()}
+                  onClick={() => activeWebview()?.reload()}
+                  aria-label={language.t("browser.reload")}
+                />
+              }
+            >
+              <div
+                class="h-6 w-6 shrink-0 flex items-center justify-center"
+                role="status"
+                aria-label={language.t("browser.reload")}
+              >
+                <Spinner class="size-3.5 text-icon-weak" />
+              </div>
+            </Show>
           </Tooltip>
         </Show>
 
