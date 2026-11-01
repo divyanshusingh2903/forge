@@ -21,6 +21,8 @@ export const browserCdpMethods = new Set([
   // The embedded webview is never the focused OS surface, and Chromium drops text insertion for a page that
   // reports no focus; emulation makes the page behave as focused without taking focus from the app.
   "Emulation.setFocusEmulationEnabled",
+  // Main-process only: paints a white canvas behind pages that set no background of their own.
+  "Emulation.setDefaultBackgroundColorOverride",
   "Page.getLayoutMetrics",
   "Page.captureScreenshot",
 ])
