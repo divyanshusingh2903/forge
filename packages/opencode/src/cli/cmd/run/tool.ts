@@ -362,18 +362,31 @@ function runBrowserNavigate(p: ToolProps<typeof BrowserNavigateTool>): ToolInlin
 
 function runBrowserRead(p: ToolProps<typeof BrowserReadTool>): ToolInline {
   const url = p.metadata.url || ""
-  const source = p.metadata.source ? ` (${p.metadata.source})` : ""
+  // Source, then the format unless it is the default markdown, then the element count of an interactive read.
+  const detail = [
+    p.metadata.source,
+    p.metadata.format && p.metadata.format !== "markdown" ? p.metadata.format : undefined,
+    p.metadata.format === "interactive" && p.metadata.elements !== undefined
+      ? `${p.metadata.elements} ${p.metadata.elements === 1 ? "element" : "elements"}`
+      : undefined,
+  ].filter(Boolean)
   return {
     icon: "%",
-    title: `Browser read${url ? ` ${url}` : ""}${source}`,
+    title: `Browser read${url ? ` ${url}` : ""}${detail.length > 0 ? ` (${detail.join(", ")})` : ""}`,
   }
 }
 
 function runBrowserScreenshot(p: ToolProps<typeof BrowserScreenshotTool>): ToolInline {
   const url = p.metadata.url || ""
+  // What was captured: the whole page, or the element behind a ref (role and name when known).
+  const target = p.metadata.fullPage
+    ? "full page"
+    : p.metadata.role
+      ? `${p.metadata.role} "${p.metadata.name ?? ""}"`
+      : p.metadata.ref
   return {
     icon: "%",
-    title: `Browser screenshot${url ? ` ${url}` : ""}`,
+    title: `Browser screenshot${url ? ` ${url}` : ""}${target ? ` (${target})` : ""}`,
   }
 }
 

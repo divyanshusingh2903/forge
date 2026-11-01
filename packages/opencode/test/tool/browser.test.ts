@@ -200,6 +200,36 @@ describe("tool.browser_read", () => {
     }),
   )
 
+  it.instance("counts the elements of an interactive read and leaves other formats without a count", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_interactive_count")
+      const ctx = makeCtx<ReadMetadata>(sessionID)
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "https://example.com/form" }] })
+      yield* fakePanel(sessionID, (command, tabID) => ({
+        ok: true,
+        tabID,
+        url: "https://example.com/form",
+        text: command.type === "read" && command.format === "interactive" ? '[e1] button "Submit"\n[e2] link "Docs"' : "# Form",
+        ...(command.type === "read" && command.format === "interactive"
+          ? {
+              elements: [
+                { ref: "e1", role: "button", name: "Submit" },
+                { ref: "e2", role: "link", name: "Docs" },
+              ],
+            }
+          : {}),
+      }))
+      const tool = yield* (yield* BrowserReadTool).init()
+
+      const interactive = yield* tool.execute({ format: "interactive" }, ctx)
+      expect(interactive.metadata.elements).toBe(2)
+
+      const markdown = yield* tool.execute({ format: "markdown" }, ctx)
+      expect(markdown.metadata).not.toHaveProperty("elements")
+    }),
+  )
+
   it.instance("fails an interactive read without falling back to a server fetch", () =>
     Effect.gen(function* () {
       const server = yield* servePage
@@ -352,6 +382,29 @@ describe("tool.browser_screenshot", () => {
       expect(result.output).toContain("Element: e3")
       expect(result.metadata).toMatchObject({ ref: "e3" })
       expect(result.attachments).toHaveLength(1)
+    }),
+  )
+
+  it.instance("names the element it captured when the ref came from an interactive read", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_screenshot_labels")
+      const url = "http://localhost:3000/form"
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url }] })
+      yield* browser.setElements(sessionID, "tab-1", [{ ref: "e1", role: "button", name: "Submit order" }])
+      yield* fakePanel(sessionID, (_command, tabID) => ({ ok: true, tabID, url, image: "AAAA", mime: "image/jpeg" }))
+      const tool = yield* (yield* BrowserScreenshotTool).init()
+      const ctx = makeCtx<ScreenshotMetadata>(sessionID)
+
+      const known = yield* tool.execute({ ref: "e1" }, ctx)
+      expect(known.output).toContain('Element: e1 (button "Submit order")')
+      expect(known.metadata).toMatchObject({ ref: "e1", role: "button", name: "Submit order" })
+
+      const unknown = yield* tool.execute({ ref: "e9" }, ctx)
+      expect(unknown.output).toContain("Element: e9")
+      expect(unknown.output).not.toContain("Element: e9 (")
+      expect(unknown.metadata.role).toBeUndefined()
+      expect(unknown.metadata.name).toBeUndefined()
     }),
   )
 

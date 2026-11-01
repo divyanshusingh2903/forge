@@ -2088,9 +2088,20 @@ ToolRegistry.register({
     const i18n = useI18n()
     const pending = createMemo(() => props.status === "pending" || props.status === "running")
     const url = createMemo(() => (typeof props.metadata.url === "string" ? props.metadata.url : ""))
+    // Source, then the format unless it is the default markdown, then how many elements an interactive read listed.
     const tag = createMemo(() => {
-      if (props.metadata.source === "live") return i18n.t("ui.tool.browser.source.live")
-      if (props.metadata.source === "fetched") return i18n.t("ui.tool.browser.source.fetched")
+      const format = props.metadata.format
+      const elements = props.metadata.elements
+      const parts = [
+        props.metadata.source === "live" && i18n.t("ui.tool.browser.source.live"),
+        props.metadata.source === "fetched" && i18n.t("ui.tool.browser.source.fetched"),
+        (format === "text" || format === "html" || format === "interactive") &&
+          i18n.t(`ui.tool.browser.format.${format}` as const),
+        format === "interactive" &&
+          typeof elements === "number" &&
+          i18n.plural("ui.tool.browser.read.elements", elements),
+      ].filter((part): part is string => typeof part === "string")
+      return parts.length > 0 ? parts.join(" · ") : undefined
     })
     return (
       <BasicTool
@@ -2159,6 +2170,13 @@ ToolRegistry.register({
     const pending = createMemo(() => props.status === "pending" || props.status === "running")
     const url = createMemo(() => (typeof props.metadata.url === "string" ? props.metadata.url : ""))
     const label = createMemo(() => (typeof props.metadata.title === "string" && props.metadata.title) || url())
+    // Says what was captured: the whole page, or the element behind a ref (by role and name when known).
+    const tag = createMemo(() => {
+      if (props.metadata.fullPage === true) return i18n.t("ui.tool.browser.screenshot.fullPage")
+      const { role, name, ref } = props.metadata
+      if (typeof role === "string" && typeof name === "string") return `${role} "${name}"`
+      return typeof ref === "string" ? ref : undefined
+    })
     const image = createMemo(() =>
       props.attachments?.find((attachment) => attachment.mime?.startsWith("image/")),
     )
@@ -2179,6 +2197,7 @@ ToolRegistry.register({
             pending={pending()}
             url={url()}
             label={label()}
+            tag={tag()}
           />
         }
       >

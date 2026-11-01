@@ -89,6 +89,8 @@ export type ReadMetadata = {
   tabID?: string
   format: SessionBrowser.ReadFormat
   source: "live" | "fetched"
+  // Number of elements an interactive read listed; the panel caps the list at 300.
+  elements?: number
 }
 
 export type ActMetadata = {
@@ -110,6 +112,9 @@ export type ScreenshotMetadata = {
   title?: string
   tabID?: string
   ref?: string
+  // Role and name of the element behind `ref`, known when the page was read in interactive format.
+  role?: string
+  name?: string
   fullPage?: boolean
 }
 
@@ -213,6 +218,7 @@ export const BrowserReadTool = Tool.define(
               format: params.format,
               source: "live",
               sourceLabel: "live",
+              elements: result.elements?.length ?? 0,
               body: result.text ?? "",
             })
           }
@@ -301,17 +307,26 @@ export const BrowserScreenshotTool = Tool.define(
           const title = result.title ?? tab.title
           const tabID = result.tabID ?? tab.tabID
           const mime = result.mime ?? "image/jpeg"
+          const target = params.ref ? yield* browser.element(ctx.sessionID, tab.tabID, params.ref) : undefined
           return {
             title: title || url,
             output: [
               `URL: ${url}`,
               ...(title ? [`Title: ${title}`] : []),
               ...(tabID ? [`Tab: ${tabID}`] : []),
-              ...(params.ref ? [`Element: ${params.ref}`] : []),
+              ...(params.ref ? [`Element: ${params.ref}${target ? ` (${target.role} "${target.name}")` : ""}`] : []),
               ...(params.fullPage ? ["Full page"] : []),
               ...(result.text ? [result.text] : []),
             ].join("\n"),
-            metadata: { url, title, tabID, ref: params.ref, fullPage: params.fullPage },
+            metadata: {
+              url,
+              title,
+              tabID,
+              ref: params.ref,
+              role: target?.role,
+              name: target?.name,
+              fullPage: params.fullPage,
+            },
             attachments: [
               {
                 type: "file" as const,
@@ -456,6 +471,7 @@ function readOutput(input: ReadMetadata & { sourceLabel: string; body: string })
       tabID: input.tabID,
       format: input.format,
       source: input.source,
+      ...(input.elements === undefined ? {} : { elements: input.elements }),
     } satisfies ReadMetadata,
   }
 }
