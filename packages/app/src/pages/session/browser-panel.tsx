@@ -13,6 +13,7 @@ import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useSessionLayout } from "@/pages/session/session-layout"
+import { formatInteractiveElements } from "./browser-interactive"
 
 const LEASE_RENEW_INTERVAL_MS = 10_000
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024
@@ -148,6 +149,9 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
   const pendingTargetUrl = new Map<string, string>()
   const pendingNavigation = new Map<string, { requestID: string; sessionID: string }>()
   const idleWaiters = new Map<string, Array<() => void>>()
+  // Per tab: ref (e1, e2, …) → backend DOM node id from the last interactive read. Dropped when the page
+  // navigates, so a stale ref is never resolved against a different document.
+  const interactiveRefs = new Map<string, Map<string, number>>()
   let urlInputRef: HTMLInputElement | undefined
 
   const activeRuntime = createMemo(() => runtime[activeTabId()])
@@ -227,6 +231,23 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
       await whenIdle(tabId)
       const el = webviewRefs.get(tabId)
       if (!el) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not loaded` })
+      if (command.format === "interactive") {
+        if (!platform.sendBrowserCdpCommand) {
+          return reply(id, requestID, { ok: false, error: "Interactive reads are only supported in the desktop app" })
+        }
+        const webContentsId = el.getWebContentsId()
+        await platform.sendBrowserCdpCommand(webContentsId, "Accessibility.enable")
+        const tree = await platform.sendBrowserCdpCommand(webContentsId, "Accessibility.getFullAXTree")
+        const elements = formatInteractiveElements(tree)
+        interactiveRefs.set(tabId, elements.refs)
+        return reply(id, requestID, {
+          ok: true,
+          tabID: tabId,
+          url: el.getURL(),
+          title: el.getTitle() || undefined,
+          text: truncateToMaxBytes(elements.text),
+        })
+      }
       const page = await el.executeJavaScript<{ url: string; title: string; content: string }>(
         command.format === "text"
           ? `({ url: location.href, title: document.title, content: document.body ? document.body.innerText : "" })`
@@ -351,9 +372,13 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
       if (!runtime[tabId]?.loading) flushIdle(tabId)
     }
 
-    const onStartLoading = () => setRuntime(tabId, "loading", true)
+    const onStartLoading = () => {
+      interactiveRefs.delete(tabId)
+      setRuntime(tabId, "loading", true)
+    }
 
     const onNavigate = (event: Event & { url?: string }) => {
+      if (event.type === "did-navigate") interactiveRefs.delete(tabId)
       if (isHttpUrl(event.url)) {
         view().browser.setUrl(event.url, tabId)
         if (tabId === activeTabId() && !inputFocused()) setInputValue(event.url)
@@ -416,6 +441,7 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
       if (request) void reply(request.sessionID, request.requestID, { ok: false, tabID: tabId, error: "The tab was closed" })
       pendingNavigation.delete(tabId)
       pendingTargetUrl.delete(tabId)
+      interactiveRefs.delete(tabId)
       // Release waiters; they find no webview and report the tab as not loaded.
       flushIdle(tabId)
       setRuntime(tabId, undefined)

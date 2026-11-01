@@ -30,7 +30,7 @@ export const AttachInput = Schema.Struct({
 }).annotate({ identifier: "SessionBrowserAttachInput" })
 export type AttachInput = Schema.Schema.Type<typeof AttachInput>
 
-export const ReadFormat = Schema.Literals(["markdown", "text", "html"])
+export const ReadFormat = Schema.Literals(["markdown", "text", "html", "interactive"])
 export type ReadFormat = Schema.Schema.Type<typeof ReadFormat>
 
 export const NavigateAction = Schema.Literals(["goto", "back", "forward", "reload"])

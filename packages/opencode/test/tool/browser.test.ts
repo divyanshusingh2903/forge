@@ -6,7 +6,7 @@ import { LayerNode } from "@opencode-ai/core/effect/layer-node"
 import { FSUtil } from "@opencode-ai/core/fs-util"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { PermissionV1 } from "@opencode-ai/core/v1/permission"
-import { Effect, Exit, Layer, Queue } from "effect"
+import { Cause, Effect, Exit, Layer, Queue } from "effect"
 import { Agent } from "@/agent/agent"
 import { Browser } from "@/browser"
 import { RuntimeFlags } from "@/effect/runtime-flags"
@@ -174,6 +174,60 @@ describe("tool.browser_read", () => {
 
       const text = yield* tool.execute({ tabID: "tab-work", format: "text" }, ctx)
       expect(text.output).toContain("Checkout Step 2")
+    }),
+  )
+
+  it.instance("reads interactive elements live from the attached panel", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_interactive")
+      const ctx = makeCtx<ReadMetadata>(sessionID)
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "https://example.com/form" }] })
+      const formats: string[] = []
+      yield* fakePanel(sessionID, (command, tabID) => {
+        if (command.type === "read") formats.push(command.format)
+        return { ok: true, tabID, url: "https://example.com/form", title: "Form", text: '[e1] button "Submit"' }
+      })
+      const tool = yield* (yield* BrowserReadTool).init()
+
+      const result = yield* tool.execute({ format: "interactive" }, ctx)
+      expect(formats).toEqual(["interactive"])
+      expect(result.metadata).toMatchObject({ format: "interactive", source: "live", tabID: "tab-1" })
+      expect(result.output).toContain("source: live")
+      expect(result.output).toContain('[e1] button "Submit"')
+    }),
+  )
+
+  it.instance("fails an interactive read without falling back to a server fetch", () =>
+    Effect.gen(function* () {
+      const server = yield* servePage
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_interactive_detached")
+      const ctx = makeCtx<ReadMetadata>(sessionID)
+      yield* browser.setState(sessionID, {
+        activeTabID: "tab-1",
+        tabs: [{ tabID: "tab-1", url: `http://127.0.0.1:${server.port}/` }],
+      })
+      const tool = yield* (yield* BrowserReadTool).init()
+
+      const exit = yield* Effect.exit(tool.execute({ format: "interactive" }, ctx))
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain("Interactive reads need the desktop Browser panel")
+    }),
+  )
+
+  it.instance("reports a failed interactive read instead of falling back", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_interactive_failed")
+      const ctx = makeCtx<ReadMetadata>(sessionID)
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "https://example.com" }] })
+      yield* fakePanel(sessionID, () => ({ ok: false, error: "Accessibility.getFullAXTree failed: boom" }))
+      const tool = yield* (yield* BrowserReadTool).init()
+
+      const exit = yield* Effect.exit(tool.execute({ format: "interactive" }, ctx))
+      expect(Exit.isFailure(exit)).toBe(true)
+      expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain("Interactive read failed")
     }),
   )
 

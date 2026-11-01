@@ -681,7 +681,7 @@ export type SessionBrowserNavigateCommand = {
 
 export type SessionBrowserReadCommand = {
   type: "read"
-  format: "markdown" | "text" | "html"
+  format: "markdown" | "text" | "html" | "interactive"
 }
 
 export type SessionBrowserScreenshotCommand = {

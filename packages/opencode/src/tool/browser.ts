@@ -31,7 +31,8 @@ export const NavigateParameters = Schema.Struct({
 export const ReadParameters = Schema.Struct({
   tabID: TabID,
   format: SessionBrowser.ReadFormat.annotate({
-    description: "The format to return the page content in (markdown, text, or html). Defaults to markdown.",
+    description:
+      "The format to return the page content in: markdown, text, html, or interactive (a list of actionable elements with refs like [e12]). Defaults to markdown.",
     default: "markdown",
   }).pipe(Schema.withDecodingDefault(Effect.succeed("markdown" as const))),
   timeout: Timeout,
@@ -148,6 +149,24 @@ export const BrowserReadTool = Tool.define(
           })
 
           const timeout = timeoutMs(params.timeout)
+
+          // Refs live in the panel, so there is no server-side fetch fallback for this format.
+          if (params.format === "interactive") {
+            if (!info.attached) throw new Error("Interactive reads need the desktop Browser panel to be open.")
+            const result = yield* browser
+              .command(ctx.sessionID, { type: "read", format: "interactive" }, { tabID: tab.tabID, timeoutMs: timeout })
+              .pipe(Effect.mapError((error) => new Error(`Interactive read failed: ${error.message}`)))
+            return readOutput({
+              url: result.url ?? tab.url,
+              title: result.title ?? tab.title,
+              tabID: tab.tabID,
+              format: params.format,
+              source: "live",
+              sourceLabel: "live",
+              body: result.text ?? "",
+            })
+          }
+
           const live = info.attached
             ? yield* browser
                 .command(ctx.sessionID, { type: "read", format: params.format }, { tabID: tab.tabID, timeoutMs: timeout })
