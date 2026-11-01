@@ -19,6 +19,7 @@ import {
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { TitlebarTheme } from "../preload/types"
+import { sendBrowserCdpCommand } from "./browser-debugger"
 import { exportDebugLogs, write as writeLog } from "./logging"
 import { getStore, removeStoreFile } from "./store"
 import { manageWindowState, readWindowState, resolveWindowState } from "./window-bounds"
@@ -285,7 +286,7 @@ export async function clearBrowserStorageData() {
   await session.fromPartition(browserPartition).clearStorageData()
 }
 
-export async function captureBrowserTab(host: Electron.WebContents, guestWebContentsId: number) {
+function requireBrowserGuest(host: Electron.WebContents, guestWebContentsId: number) {
   const guest = webContents.fromId(guestWebContentsId)
   if (!guest || guest.isDestroyed() || guest.hostWebContents?.id !== host.id) {
     throw new Error("Browser tab is not available")
@@ -293,6 +294,23 @@ export async function captureBrowserTab(host: Electron.WebContents, guestWebCont
   if (guest.session !== session.fromPartition(browserPartition)) {
     throw new Error("Invalid browser tab session")
   }
+  return guest
+}
+
+export async function sendBrowserTabCdpCommand(
+  host: Electron.WebContents,
+  guestWebContentsId: unknown,
+  method: unknown,
+  params: unknown,
+) {
+  if (typeof guestWebContentsId !== "number" || !Number.isInteger(guestWebContentsId)) {
+    throw new Error("Browser tab is not available")
+  }
+  return sendBrowserCdpCommand(requireBrowserGuest(host, guestWebContentsId).debugger, method, params)
+}
+
+export async function captureBrowserTab(host: Electron.WebContents, guestWebContentsId: number) {
+  const guest = requireBrowserGuest(host, guestWebContentsId)
   const captured = await guest.capturePage()
   const size = captured.getSize()
   if (captured.isEmpty() || size.width === 0 || size.height === 0) {

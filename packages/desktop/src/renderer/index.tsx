@@ -260,6 +260,9 @@ const createPlatform = (windowState: DesktopWindowState): Platform => {
 
     captureBrowserTab: (webContentsId) => window.api.captureBrowserTab(webContentsId),
 
+    sendBrowserCdpCommand: (webContentsId, method, params) =>
+      window.api.sendBrowserCdpCommand(webContentsId, method, params),
+
     restart: async () => {
       await window.api.killSidecar().catch(() => undefined)
       window.api.relaunch()

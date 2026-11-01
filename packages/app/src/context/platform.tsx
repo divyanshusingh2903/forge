@@ -130,6 +130,9 @@ type PlatformBase = {
 
   /** Capture a JPEG screenshot of a session browser guest webContents (desktop only) */
   captureBrowserTab?(webContentsId: number): Promise<{ image: string; mime: string }>
+
+  /** Send an allowlisted DevTools Protocol command to a session browser guest webContents (desktop only) */
+  sendBrowserCdpCommand?(webContentsId: number, method: string, params?: Record<string, unknown>): Promise<unknown>
 }
 
 export type Platform = PlatformBase &

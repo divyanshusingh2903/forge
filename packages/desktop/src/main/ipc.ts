@@ -19,6 +19,7 @@ import {
   iconPath,
   openExternalURL,
   openLocalFileURL,
+  sendBrowserTabCdpCommand,
   setPinchZoomEnabled,
   setTitlebar,
   updateTitlebar,
@@ -324,6 +325,11 @@ export function registerIpcHandlers(deps: Deps) {
   ipcMain.handle("clear-browser-data", () => clearBrowserStorageData())
   ipcMain.handle("capture-browser-tab", (event: IpcMainInvokeEvent, webContentsId: number) =>
     captureBrowserTab(event.sender, webContentsId),
+  )
+  ipcMain.handle(
+    "browser-cdp-command",
+    (event: IpcMainInvokeEvent, webContentsId: number, method: string, params?: Record<string, unknown>) =>
+      sendBrowserTabCdpCommand(event.sender, webContentsId, method, params),
   )
 }
 
