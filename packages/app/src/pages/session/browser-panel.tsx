@@ -340,7 +340,7 @@ export function SessionBrowserPanel(props: { stacked?: boolean; resizing?: boole
         newTab: command.newTab,
         tabs: tabs(),
         activeTab: activeTab(),
-        addTab: () => view().browser.addTab(""),
+        addTab,
       })
       view().browser.setActiveTab(tabId)
       return navigateTab(tabId, url, { requestID, sessionID: id })
@@ -504,8 +504,17 @@ export function SessionBrowserPanel(props: { stacked?: boolean; resizing?: boole
     navigateTab(activeTabId(), normalized)
   }
 
+  // Kobalte Tabs sees the new active ID before the new trigger registers and "repairs" the selection by
+  // calling onChange with the first tab, so ignore selection changes until the current update settles.
+  let addingTab = false
+  const addTab = () => {
+    addingTab = true
+    queueMicrotask(() => (addingTab = false))
+    return view().browser.addTab("")
+  }
+
   const handleAddTab = () => {
-    view().browser.addTab("")
+    addTab()
     setInputValue("")
     requestAnimationFrame(() => urlInputRef?.focus())
   }
@@ -536,36 +545,43 @@ export function SessionBrowserPanel(props: { stacked?: boolean; resizing?: boole
         <Tabs
           variant="normal"
           value={activeTabId()}
-          onChange={(id) => view().browser.setActiveTab(id)}
+          onChange={(id) => {
+            if (!addingTab) view().browser.setActiveTab(id)
+          }}
           class="flex-1 min-w-0 !h-10 !flex-none"
         >
           <Tabs.List class="h-10 overflow-x-auto no-scrollbar">
-            <For each={tabs()}>
-              {(tab) => (
-                <Tabs.Trigger
-                  value={tab.id}
-                  onMiddleClick={() => handleCloseTab(tab.id)}
-                  closeButton={
-                    <Tooltip value={language.t("browser.closeTab")} placement="bottom">
-                      <IconButton
-                        icon="close-small"
-                        variant="ghost"
-                        class="h-5 w-5"
-                        onClick={(event: MouseEvent) => {
-                          event.stopPropagation()
-                          handleCloseTab(tab.id)
-                        }}
-                        aria-label={language.t("browser.closeTab")}
-                      />
-                    </Tooltip>
-                  }
-                >
-                  <span class="flex items-center gap-1.5 max-w-40 truncate">
-                    <Icon name="browser" size="small" class="shrink-0 text-icon-weak" />
-                    <span class="truncate">{formatTabLabel(tab, language.t("browser.newTab"))}</span>
-                  </span>
-                </Tabs.Trigger>
-              )}
+            {/* Keyed by ID like the webviews: a recreated trigger briefly unregisters the selected tab and
+                Kobalte falls back to the first one. */}
+            <For each={tabIds()}>
+              {(tabId) => {
+                const tab = () => tabs().find((item) => item.id === tabId) ?? { id: tabId, url: "" }
+                return (
+                  <Tabs.Trigger
+                    value={tabId}
+                    onMiddleClick={() => handleCloseTab(tabId)}
+                    closeButton={
+                      <Tooltip value={language.t("browser.closeTab")} placement="bottom">
+                        <IconButton
+                          icon="close-small"
+                          variant="ghost"
+                          class="h-5 w-5"
+                          onClick={(event: MouseEvent) => {
+                            event.stopPropagation()
+                            handleCloseTab(tabId)
+                          }}
+                          aria-label={language.t("browser.closeTab")}
+                        />
+                      </Tooltip>
+                    }
+                  >
+                    <span class="flex items-center gap-1.5 max-w-40 truncate">
+                      <Icon name="browser" size="small" class="shrink-0 text-icon-weak" />
+                      <span class="truncate">{formatTabLabel(tab(), language.t("browser.newTab"))}</span>
+                    </span>
+                  </Tabs.Trigger>
+                )
+              }}
             </For>
             <Tooltip value={language.t("browser.newTab")} placement="bottom">
               <IconButton
