@@ -50,6 +50,8 @@ export const ReadCommand = Schema.Struct({
 
 export const ScreenshotCommand = Schema.Struct({
   type: Schema.Literal("screenshot"),
+  ref: Schema.optional(Schema.String),
+  fullPage: Schema.optional(Schema.Boolean),
 }).annotate({ identifier: "SessionBrowserScreenshotCommand" })
 
 export const ActAction = Schema.Literals(["click", "type", "fill", "select", "press", "scroll", "hover"])
@@ -74,7 +76,7 @@ export const Command = Schema.Union([NavigateCommand, ReadCommand, ScreenshotCom
 export type Command = Schema.Schema.Type<typeof Command>
 
 // One flat result shape for every command keeps the reply route simple; `html`/`text` are only set by reads
-// (and `text` by actions that report a detail) and `image`/`mime` are only set by screenshots.
+// (and `text` by actions and screenshots that report a detail) and `image`/`mime` are only set by screenshots.
 export const ResultInput = Schema.Struct({
   requestID: Schema.String,
   ok: Schema.Boolean,

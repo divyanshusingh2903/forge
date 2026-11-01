@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionBrowserActCommand } from "@opencode-ai/sdk/v2/client"
-import { runBrowserAction } from "./browser-actions"
+import { captureScreenshot, runBrowserAction } from "./browser-actions"
 
 type Call = { method: string; params?: Record<string, unknown> }
 
@@ -12,6 +12,7 @@ function fakeCdp(replies: Record<string, unknown | ((params?: Record<string, unk
     "DOM.getContentQuads": { quads: [[10, 20, 30, 20, 30, 40, 10, 40]] },
     // Answers the post-click focus check; tests that need other results override it.
     "Runtime.callFunctionOn": { result: { value: true } },
+    "Page.captureScreenshot": { data: "AAAA" },
     "Page.getLayoutMetrics": { cssVisualViewport: { clientWidth: 1000, clientHeight: 500 } },
   }
   const send = async (method: string, params?: Record<string, unknown>) => {
@@ -220,5 +221,90 @@ describe("runBrowserAction", () => {
     })
     const error = await runBrowserAction(cdp.send, act({ action: "click", ref: "e1" }), refs).catch((error: Error) => error)
     expect((error as Error).message).toBe('Browser action "click" failed on the page')
+  })
+})
+
+// Layout metrics as CDP reports them: viewport and page offset in CSS px, `visualViewport` in device px.
+const metrics = (input: { pageY?: number; dpr?: number; contentHeight?: number } = {}) => ({
+  cssVisualViewport: { pageX: 0, pageY: input.pageY ?? 100, clientWidth: 1000, clientHeight: 500 },
+  visualViewport: { clientWidth: 1000 * (input.dpr ?? 1) },
+  cssContentSize: { width: 1000, height: input.contentHeight ?? 3000 },
+})
+
+describe("captureScreenshot", () => {
+  const shotParams = (cdp: ReturnType<typeof fakeCdp>) =>
+    cdp.calls.find((call) => call.method === "Page.captureScreenshot")?.params
+
+  test("crops to the element with padding, in page coordinates", async () => {
+    const cdp = fakeCdp({ "Page.getLayoutMetrics": metrics() })
+    const shot = await captureScreenshot(cdp.send, { ref: "e1" }, refs)
+    expect(shot).toEqual({ image: "AAAA", mime: "image/jpeg", detail: undefined })
+    expect(shotParams(cdp)).toEqual({
+      format: "jpeg",
+      quality: 80,
+      clip: { x: 2, y: 112, width: 36, height: 36, scale: 1 },
+      captureBeyondViewport: false,
+    })
+    expect(cdp.calls.at(-1)).toEqual({ method: "Runtime.releaseObject", params: { objectId: "obj-1" } })
+  })
+
+  test("shrinks a large element on a high-density display to the size limit", async () => {
+    const cdp = fakeCdp({
+      "Page.getLayoutMetrics": metrics({ dpr: 2 }),
+      "DOM.getContentQuads": { quads: [[0, 0, 1500, 0, 1500, 100, 0, 100]] },
+    })
+    await captureScreenshot(cdp.send, { ref: "e1" }, refs)
+    const clip = (shotParams(cdp)?.clip ?? {}) as { width: number; scale: number }
+    expect(clip.width).toBe(1516)
+    expect(clip.scale).toBeCloseTo(1920 / (1516 * 2), 6)
+  })
+
+  test("rejects a stale or invisible element without capturing", async () => {
+    const stale = fakeCdp()
+    await expect(captureScreenshot(stale.send, { ref: "e9" }, refs)).rejects.toThrow("is not on the current page")
+    expect(stale.methods()).not.toContain("Page.captureScreenshot")
+
+    const hidden = fakeCdp({ "DOM.getContentQuads": { quads: [[10, 20, 10, 20, 10, 20, 10, 20]] }, "Page.getLayoutMetrics": metrics() })
+    await expect(captureScreenshot(hidden.send, { ref: "e1" }, refs)).rejects.toThrow("Element e1 is not visible on the page")
+    expect(hidden.methods()).not.toContain("Page.captureScreenshot")
+  })
+
+  test("captures the whole page beyond the viewport when it fits the height cap", async () => {
+    const cdp = fakeCdp({ "Page.getLayoutMetrics": metrics() })
+    const shot = await captureScreenshot(cdp.send, { fullPage: true }, undefined)
+    expect(shot.detail).toBeUndefined()
+    expect(shotParams(cdp)).toMatchObject({
+      clip: { x: 0, y: 0, width: 1000, height: 3000, scale: 0.64 },
+      captureBeyondViewport: true,
+    })
+  })
+
+  test("caps a tall page and says how much was captured", async () => {
+    const cdp = fakeCdp({ "Page.getLayoutMetrics": metrics({ contentHeight: 9500 }) })
+    const shot = await captureScreenshot(cdp.send, { fullPage: true }, undefined)
+    expect(shot.detail).toBe("Captured the top 4000px of a 9500px page")
+    expect(shotParams(cdp)).toMatchObject({ clip: { x: 0, y: 0, width: 1000, height: 4000 } })
+  })
+
+  test("reports an empty or oversized capture", async () => {
+    const empty = fakeCdp({ "Page.getLayoutMetrics": metrics(), "Page.captureScreenshot": {} })
+    await expect(captureScreenshot(empty.send, { fullPage: true }, undefined)).rejects.toThrow("Screenshot did not return an image")
+
+    const huge = fakeCdp({ "Page.getLayoutMetrics": metrics(), "Page.captureScreenshot": { data: "x".repeat(5 * 1024 * 1024 + 1) } })
+    await expect(captureScreenshot(huge.send, { fullPage: true }, undefined)).rejects.toThrow("Screenshot is too large")
+
+    const blank = fakeCdp({ "Page.getLayoutMetrics": { cssContentSize: { width: 0, height: 0 } } })
+    await expect(captureScreenshot(blank.send, { fullPage: true }, undefined)).rejects.toThrow("The page has no content to capture")
+  })
+
+  test("replaces unexpected protocol failures with a generic message", async () => {
+    const cdp = fakeCdp({
+      "Page.getLayoutMetrics": metrics(),
+      "Page.captureScreenshot": () => {
+        throw new Error("Internal CDP detail: renderer gone")
+      },
+    })
+    const error = await captureScreenshot(cdp.send, { fullPage: true }, undefined).catch((error: Error) => error)
+    expect((error as Error).message).toBe("Browser screenshot failed on the page")
   })
 })

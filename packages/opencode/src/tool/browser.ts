@@ -42,6 +42,12 @@ export const ReadParameters = Schema.Struct({
 })
 
 export const ScreenshotParameters = Schema.Struct({
+  ref: Schema.optional(Schema.String.check(Schema.isPattern(/^e\d{1,5}$/))).annotate({
+    description: 'Element ref from browser_read with format "interactive", e.g. e12. Captures just that element, close up.',
+  }),
+  fullPage: Schema.optional(Schema.Boolean).annotate({
+    description: "Capture the whole page beyond the viewport instead of only what is visible (limited to the top 4000px).",
+  }),
   tabID: TabID,
   timeout: Timeout,
 })
@@ -98,6 +104,8 @@ export type ScreenshotMetadata = {
   url: string
   title?: string
   tabID?: string
+  ref?: string
+  fullPage?: boolean
 }
 
 export const BrowserNavigateTool = Tool.define(
@@ -251,6 +259,7 @@ export const BrowserScreenshotTool = Tool.define(
       parameters: ScreenshotParameters,
       execute: (params: Schema.Schema.Type<typeof ScreenshotParameters>, ctx: Tool.Context<ScreenshotMetadata>) =>
         Effect.gen(function* () {
+          if (params.ref && params.fullPage) throw new Error("browser_screenshot accepts ref or fullPage, not both")
           const info = yield* browser.get(ctx.sessionID)
           const tab = findTab(info, params.tabID)
           if (!tab) {
@@ -270,7 +279,15 @@ export const BrowserScreenshotTool = Tool.define(
           })
 
           const result = yield* browser
-            .command(ctx.sessionID, { type: "screenshot" }, { tabID: tab.tabID, timeoutMs: timeoutMs(params.timeout) })
+            .command(
+              ctx.sessionID,
+              {
+                type: "screenshot",
+                ...(params.ref ? { ref: params.ref } : {}),
+                ...(params.fullPage ? { fullPage: true } : {}),
+              },
+              { tabID: tab.tabID, timeoutMs: timeoutMs(params.timeout) },
+            )
             .pipe(Effect.mapError((error) => new Error(error.message)))
 
           if (!result.image) throw new Error("Browser screenshot did not return an image")
@@ -284,8 +301,11 @@ export const BrowserScreenshotTool = Tool.define(
               `URL: ${url}`,
               ...(title ? [`Title: ${title}`] : []),
               ...(tabID ? [`Tab: ${tabID}`] : []),
+              ...(params.ref ? [`Element: ${params.ref}`] : []),
+              ...(params.fullPage ? ["Full page"] : []),
+              ...(result.text ? [result.text] : []),
             ].join("\n"),
-            metadata: { url, title, tabID },
+            metadata: { url, title, tabID, ref: params.ref, fullPage: params.fullPage },
             attachments: [
               {
                 type: "file" as const,

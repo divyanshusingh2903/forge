@@ -1,5 +1,7 @@
-- Captures a screenshot of the visible viewport of a tab in the session's Browser panel.
+- Captures a screenshot of a tab in the session's Browser panel. By default this is the visible viewport.
 - Captures the active tab unless `tabID` is given. Use `browser_navigate` first to load a page; its output lists the open tab IDs.
+- Pass `ref` (from `browser_read` with `format: interactive`, e.g. `e12`) to capture just that element, close up. Use this to read small text or inspect one control. Refs go stale after navigation.
+- Pass `fullPage: true` to capture the page beyond the viewport. It is limited to the top 4000px; the output says when the page was cut off. `ref` and `fullPage` cannot be combined.
 - Returns the screenshot as an image attachment along with the tab ID, URL and title.
 - Use this tool when you need to visually inspect layout, styling, canvas/SVG rendering, or visual regressions that text/markdown reads (`browser_read`) cannot show.
-- Fails when no Browser panel is available (web app, CLI, or the panel is not open).
+- Fails when no Browser panel is available (web app, CLI, or the panel is not open). `ref` and `fullPage` need the desktop app.

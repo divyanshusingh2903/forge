@@ -63,6 +63,13 @@ const SELECT_OPTION = `function (wanted) {
   return { label: match.label.trim() || match.value }
 }`
 
+// The long edge limit and JPEG quality match the viewport capture in the desktop main process.
+const MAX_SCREENSHOT_DIMENSION = 1920
+const SCREENSHOT_QUALITY = 80
+const MAX_FULL_PAGE_HEIGHT = 4000
+const ELEMENT_PADDING = 8
+const MAX_SCREENSHOT_BASE64 = 5 * 1024 * 1024
+
 export async function runBrowserAction(
   send: Send,
   command: SessionBrowserActCommand,
@@ -80,6 +87,91 @@ export async function runBrowserAction(
     throw new BrowserActionError(`Browser action "${command.action}" failed on the page`)
   } finally {
     if (target) void send("Runtime.releaseObject", { objectId: target.objectId }).catch(() => undefined)
+  }
+}
+
+// Captures one element (`ref`) or the page beyond the viewport (`fullPage`, top MAX_FULL_PAGE_HEIGHT px) as a JPEG.
+export async function captureScreenshot(
+  send: Send,
+  options: { ref?: string; fullPage?: boolean },
+  refs: Map<string, number> | undefined,
+): Promise<{ image: string; mime: "image/jpeg"; detail?: string }> {
+  let target: Target | undefined
+  try {
+    await send("DOM.enable")
+    target = options.ref ? await resolveTarget(send, options.ref, refs) : undefined
+    const area = target ? await elementArea(send, target) : await pageArea(send)
+    const result = await send("Page.captureScreenshot", {
+      format: "jpeg",
+      quality: SCREENSHOT_QUALITY,
+      clip: { ...area.clip, scale: area.scale },
+      captureBeyondViewport: !target,
+    })
+    const image = readString(result, "data")
+    if (!image) throw new BrowserActionError("Screenshot did not return an image")
+    if (image.length > MAX_SCREENSHOT_BASE64) {
+      throw new BrowserActionError("Screenshot is too large; try a smaller element or a viewport screenshot")
+    }
+    return { image, mime: "image/jpeg", detail: area.detail }
+  } catch (error) {
+    if (error instanceof BrowserActionError) throw error
+    console.warn("browser screenshot failed", error)
+    throw new BrowserActionError("Browser screenshot failed on the page")
+  } finally {
+    if (target) void send("Runtime.releaseObject", { objectId: target.objectId }).catch(() => undefined)
+  }
+}
+
+async function elementArea(send: Send, target: Target) {
+  const quad = await elementQuad(send, target)
+  // Read the metrics after scrolling: the quad is viewport-relative, so the page offset must be current.
+  const metrics = await layoutMetrics(send)
+  const xs = [quad[0]!, quad[2]!, quad[4]!, quad[6]!]
+  const ys = [quad[1]!, quad[3]!, quad[5]!, quad[7]!]
+  const width = Math.max(...xs) - Math.min(...xs)
+  const height = Math.max(...ys) - Math.min(...ys)
+  if (width <= 0 || height <= 0) throw new BrowserActionError(`Element ${target.ref} is not visible on the page`)
+  const clip = {
+    x: Math.max(0, Math.min(...xs) + metrics.pageX - ELEMENT_PADDING),
+    y: Math.max(0, Math.min(...ys) + metrics.pageY - ELEMENT_PADDING),
+    width: width + ELEMENT_PADDING * 2,
+    height: height + ELEMENT_PADDING * 2,
+  }
+  return { clip, scale: fitScale(clip, metrics.dpr), detail: undefined }
+}
+
+async function pageArea(send: Send) {
+  const metrics = await layoutMetrics(send)
+  if (metrics.contentWidth <= 0 || metrics.contentHeight <= 0) throw new BrowserActionError("The page has no content to capture")
+  const clip = { x: 0, y: 0, width: metrics.contentWidth, height: Math.min(metrics.contentHeight, MAX_FULL_PAGE_HEIGHT) }
+  const detail =
+    metrics.contentHeight > MAX_FULL_PAGE_HEIGHT
+      ? `Captured the top ${MAX_FULL_PAGE_HEIGHT}px of a ${Math.round(metrics.contentHeight)}px page`
+      : undefined
+  return { clip, scale: fitScale(clip, metrics.dpr), detail }
+}
+
+// Shrinks so the long edge, in device pixels, stays within the limit; never enlarges.
+function fitScale(clip: { width: number; height: number }, dpr: number) {
+  return Math.min(1, MAX_SCREENSHOT_DIMENSION / (Math.max(clip.width, clip.height) * dpr))
+}
+
+async function layoutMetrics(send: Send) {
+  const metrics = await send("Page.getLayoutMetrics")
+  const section = (name: string) => (isRecord(metrics) && isRecord(metrics[name]) ? metrics[name] : {})
+  const number = (value: unknown) => (typeof value === "number" ? value : 0)
+  const css = section("cssVisualViewport")
+  const content = section("cssContentSize")
+  // Device pixels per CSS pixel: how much larger the screenshot is than the clip.
+  const dpr = number(css.clientWidth) > 0 && number(section("visualViewport").clientWidth) > 0
+    ? number(section("visualViewport").clientWidth) / number(css.clientWidth)
+    : 1
+  return {
+    pageX: number(css.pageX),
+    pageY: number(css.pageY),
+    contentWidth: number(content.width),
+    contentHeight: number(content.height),
+    dpr,
   }
 }
 
@@ -144,13 +236,18 @@ function requireTarget(command: SessionBrowserActCommand, target: Target | undef
   return target
 }
 
-async function elementPoint(send: Send, target: Target) {
+async function elementQuad(send: Send, target: Target) {
   await send("DOM.scrollIntoViewIfNeeded", { backendNodeId: target.backendNodeId }).catch(() => undefined)
   const result = await send("DOM.getContentQuads", { backendNodeId: target.backendNodeId })
   const quad = (isRecord(result) && Array.isArray(result.quads) ? result.quads : []).find(
     (item): item is number[] => Array.isArray(item) && item.length >= 8 && item.every((n) => typeof n === "number"),
   )
   if (!quad) throw new BrowserActionError(`Element ${target.ref} is not visible on the page`)
+  return quad
+}
+
+async function elementPoint(send: Send, target: Target) {
+  const quad = await elementQuad(send, target)
   return {
     x: (quad[0]! + quad[2]! + quad[4]! + quad[6]!) / 4,
     y: (quad[1]! + quad[3]! + quad[5]! + quad[7]!) / 4,

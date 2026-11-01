@@ -13,7 +13,7 @@ import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useSessionLayout } from "@/pages/session/session-layout"
-import { runBrowserAction } from "./browser-actions"
+import { captureScreenshot, runBrowserAction } from "./browser-actions"
 import { formatInteractiveElements } from "./browser-interactive"
 
 const LEASE_RENEW_INTERVAL_MS = 10_000
@@ -273,6 +273,26 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
       await whenIdle(tabId)
       const el = webviewRefs.get(tabId)
       if (!el) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not loaded` })
+      if (command.ref || command.fullPage) {
+        const sendCdp = platform.sendBrowserCdpCommand
+        if (!sendCdp) {
+          return reply(id, requestID, { ok: false, error: "Element and full-page screenshots are only supported in the desktop app" })
+        }
+        const shot = await captureScreenshot(
+          (method, params) => sendCdp(el.getWebContentsId(), method, params),
+          { ref: command.ref, fullPage: command.fullPage },
+          interactiveRefs.get(tabId),
+        )
+        return reply(id, requestID, {
+          ok: true,
+          tabID: tabId,
+          url: el.getURL(),
+          title: el.getTitle() || undefined,
+          image: shot.image,
+          mime: shot.mime,
+          text: shot.detail,
+        })
+      }
       const captured = await platform.captureBrowserTab(el.getWebContentsId())
       return reply(id, requestID, {
         ok: true,

@@ -686,6 +686,8 @@ export type SessionBrowserReadCommand = {
 
 export type SessionBrowserScreenshotCommand = {
   type: "screenshot"
+  ref?: string
+  fullPage?: boolean
 }
 
 export type SessionBrowserActCommand = {

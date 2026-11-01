@@ -334,6 +334,76 @@ describe("tool.browser_screenshot", () => {
     }),
   )
 
+  it.instance("captures one element when given a ref", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_screenshot_ref")
+      const ctx = makeCtx<ScreenshotMetadata>(sessionID)
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "http://localhost:3000/" }] })
+      const sent: Browser.Command[] = []
+      yield* fakePanel(sessionID, (command, tabID) => {
+        sent.push(command)
+        return { ok: true, tabID, url: "http://localhost:3000/", image: "AAAA", mime: "image/jpeg" }
+      })
+      const tool = yield* (yield* BrowserScreenshotTool).init()
+
+      const result = yield* tool.execute({ ref: "e3" }, ctx)
+      expect(sent).toEqual([{ type: "screenshot", ref: "e3" }])
+      expect(result.output).toContain("Element: e3")
+      expect(result.metadata).toMatchObject({ ref: "e3" })
+      expect(result.attachments).toHaveLength(1)
+    }),
+  )
+
+  it.instance("captures the full page and passes on the panel's truncation note", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_screenshot_full")
+      const ctx = makeCtx<ScreenshotMetadata>(sessionID)
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "http://localhost:3000/" }] })
+      const sent: Browser.Command[] = []
+      yield* fakePanel(sessionID, (command, tabID) => {
+        sent.push(command)
+        return {
+          ok: true,
+          tabID,
+          url: "http://localhost:3000/",
+          image: "AAAA",
+          mime: "image/jpeg",
+          text: "Captured the top 4000px of a 9500px page",
+        }
+      })
+      const tool = yield* (yield* BrowserScreenshotTool).init()
+
+      const result = yield* tool.execute({ fullPage: true }, ctx)
+      expect(sent).toEqual([{ type: "screenshot", fullPage: true }])
+      expect(result.output).toContain("Full page")
+      expect(result.output).toContain("Captured the top 4000px of a 9500px page")
+      expect(result.metadata).toMatchObject({ fullPage: true })
+    }),
+  )
+
+  it.instance("rejects ref together with fullPage before asking permission or contacting the panel", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const asks: Ask[] = []
+      const sessionID = SessionID.make("ses_tool_browser_screenshot_both")
+      const ctx = makeCtx<ScreenshotMetadata>(sessionID, asks)
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "http://localhost:3000/" }] })
+      const sent: Browser.Command[] = []
+      yield* fakePanel(sessionID, (command, tabID) => {
+        sent.push(command)
+        return { ok: true, tabID, image: "AAAA" }
+      })
+      const tool = yield* (yield* BrowserScreenshotTool).init()
+
+      const exit = yield* Effect.exit(tool.execute({ ref: "e1", fullPage: true }, ctx))
+      expect(Exit.isFailure(exit) && Cause.pretty(exit.cause)).toContain("ref or fullPage, not both")
+      expect(asks).toHaveLength(0)
+      expect(sent).toHaveLength(0)
+    }),
+  )
+
   it.instance("fails clearly when no page is open or no panel is attached", () =>
     Effect.gen(function* () {
       const browser = yield* Browser.Service
