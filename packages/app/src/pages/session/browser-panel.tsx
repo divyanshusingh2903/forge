@@ -117,7 +117,7 @@ export function resolveBrowserGotoTab(input: {
   return sameOrigin?.id ?? addTab("")
 }
 
-export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
+export function SessionBrowserPanel(props: { stacked?: boolean; resizing?: boolean } = {}) {
   const language = useLanguage()
   const platform = usePlatform()
   const sdk = useSDK()
@@ -690,9 +690,13 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
                   ref={(el) => bindWebview(tabId, el)}
                   partition="persist:forge-browser"
                   src="about:blank"
-                  class="size-full flex-1 min-h-0"
+                  // Pages without their own background are transparent, so paint white like a normal browser
+                  // instead of letting the app theme show through. The webview also swallows mouse events,
+                  // which stalls panel resize drags that cross it.
+                  class="size-full flex-1 min-h-0 bg-white"
                   classList={{
                     hidden: !isActive() || !hasContent(),
+                    "pointer-events-none": props.resizing,
                   }}
                 />
               )

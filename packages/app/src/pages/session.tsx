@@ -2504,7 +2504,7 @@ export default function Page() {
               </Suspense>
             }
           >
-            <SessionBrowserPanel />
+            <SessionBrowserPanel resizing={size.active()} />
           </Show>
         </Show>
         <Show when={newSessionDesign()}>
@@ -2542,7 +2542,7 @@ export default function Page() {
                       </Suspense>
                     }
                   >
-                    <SessionBrowserPanel stacked={desktopV2PanelLayout().stacked} />
+                    <SessionBrowserPanel stacked={desktopV2PanelLayout().stacked} resizing={size.active()} />
                   </Show>
                 </div>
               </Show>
