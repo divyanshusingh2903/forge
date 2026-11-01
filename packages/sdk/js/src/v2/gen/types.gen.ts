@@ -2694,6 +2694,12 @@ export type SessionBrowserInfo = {
   tabs: Array<SessionBrowserTab>
 }
 
+export type SessionBrowserInteractiveElement = {
+  ref: string
+  role: string
+  name: string
+}
+
 export type PayloadTooLargeError = {
   _tag: "PayloadTooLargeError"
   message: string
@@ -10779,6 +10785,7 @@ export type SessionBrowserResultData = {
     text?: string
     image?: string
     mime?: string
+    elements?: Array<SessionBrowserInteractiveElement>
   }
   path: {
     sessionID: string

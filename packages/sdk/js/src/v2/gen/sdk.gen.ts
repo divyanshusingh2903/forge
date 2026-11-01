@@ -224,6 +224,7 @@ import type {
   SessionBrowserAttachErrors,
   SessionBrowserAttachResponses,
   SessionBrowserErrors,
+  SessionBrowserInteractiveElement,
   SessionBrowserResponses,
   SessionBrowserResultErrors,
   SessionBrowserResultResponses,
@@ -4551,6 +4552,7 @@ export class Session2 extends HeyApiClient {
       text?: string
       image?: string
       mime?: string
+      elements?: Array<SessionBrowserInteractiveElement>
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -4572,6 +4574,7 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "text" },
             { in: "body", key: "image" },
             { in: "body", key: "mime" },
+            { in: "body", key: "elements" },
           ],
         },
       ],

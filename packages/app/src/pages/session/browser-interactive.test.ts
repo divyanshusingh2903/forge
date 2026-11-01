@@ -79,10 +79,27 @@ describe("formatInteractiveElements", () => {
     expect(result.refs.get("e300")).toBe(300)
   })
 
+  test("returns each ref's role and name for labelling actions", () => {
+    const result = formatInteractiveElements({
+      nodes: [
+        node("generic", "wrapper", 1),
+        node("textbox", "Customer name:", 2),
+        node("button", `say "hi"`, 3),
+        node("link", "x".repeat(200), 4),
+      ],
+    })
+    expect(result.elements).toEqual([
+      { ref: "e1", role: "textbox", name: "Customer name:" },
+      { ref: "e2", role: "button", name: 'say "hi"' },
+      { ref: "e3", role: "link", name: `${"x".repeat(80)}…` },
+    ])
+  })
+
   test("reports an empty page", () => {
     const result = formatInteractiveElements({ nodes: [node("StaticText", "Just text", 1)] })
     expect(result.text).toBe("No interactive elements found on this page.")
     expect(result.refs.size).toBe(0)
+    expect(result.elements).toEqual([])
   })
 
   test("rejects a missing tree and skips malformed entries", () => {

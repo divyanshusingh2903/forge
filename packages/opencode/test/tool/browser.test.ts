@@ -536,4 +536,78 @@ describe("tool.browser_act", () => {
       expect(Exit.isFailure(yield* Effect.exit(tool.execute({ action: "click", ref: "e1", tabID: "missing" }, ctx)))).toBe(true)
     }),
   )
+
+  it.instance("describes the element and input from the last interactive read", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const asks: Ask[] = []
+      const sessionID = SessionID.make("ses_tool_browser_act_labels")
+      const url = "http://localhost:3000/form"
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url, title: "Form" }] })
+      yield* fakePanel(sessionID, (command, tabID) =>
+        command.type === "read"
+          ? {
+              ok: true,
+              tabID,
+              url,
+              text: '[e1] button "Submit order"\n[e2] textbox "Customer name:"',
+              elements: [
+                { ref: "e1", role: "button", name: "Submit order" },
+                { ref: "e2", role: "textbox", name: "Customer name:" },
+              ],
+            }
+          : { ok: true, tabID, url },
+      )
+      yield* (yield* (yield* BrowserReadTool).init()).execute({ format: "interactive" }, makeCtx<ReadMetadata>(sessionID))
+      const tool = yield* (yield* BrowserActTool).init()
+      const ctx = makeCtx<ActMetadata>(sessionID, asks)
+
+      const fill = yield* tool.execute({ action: "fill", ref: "e2", value: "Test User" }, ctx)
+      // The approval prompt is built before the panel is contacted, so it must already carry the label.
+      expect(asks[0]?.metadata).toMatchObject({ action: "fill", ref: "e2", role: "textbox", name: "Customer name:", input: "Test User" })
+      expect(fill.title).toBe('fill textbox "Customer name:"')
+      expect(fill.metadata).toMatchObject({ role: "textbox", name: "Customer name:", input: "Test User", navigated: false })
+      expect(fill.output).toContain('Action: fill e2 (textbox "Customer name:")')
+
+      const click = yield* tool.execute({ action: "click", ref: "e1" }, ctx)
+      expect(click.title).toBe('click button "Submit order"')
+      expect(click.metadata.input).toBeUndefined()
+    }),
+  )
+
+  it.instance("falls back to the ref when it has no label and shortens long input", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_act_unlabelled")
+      const url = "http://localhost:3000/form"
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url }] })
+      yield* fakePanel(sessionID, (_command, tabID) => ({ ok: true, tabID, url }))
+      const tool = yield* (yield* BrowserActTool).init()
+
+      const result = yield* tool.execute({ action: "type", ref: "e7", text: "x".repeat(500) }, makeCtx<ActMetadata>(sessionID))
+      expect(result.title).toBe("type e7")
+      expect(result.metadata.role).toBeUndefined()
+      expect(result.metadata.input).toBe(`${"x".repeat(120)}…`)
+    }),
+  )
+
+  it.instance("forgets labels when the tab's page changes", () =>
+    Effect.gen(function* () {
+      const browser = yield* Browser.Service
+      const sessionID = SessionID.make("ses_tool_browser_act_labels_reset")
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "http://localhost:3000/a" }] })
+      yield* browser.setElements(sessionID, "tab-1", [{ ref: "e1", role: "button", name: "Go" }])
+      expect(yield* browser.element(sessionID, "tab-1", "e1")).toEqual({ role: "button", name: "Go" })
+
+      // A title or active-tab update on the same page keeps them.
+      yield* browser.setState(sessionID, {
+        activeTabID: "tab-1",
+        tabs: [{ tabID: "tab-1", url: "http://localhost:3000/a", title: "A" }],
+      })
+      expect(yield* browser.element(sessionID, "tab-1", "e1")).toEqual({ role: "button", name: "Go" })
+
+      yield* browser.setState(sessionID, { activeTabID: "tab-1", tabs: [{ tabID: "tab-1", url: "http://localhost:3000/b" }] })
+      expect(yield* browser.element(sessionID, "tab-1", "e1")).toBeUndefined()
+    }),
+  )
 })

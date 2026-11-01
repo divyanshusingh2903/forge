@@ -94,6 +94,11 @@ export type ReadMetadata = {
 export type ActMetadata = {
   action: SessionBrowser.ActAction
   ref?: string
+  // Role and name of the element behind `ref`, known when the page was read in interactive format.
+  role?: string
+  name?: string
+  // Short summary of what the action sends: typed text, a field value, a key or a scroll direction.
+  input?: string
   url: string
   title?: string
   tabID?: string
@@ -200,6 +205,7 @@ export const BrowserReadTool = Tool.define(
             const result = yield* browser
               .command(ctx.sessionID, { type: "read", format: "interactive" }, { tabID: tab.tabID, timeoutMs: timeout })
               .pipe(Effect.mapError((error) => new Error(`Interactive read failed: ${error.message}`)))
+            yield* browser.setElements(ctx.sessionID, tab.tabID, result.elements ?? [])
             return readOutput({
               url: result.url ?? tab.url,
               title: result.title ?? tab.title,
@@ -340,12 +346,21 @@ export const BrowserActTool = Tool.define(
             )
           }
           const origin = requireHttpOrigin(tab.url)
+          // The label is looked up before asking so the approval prompt can say what the action will touch.
+          const target = params.ref ? yield* browser.element(ctx.sessionID, tab.tabID, params.ref) : undefined
+          const input = actInput(params)
+          const label = { role: target?.role, name: target?.name, input }
+
+          // Publish the label now, so the timeline row names the element while it waits for approval.
+          yield* ctx.metadata({
+            metadata: { action: params.action, ref: params.ref, ...label, url: tab.url, tabID: tab.tabID, navigated: false },
+          })
 
           yield* ctx.ask({
             permission: "browser_act",
             patterns: [tab.url],
             always: [`${origin}/*`],
-            metadata: { url: tab.url, tabID: tab.tabID, action: params.action, ref: params.ref },
+            metadata: { url: tab.url, tabID: tab.tabID, action: params.action, ref: params.ref, ...label },
           })
 
           const result = yield* browser
@@ -368,10 +383,12 @@ export const BrowserActTool = Tool.define(
           const title = result.title ?? tab.title
           const tabID = result.tabID ?? tab.tabID
           const navigated = url !== tab.url
+          if (navigated) yield* browser.setElements(ctx.sessionID, tabID ?? tab.tabID, [])
+          const subject = target ? `${target.role} "${target.name}"` : params.ref
           return {
-            title: `${params.action}${params.ref ? ` ${params.ref}` : ""}`,
+            title: `${params.action}${subject ? ` ${subject}` : ""}`,
             output: [
-              `Action: ${params.action}${params.ref ? ` ${params.ref}` : ""}`,
+              `Action: ${params.action}${params.ref ? ` ${params.ref}` : ""}${target ? ` (${subject})` : ""}`,
               `URL: ${url}`,
               ...(title ? [`Title: ${title}`] : []),
               ...(tabID ? [`Tab: ${tabID}`] : []),
@@ -382,12 +399,30 @@ export const BrowserActTool = Tool.define(
                   ]
                 : []),
             ].join("\n"),
-            metadata: { action: params.action, ref: params.ref, url, title, tabID, navigated },
+            metadata: { action: params.action, ref: params.ref, ...label, url, title, tabID, navigated },
           }
         }).pipe(Effect.orDie),
     }
   }),
 )
+
+const MAX_INPUT_SUMMARY = 120
+
+// What the action puts into the page, shortened for the approval prompt and the transcript.
+function actInput(params: Schema.Schema.Type<typeof ActParameters>) {
+  const value =
+    params.action === "type"
+      ? params.text
+      : params.action === "fill" || params.action === "select"
+        ? params.value
+        : params.action === "press"
+          ? params.key
+          : params.action === "scroll"
+            ? params.direction
+            : undefined
+  if (value === undefined) return
+  return value.length > MAX_INPUT_SUMMARY ? `${value.slice(0, MAX_INPUT_SUMMARY)}…` : value
+}
 
 // Each action needs different inputs; failing here keeps a malformed call from reaching the permission prompt.
 function requireActInput(params: Schema.Schema.Type<typeof ActParameters>) {

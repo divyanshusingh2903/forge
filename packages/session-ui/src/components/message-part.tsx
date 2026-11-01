@@ -64,6 +64,7 @@ import { ToolStatusTitle } from "./tool-status-title"
 import { patchFiles } from "./apply-patch-file"
 import { parseWebSearchResults } from "./web-search-results"
 import { ToolResponse } from "./tool-response"
+import { browserActLabel } from "./browser-act-label"
 import { writeClipboard } from "./clipboard"
 import { partDefaultOpen } from "./part-default-open"
 import { animate } from "motion"
@@ -526,14 +527,16 @@ export function getToolInfo(
         title: i18n.t("ui.tool.browser.screenshot"),
         subtitle: (typeof metadata?.title === "string" && metadata.title) || (typeof metadata?.url === "string" ? metadata.url : undefined),
       }
-    case "browser_act":
+    case "browser_act": {
+      const label = browserActLabel(i18n, metadata, input)
       return {
         icon: "browser",
-        title: i18n.t("ui.tool.browser.act"),
+        title: label.verb,
         subtitle:
-          [input.action, input.ref].filter((item) => typeof item === "string" && item).join(" ") ||
+          [label.target, label.input].filter(Boolean).join(" · ") ||
           (typeof metadata?.url === "string" ? metadata.url : undefined),
       }
+    }
     case "webfetch":
       return {
         icon: "window-cursor",
@@ -1992,13 +1995,36 @@ ToolRegistry.register({
   },
 })
 
-function BrowserToolTrigger(props: { title: string; pending: boolean; url: string; label: string; tag?: string }) {
+function BrowserToolTrigger(props: {
+  title: string
+  pending: boolean
+  url: string
+  label: string
+  tag?: string
+  // Plain-text subject shown before the link, e.g. the element a browser_act call touches.
+  target?: string
+  // Short chip for what the call sends, e.g. the text typed into a field.
+  detail?: string
+}) {
   return (
     <div data-slot="basic-tool-tool-info-structured">
       <div data-slot="basic-tool-tool-info-main">
         <span data-slot="basic-tool-tool-title">
           <TextShimmer text={props.title} active={props.pending} />
         </span>
+        <Show when={props.target}>
+          {(target) => <span data-slot="basic-tool-tool-subtitle">{target()}</span>}
+        </Show>
+        <Show when={props.detail}>
+          {(detail) => (
+            <span
+              data-slot="basic-tool-browser-source"
+              class="text-11-regular text-text-weak px-1.5 py-0.5 rounded bg-surface-base shrink-0 truncate"
+            >
+              {detail()}
+            </span>
+          )}
+        </Show>
         <Show when={!props.pending && props.url}>
           <a
             data-slot="basic-tool-tool-subtitle"
@@ -2079,6 +2105,41 @@ ToolRegistry.register({
             url={url()}
             label={(typeof props.metadata.title === "string" && props.metadata.title) || url()}
             tag={tag()}
+          />
+        }
+      >
+        <Show when={props.output?.trim()}>
+          <ToolResponse output={props.output} />
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "browser_act",
+  render(props) {
+    const i18n = useI18n()
+    const pending = createMemo(() => props.status === "pending" || props.status === "running")
+    const label = createMemo(() => browserActLabel(i18n, props.metadata, props.input))
+    // The link only shows when the action moved the page, so a plain click doesn't repeat the URL.
+    const navigatedUrl = createMemo(() =>
+      props.metadata.navigated === true && typeof props.metadata.url === "string" ? props.metadata.url : "",
+    )
+    return (
+      <BasicTool
+        {...props}
+        hideDetails={props.hideDetails || !props.output?.trim()}
+        defaultOpen={props.defaultOpen ?? false}
+        icon="browser"
+        trigger={
+          <BrowserToolTrigger
+            title={label().verb}
+            pending={pending()}
+            target={label().target}
+            detail={label().input}
+            url={navigatedUrl()}
+            label={(typeof props.metadata.title === "string" && props.metadata.title) || navigatedUrl()}
           />
         }
       >
