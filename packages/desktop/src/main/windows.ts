@@ -146,8 +146,10 @@ export function setTitlebar(win: BrowserWindow, theme: Partial<TitlebarTheme> = 
   // Align it with the app theme so a light app on a dark system does not get
   // the dark-appearance border and shadow. A "system" scheme must map to
   // "system" (not the resolved mode) or prefers-color-scheme stops tracking
-  // OS appearance changes in the renderer.
-  if (process.platform === "darwin") nativeTheme.themeSource = theme.scheme ?? theme.mode ?? "system"
+  // OS appearance changes in the renderer. Browser panel pages also read
+  // prefers-color-scheme from nativeTheme, so sync it on every platform or a
+  // light app on a dark system renders dark pages over the panel's white canvas.
+  nativeTheme.themeSource = theme.scheme ?? theme.mode ?? "system"
   updateTitlebar(win)
 }
 
