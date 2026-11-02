@@ -69,7 +69,8 @@ export default function Layout(props: ParentProps) {
   const rail = useProjectRail()
   const verticalTabs = () => preferences.appearance.tabLayout() !== "horizontal" && !mobile()
 
-  const toggleSidebar = () => preferences.appearance.setSidebarOpen(!preferences.appearance.sidebarOpen())
+  const toggleSidebar = () =>
+    verticalTabs() ? preferences.appearance.setSidebarOpen(!preferences.appearance.sidebarOpen()) : rail.toggle()
 
   // How far closed the docked sidebar is, and how far in its peek has it, undefined while it isn't peeking.
   const sidebar: SidebarPose = {
@@ -311,7 +312,7 @@ export default function Layout(props: ParentProps) {
             />
           </aside>
         </Show>
-        <Show when={rail.available() && !preferences.appearance.sidebarOpen()}>
+        <Show when={rail.available() && !rail.open()}>
           <div class="absolute start-[calc(var(--shell-inline-inset,8px)+10px)] top-[calc(var(--shell-top-inset,8px)+10px)] z-20">
             <Tooltip placement="bottom" value={language.t("sidebar.rail.show")}>
               <IconButton

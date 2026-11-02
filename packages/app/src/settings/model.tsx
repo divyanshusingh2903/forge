@@ -147,6 +147,8 @@ const appearanceSchema = Persistence.struct({
   // "inbox" is experimental: the vertical layout with a server-wide session inbox in place of tabs.
   tabLayout: Schema.Literals(["horizontal", "vertical", "inbox"]),
   sidebarOpen: Persistence.optional(Schema.Boolean),
+  // The Projects sidebar of the top-tabs layout; the side-tabs sidebar keeps `sidebarOpen`.
+  projectRailOpen: Persistence.optional(Schema.Boolean),
   reduceMotion: Schema.Literals(["system", "on", "off"]),
 })
 
@@ -463,6 +465,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         sidebarOpen: withFallback(() => store.appearance?.sidebarOpen, true),
         setSidebarOpen(value: boolean) {
           setStore("appearance", "sidebarOpen", value)
+        },
+        projectRailOpen: withFallback(() => store.appearance?.projectRailOpen, true),
+        setProjectRailOpen(value: boolean) {
+          setStore("appearance", "projectRailOpen", value)
         },
         reduceMotion,
         setReduceMotion(value: ReduceMotion) {

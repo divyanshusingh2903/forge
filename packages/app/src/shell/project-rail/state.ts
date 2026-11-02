@@ -9,7 +9,8 @@ export function useProjectRail() {
 
   return {
     available,
-    visible: () => available() && settings.appearance.sidebarOpen(),
-    toggle: () => settings.appearance.setSidebarOpen(!settings.appearance.sidebarOpen()),
+    open: settings.appearance.projectRailOpen,
+    visible: () => available() && settings.appearance.projectRailOpen(),
+    toggle: () => settings.appearance.setProjectRailOpen(!settings.appearance.projectRailOpen()),
   }
 }
