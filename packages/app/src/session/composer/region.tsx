@@ -10,6 +10,7 @@ import { Composer } from "@/composer/composer"
 import { VoiceComposer } from "@/voice/composer"
 import { useComposerState } from "@/composer/persistence"
 import { createComposerControls } from "@/composer/selection"
+import { ForgeMode } from "@opencode/schema/forge-mode"
 import { setCursorPosition } from "@/composer/editor/dom"
 import { promptLength } from "@/composer/prompt-parts"
 import { useCommand } from "@/shell/commands/command"
@@ -72,7 +73,28 @@ export function createActiveSessionRegion(input: {
   const platform = usePlatform()
   const prompt = useComposerState()
   const state = createSessionRequestModel()
-  const controls = createComposerControls()
+
+  const controls = createComposerControls({
+    mode: {
+      current: () => ForgeMode.read(input.session.data.info()?.metadata) ?? "manual",
+      // Metadata is replaced as a whole, so the mode is merged into what the session already holds.
+      select: (mode) => {
+        const info = input.session.data.info()
+
+        if (!info) return
+        void server.api.session
+          .update({ sessionID: info.id, metadata: { ...info.metadata, [ForgeMode.key]: mode } })
+          .catch((error) =>
+            showToast({
+              variant: "error",
+              title: language.t("common.requestFailed"),
+              description: error instanceof Error ? error.message : String(error),
+            }),
+          )
+      },
+    },
+  })
+
   let promptRef: HTMLDivElement | undefined
 
   createEffect(
@@ -301,7 +323,7 @@ export function createActiveSessionRegion(input: {
       server.api.session.inbox.cancel({ sessionID, inboxID: messageID }).then(() => undefined, notifyFailed),
   }
 
-  useComposerCommands()
+  useComposerCommands({ controls })
   useSessionCommands({
     session: input.session,
     region: input.region,

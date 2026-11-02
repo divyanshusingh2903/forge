@@ -111,6 +111,7 @@ function ComposerDocksPreview(props: DockArgs) {
 
   const region = {
     state: {
+      planRequest: () => undefined,
       questionRequest: () =>
         state.question ? { ...activeQuestionRequest, id: `${activeQuestionRequest.id}:${state.revision}` } : undefined,
       websearch: {
@@ -131,7 +132,7 @@ function ComposerDocksPreview(props: DockArgs) {
         submit: async () => void setState("websearch", false),
       } satisfies WebSearchRequestModel,
       elicitationRequest: () => undefined,
-    permissionRequest: () => (state.permission ? activePermissionRequest : undefined),
+      permissionRequest: () => (state.permission ? activePermissionRequest : undefined),
       permissionResponding: () => false,
       decide: () => {
         deciding = true

@@ -1,6 +1,7 @@
 import type { Data } from "@opencode/client/solid"
 import type { SessionMessageUser } from "@opencode/client/promise"
 import type { Accessor } from "solid-js"
+import type { ForgeMode } from "@opencode/schema/forge-mode"
 import type { ModelSelection } from "@/providers/models/selection"
 import type { ServerSDK } from "@/runtime/server/client"
 import type { SessionMessageHandoff } from "@/session/handoff"
@@ -15,6 +16,11 @@ export type ComposerControls = {
     current: string
     visible: boolean
     select: (name: string | undefined) => void
+  }
+  /** The session's Forge mode, which settles permission requests on the server. */
+  mode: {
+    current: ForgeMode.Mode
+    select: (mode: ForgeMode.Mode) => void
   }
   model: {
     selection: ModelSelection

@@ -2,6 +2,7 @@ import { createMemo, Show, type JSX } from "solid-js"
 import { SessionElicitationDock } from "@/session/requests/session-elicitation-dock"
 import { SessionPermissionDock } from "@/session/requests/session-permission-dock"
 import { SessionQuestionDock } from "@/session/requests/session-question-dock"
+import { SessionPlanDock } from "@/session/requests/session-plan-dock"
 import { questionMotion } from "@/session/requests/question-motion"
 import { useSettings } from "@/settings/model"
 import { SessionWebSearchDock } from "@/session/requests/session-websearch-dock"
@@ -10,6 +11,7 @@ import { ComposerMorph, Grow } from "./spring-height"
 
 type SessionComposerRegionState = Pick<
   SessionComposerRegionController["state"],
+  | "planRequest"
   | "questionRequest"
   | "elicitationRequest"
   | "websearch"
@@ -35,12 +37,13 @@ export function SessionComposerRegion(props: {
 
   const face = createMemo(() => {
     const websearch = controller.state.websearch.request()
+    const plan = controller.state.planRequest()
     const question = controller.state.questionRequest()
     const elicitation = controller.state.elicitationRequest()
     const permission = controller.state.permissionRequest()
     const composer = controller.showComposer() && !controller.child() && !controller.state.blocked()
 
-    return { key: composer ? "composer" : "docks", websearch, question, elicitation, permission, composer }
+    return { key: composer ? "composer" : "docks", websearch, plan, question, elicitation, permission, composer }
   })
 
   return (
@@ -66,6 +69,9 @@ export function SessionComposerRegion(props: {
               <div class="flex flex-col">
                 <Grow when={current().websearch} fade card class={controller.child() ? "mb-2" : undefined}>
                   <SessionWebSearchDock model={controller.state.websearch} onSubmit={controller.onResponseSubmit} />
+                </Grow>
+                <Grow when={current().plan} fade card class={controller.child() ? "mb-2" : undefined}>
+                  {(request) => <SessionPlanDock request={request} onSubmit={controller.onResponseSubmit} />}
                 </Grow>
                 <Grow
                   when={current().question}

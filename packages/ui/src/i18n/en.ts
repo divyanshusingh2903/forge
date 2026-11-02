@@ -243,6 +243,8 @@ const source = {
   "ui.tool.agent.default": "Agent",
   "ui.tool.agent.delegating": "Delegating agent…",
   "ui.tool.skill": "Skill",
+  "ui.tool.planEnter": "Plan check",
+  "ui.tool.presentPlan": "Plan review",
 
   "ui.basicTool.called": "Called `{{tool}}`",
   "ui.toolErrorCard.failed": "Failed",

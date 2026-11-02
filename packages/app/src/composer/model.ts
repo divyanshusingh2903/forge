@@ -31,6 +31,7 @@ import { isCommentItem } from "./state"
 import type { PromptHistoryComment } from "./history/entry"
 import { createComposerHistory } from "./history/store"
 import { createComposerSubmit } from "./submit"
+import { createModeControl } from "./mode-control"
 import { useAttachmentDestination } from "./attachments/destination"
 import { parseClientSlashCommand } from "./client-slash-command"
 
@@ -61,6 +62,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
   const language = useLanguage()
   const platform = usePlatform()
   const serverSDK = useServerSDK()
+  const modes = createModeControl(adapter.controls, (mode) => language.t(`composer.mode.${mode}`))
   const prompt = adapter.state
   // Editor actions write the captured store directly, rather than going through the context methods.
   createEffect(
@@ -501,17 +503,11 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     },
     view: {
       placeholder,
-      get agent() {
-        const agents = adapter.controls().agents
-
-        return agents.visible && agents.options.length > 0
-          ? {
-              options: () => adapter.controls().agents.options.map((name) => ({ id: name, label: name })),
-              current: () => adapter.controls().agents.current,
-              onSelect: (value: string) => adapter.controls().agents.select(value),
-              keybind: () => command.keybindParts("agent.cycle"),
-            }
-          : undefined
+      agent: {
+        options: modes.options,
+        current: modes.current,
+        onSelect: modes.select,
+        keybind: () => command.keybindParts("agent.cycle"),
       },
       variant: {
         options: () => {

@@ -17,6 +17,7 @@ import {
   type SessionScreen,
   type SetupContext,
 } from "@opencode/plugin/gui"
+import { ForgePlan } from "@opencode/schema/forge-plan"
 import type Review from "./index"
 import {
   expandReviewFolders,
@@ -236,7 +237,8 @@ export function createReviewModel(input: {
     if (view().server.connected && view().project?.vcs) void diffQuery.refetch()
   })
 
-  const rows = (): FileDiffInfo[] => (diffQuery.isFetched ? (diffQuery.data ?? []) : [])
+  // Forge's plan files are the plan agent's notes, reviewed in the Plan tab, so they stay out of the changes.
+  const rows = (): FileDiffInfo[] => (diffQuery.isFetched ? (diffQuery.data ?? []).filter(notPlan) : [])
 
   // Git lists an untracked folder as one row. Once the change tree opens it, the folder lists its entries one level
   // deep; they stay loaded while it is closed again, until the changes' source changes.
@@ -268,7 +270,7 @@ export function createReviewModel(input: {
     expandReviewFolders(
       rows(),
       new Map(openFolders().map((folder, index) => [folder, folderQueries[index]?.data ?? []] as const)),
-    ),
+    ).filter(notPlan),
   )
 
   // An opened folder's entry count, and whether its listing stopped before showing or checking every entry.
@@ -704,3 +706,7 @@ export function createReviewModel(input: {
 }
 
 export type ReviewModel = ReturnType<typeof createReviewModel>
+
+function notPlan(diff: FileDiffInfo) {
+  return diff.file !== ForgePlan.directory && !diff.file.startsWith(`${ForgePlan.directory}/`)
+}

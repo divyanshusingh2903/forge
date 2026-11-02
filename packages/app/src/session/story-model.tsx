@@ -222,6 +222,7 @@ function SessionSurfaceState(props: SessionPreviewProps & { onReset: () => void 
 
   const region = {
     state: {
+      planRequest: () => undefined,
       questionRequest: () => (state.request?.type === "question" ? state.request.value : undefined),
       elicitationRequest: () => (state.request?.type === "elicitation" ? state.request.value : undefined),
       websearch: {

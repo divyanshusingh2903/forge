@@ -44,7 +44,7 @@ export default function NewSessionPage(props: { draftId: string }) {
   })
 
   const model = createComposerModel(composer.adapter)
-  useComposerCommands({ model: composer.model })
+  useComposerCommands({ model: composer.model, controls: composer.adapter.controls })
 
   const project = createPromptProjectController({ controls: composer.project })
   const location = useNewSessionLocationDialog({ project, workspace, onDone: model.restoreFocus })

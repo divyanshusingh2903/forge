@@ -1,12 +1,14 @@
 import { Predicate } from "effect"
 import { base64Encode } from "@opencode/util/encode"
 import { Session } from "@opencode/schema/session"
-import { startTransition } from "solid-js"
+import { createSignal, startTransition } from "solid-js"
+import { ForgeMode } from "@opencode/schema/forge-mode"
 import type { NewSessionComposerAdapter } from "@/composer/adapter"
 import { useComposerState } from "@/composer/persistence"
 import { createComposerControls, createComposerModelSelection } from "@/composer/selection"
 import { createComposerProjectControls } from "./project/controller"
 import { useLanguage } from "@/runtime/i18n/language"
+import { useSettings } from "@/settings/model"
 import { useLocal } from "@/providers/models/selection"
 import { useData, useServer } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
@@ -35,7 +37,12 @@ export function createNewSessionComposerAdapter(props: {
   const location = useWorkspaceLocation()
   const language = useLanguage()
   const model = createComposerModelSelection({ agent: () => local.agent.current() })
-  const controls = createComposerControls({ model })
+  // The session doesn't exist yet, so the draft holds the mode until it is created with it. The auto-approve setting
+  // picks the starting mode, so new sessions under it start in Auto.
+  const [mode, setMode] = createSignal<ForgeMode.Mode>(
+    useSettings().permissions.autoApproveDefault() ? "auto" : "manual",
+  )
+  const controls = createComposerControls({ model, mode: { current: mode, select: setMode } })
 
   const adapter: NewSessionComposerAdapter = {
     kind: "new-session",
@@ -102,6 +109,7 @@ export function createNewSessionComposerAdapter(props: {
           variant: selection.variant,
         },
         location: { directory: sessionDirectory },
+        metadata: { [ForgeMode.key]: mode() },
       })
 
       const creation = created.request.then(

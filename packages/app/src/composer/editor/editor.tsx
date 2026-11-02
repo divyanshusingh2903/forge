@@ -667,7 +667,7 @@ function composerCursor(editor: HTMLDivElement) {
   return range.toString().length
 }
 
-function ComposerAttachments(props: {
+export function ComposerAttachments(props: {
   attachments: ComposerAttachment[]
   uploads?: Upload[]
   comments?: ComposerComment[]

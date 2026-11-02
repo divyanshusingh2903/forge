@@ -11,6 +11,8 @@ import { useServerSDK } from "@/runtime/server/client"
 import { formatServerError } from "@/runtime/server/errors"
 import { showToast } from "@/shell/notifications/toast"
 import { toaster } from "@opencode/ui/toast"
+import type { ComposerControls } from "./adapter"
+import { createModeControl } from "./mode-control"
 
 const withCategory = (category: string) => {
   return (option: Omit<CommandOption, "category">): CommandOption => ({
@@ -19,7 +21,7 @@ const withCategory = (category: string) => {
   })
 }
 
-export const useComposerCommands = (input: { model?: ModelSelection } = {}) => {
+export const useComposerCommands = (input: { model?: ModelSelection; controls?: () => ComposerControls } = {}) => {
   const command = useCommand()
   const dialog = useDialog()
   const language = useLanguage()
@@ -30,6 +32,8 @@ export const useComposerCommands = (input: { model?: ModelSelection } = {}) => {
   const sdk = useServerSDK()
   const sessionOwnership = createSessionOwnership(sessionKey)
   const model = input.model ?? local.model
+  // With the composer's controls, the cycle walks Forge's mode list, so it also steps through permission modes.
+  const modes = input.controls && createModeControl(input.controls, (mode) => language.t(`composer.mode.${mode}`))
   const modelCommand = withCategory(language.t("command.category.model"))
   const agentCommand = withCategory(language.t("command.category.agent"))
   const providerCommand = withCategory(language.t("command.category.provider"))
@@ -132,16 +136,16 @@ export const useComposerCommands = (input: { model?: ModelSelection } = {}) => {
       description: language.t("command.agent.cycle.description"),
       keybind: "mod+.",
       slash: "agent",
-      disabled: !local.agent.visible(),
-      onSelect: () => local.agent.move(1),
+      disabled: !modes && !local.agent.visible(),
+      onSelect: () => (modes ? modes.move(1) : local.agent.move(1)),
     }),
     agentCommand({
       id: "agent.cycle.reverse",
       title: language.t("command.agent.cycle.reverse"),
       description: language.t("command.agent.cycle.reverse.description"),
       keybind: "shift+mod+.",
-      disabled: !local.agent.visible(),
-      onSelect: () => local.agent.move(-1),
+      disabled: !modes && !local.agent.visible(),
+      onSelect: () => (modes ? modes.move(-1) : local.agent.move(-1)),
     }),
   ])
 }

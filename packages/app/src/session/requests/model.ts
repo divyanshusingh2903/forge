@@ -12,6 +12,7 @@ import { createWebSearchRequest } from "./websearch"
 import { createSessionBackground } from "@/session/requests/background"
 import { createSteerBackground } from "@/session/requests/steer-background"
 import { useData } from "@/runtime/server/current"
+import { isPlanForm } from "@/session/requests/session-plan-dock"
 
 export function createSessionRequestModel() {
   const params = useParams()
@@ -84,15 +85,23 @@ export function createSessionRequestModel() {
     events: serverSDK.event,
   })
 
-  const questionRequest = createMemo(() => {
+  // Forge's plan forms are questions too, so older clients still answer them, but this one gives them their own dock.
+  const planRequest = createMemo(() => {
     if (websearch.request()) return
+    const form = formRequest()
+
+    return isPlanForm(form) ? form : undefined
+  })
+
+  const questionRequest = createMemo(() => {
+    if (websearch.request() || planRequest()) return
     const form = formRequest()
 
     return form?.metadata?.kind === "question" ? form : undefined
   })
 
   const elicitationRequest = createMemo(() => {
-    if (websearch.request() || questionRequest()) return
+    if (websearch.request() || planRequest() || questionRequest()) return
     const form = formRequest()
 
     if (form?.metadata?.kind === "mcp-elicitation") return form
@@ -119,7 +128,9 @@ export function createSessionRequestModel() {
 
     if (!id) return false
 
-    return !!permissionRequest() || !!questionRequest() || !!elicitationRequest() || !!websearch.request()
+    return (
+      !!permissionRequest() || !!planRequest() || !!questionRequest() || !!elicitationRequest() || !!websearch.request()
+    )
   })
 
   const primary = () => {
@@ -193,6 +204,7 @@ export function createSessionRequestModel() {
 
   return {
     blocked,
+    planRequest,
     questionRequest,
     elicitationRequest,
     websearch,

@@ -306,6 +306,10 @@ function toolTitle(tool: SessionMessageAssistantTool, i18n: UiI18n) {
       return i18n.t("ui.tool.questions")
     case "skill":
       return i18n.t("ui.tool.skill")
+    case "plan_enter":
+      return i18n.t("ui.tool.planEnter")
+    case "present_plan":
+      return i18n.t("ui.tool.presentPlan")
     default:
       return tool.name
   }

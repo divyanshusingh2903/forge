@@ -51,6 +51,7 @@ function controls(): ComposerControls {
       visible: true,
       select() {},
     },
+    mode: { current: "manual", select() {} },
     model: { selection, paid: true, loading: false },
   }
 }

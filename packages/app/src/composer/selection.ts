@@ -1,5 +1,6 @@
 import { batch, createEffect, createMemo, on } from "solid-js"
 import { createStore } from "solid-js/store"
+import type { ForgeMode } from "@opencode/schema/forge-mode"
 import type { ComposerControls } from "./adapter"
 import { useLocal, type ModelKey, type ModelSelection } from "@/providers/models/selection"
 import { useWorkspaceLocation } from "@/workspaces/location"
@@ -13,7 +14,10 @@ import { useConfiguredModel } from "@/providers/models/configured"
 import { useGlobal } from "@/runtime/server/runtime"
 import { composerModelLabelKey, composerModelLabels, composerProviderName } from "./model-label"
 
-export function createComposerControls(input: { model?: ModelSelection } = {}) {
+export function createComposerControls(input: {
+  model?: ModelSelection
+  mode: { current: () => ForgeMode.Mode; select: (mode: ForgeMode.Mode) => void }
+}) {
   const local = useLocal()
   const sdk = useWorkspaceLocation()
   const data = useData()
@@ -102,6 +106,7 @@ export function createComposerControls(input: { model?: ModelSelection } = {}) {
         visible: local.agent.visible(),
         select: local.agent.set,
       },
+      mode: { current: input.mode.current(), select: input.mode.select },
       model: {
         selection,
         providerName:
