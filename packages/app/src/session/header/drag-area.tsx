@@ -6,7 +6,7 @@ const minWidth = 24
 
 /** Whether this window hides its native titlebar and moves from app-drawn drag regions. */
 export function windowDragEnabled(platform: Platform) {
-  return platform.platform === "desktop" && (platform.os === "macos" || platform.os === "windows")
+  return platform.platform === "desktop" && (platform.os === "macos" || platform.os === "windows" || platform.os === "linux")
 }
 
 /** Fills the session header between the title and the actions; the active timeline hands it to the pane's drag area. */

@@ -80,15 +80,17 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   const mac = createMemo(() => platform.platform === "desktop" && platform.os === "macos")
   const windows = createMemo(() => platform.platform === "desktop" && platform.os === "windows")
   const linux = createMemo(() => platform.platform === "desktop" && platform.os === "linux")
+  // Windows and Linux both draw their window controls in a native overlay on the titlebar's right.
+  const overlay = createMemo(() => windows() || linux())
   const macTrafficLights = createMemo(() => mac() && !platform.windowFullscreen?.())
   const macVerticalTabs = createMemo(() => mac() && !!props.verticalTabs)
   const zoom = () => platform.webviewZoom?.() ?? 1
-  const titlebarZoom = () => (windows() ? Math.max(zoom(), minTitlebarZoom) : zoom())
+  const titlebarZoom = () => (overlay() ? Math.max(zoom(), minTitlebarZoom) : zoom())
 
   const minHeight = () => {
     if (mac()) return `${titlebarHeight / zoom()}px`
 
-    if (windows()) return `env(titlebar-area-height, ${windowsTitlebarHeight / Math.min(titlebarZoom(), 1)}px)`
+    if (overlay()) return `env(titlebar-area-height, ${windowsTitlebarHeight / Math.min(titlebarZoom(), 1)}px)`
 
     return undefined
   }
@@ -128,8 +130,8 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
   })
 
   const titlebarItems = useTitlebarItems()
-  const hideVerticalTitlebar = createMemo(() => !!props.verticalTabs && !windows())
-  const homeInSidebarHeader = () => !windows() && !macTrafficLights()
+  const hideVerticalTitlebar = createMemo(() => !!props.verticalTabs && !overlay())
+  const homeInSidebarHeader = () => !overlay() && !macTrafficLights()
 
   const back = () => {
     const next = backPath(history)
@@ -188,10 +190,10 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
         "min-height": minHeight(),
         // Keep native macOS traffic lights clear even when the desktop window is narrow.
         "padding-left": macTrafficLights() ? `${macTrafficLightsBaseWidth / zoom()}px` : 0,
-        width: windows() ? `env(titlebar-area-width, calc(100vw - ${windowsControlsWidth()}))` : undefined,
-        "max-width": windows() ? `env(titlebar-area-width, calc(100vw - ${windowsControlsWidth()}))` : undefined,
-        // Native Windows caption controls remain on the physical right in both writing directions.
-        "margin-right": windows() ? "auto" : undefined,
+        width: overlay() ? `env(titlebar-area-width, calc(100vw - ${windowsControlsWidth()}))` : undefined,
+        "max-width": overlay() ? `env(titlebar-area-width, calc(100vw - ${windowsControlsWidth()}))` : undefined,
+        // Native caption controls remain on the physical right in both writing directions.
+        "margin-right": overlay() ? "auto" : undefined,
       }}
       data-tauri-drag-region
     >
@@ -626,11 +628,11 @@ export function Titlebar(props: { verticalTabs?: { mount?: HTMLElement } }) {
               <div
                 class="h-full flex-1 overflow-hidden flex flex-row items-center gap-1.5 px-2 md:pe-3"
                 classList={{
-                  "pt-[max(0px,calc(8px-env(safe-area-inset-top,0px)))]": !bottom() && !windows() && !mobileTop(),
+                  "pt-[max(0px,calc(8px-env(safe-area-inset-top,0px)))]": !bottom() && !overlay() && !mobileTop(),
                   "pb-[max(0px,calc(8px-var(--safe-area-inset-bottom,env(safe-area-inset-bottom,0px))))]": bottom(),
                   "pl-4": macTrafficLights(),
                   // Center the 20px app icon over the sidebar's 16px icon column.
-                  "ps-3.5": windows(),
+                  "ps-3.5": overlay(),
                 }}
               >
                 <Show when={windows() || linux()}>

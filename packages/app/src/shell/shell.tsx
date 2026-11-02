@@ -213,7 +213,7 @@ export default function Layout(props: ParentProps) {
         // retain outer-outline clearance.
         "--shell-top-inset": bottomTitlebar()
           ? "0px"
-          : platform.platform === "desktop" && platform.os === "windows"
+          : platform.platform === "desktop" && (platform.os === "windows" || platform.os === "linux")
             ? "1px"
             : "8px",
         "--shell-bottom-inset": bottomTitlebar()

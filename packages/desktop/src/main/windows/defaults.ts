@@ -54,7 +54,8 @@ export function titlebarOverlay(mode: "light" | "dark" = tone(), zoom = 1) {
   }
 }
 
-// macOS and Windows hide the titlebar; Windows draws its window controls in an overlay sized to the zoom.
+// macOS, Windows and Linux hide the native titlebar; Windows and Linux draw their window controls in an overlay sized
+// to the zoom, on the same bar as the tabs.
 export function platformFrame(mode: "light" | "dark", zoom: number) {
   const frame: BrowserWindowConstructorOptions = {}
 
@@ -65,6 +66,11 @@ export function platformFrame(mode: "light" | "dark", zoom: number) {
 
   if (process.platform === "win32") {
     frame.frame = false
+    frame.titleBarStyle = "hidden"
+    frame.titleBarOverlay = titlebarOverlay(mode, zoom)
+  }
+
+  if (process.platform === "linux") {
     frame.titleBarStyle = "hidden"
     frame.titleBarOverlay = titlebarOverlay(mode, zoom)
   }

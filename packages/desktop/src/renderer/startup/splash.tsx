@@ -40,7 +40,7 @@ export function LoadingSplash(props: {
 
     if (props.platform.os === "macos") return `max(36px, ${36 / zoom}px)`
 
-    if (props.platform.os === "windows")
+    if (props.platform.os === "windows" || props.platform.os === "linux")
       return `max(36px, env(titlebar-area-height, ${44 / Math.min(Math.max(zoom, 0.25), 1)}px))`
 
     return "36px"
@@ -69,7 +69,7 @@ export function LoadingSplash(props: {
         class="h-dvh w-screen bg-v2-background-bg-base"
         style={{
           // Match the default session's titlebar, panel insets, and wordmark position.
-          "padding-block-start": `calc(${titlebarHeight()} + ${props.platform.os === "windows" ? 1 : 8}px)`,
+          "padding-block-start": `calc(${titlebarHeight()} + ${props.platform.os === "windows" || props.platform.os === "linux" ? 1 : 8}px)`,
           "padding-block-end": "8px",
           "padding-inline": "32px",
         }}

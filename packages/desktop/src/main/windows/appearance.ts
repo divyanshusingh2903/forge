@@ -79,7 +79,7 @@ export function setTrafficLightsPosition(win: BrowserWindow, position: { x: numb
 }
 
 export function updateTitlebar(win: BrowserWindow) {
-  if (process.platform !== "win32") return
+  if (process.platform !== "win32" && process.platform !== "linux") return
   win.setTitleBarOverlay(overlay(titlebarThemes.get(win), win.webContents.getZoomFactor()))
 }
 
