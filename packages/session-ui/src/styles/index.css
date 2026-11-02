@@ -8,6 +8,7 @@
 @import "../components/question-prompt.css" layer(components);
 @import "../components/question-prompt-experimental.css" layer(components);
 @import "../components/quote-highlight.css" layer(components);
+@import "../components/reference-popup.css" layer(components);
 @import "../components/session-review.css" layer(components);
 @import "../components/session-compaction.css" layer(components);
 @import "../components/session-turn.css" layer(components);

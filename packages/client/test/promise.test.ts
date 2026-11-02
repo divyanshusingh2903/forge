@@ -32,6 +32,7 @@ test("exposes every standard HTTP API group", () => {
     "vcs",
     "debug",
     "websearch",
+    "linkPreview",
     "config",
     "generate",
     "voice",

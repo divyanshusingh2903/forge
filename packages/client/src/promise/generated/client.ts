@@ -311,6 +311,8 @@ import type {
   WebsearchProvidersOutput,
   WebsearchQueryInput,
   WebsearchQueryOutput,
+  LinkPreviewResolveInput,
+  LinkPreviewResolveOutput,
   ExperimentalUsageLimitsInput,
   ExperimentalUsageLimitsOutput,
   ConfigGetInput,
@@ -2635,6 +2637,28 @@ export function make(options: ClientOptions) {
             path: `/api/websearch`,
             query: { location: input["location"] },
             body: { query: input["query"], providerID: input["providerID"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 503],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    linkPreview: {
+      resolve: (input: LinkPreviewResolveInput, requestOptions?: RequestOptions) =>
+        request<LinkPreviewResolveOutput>(
+          {
+            method: "POST",
+            path: `/api/link-preview`,
+            query: { location: input["location"] },
+            body: {
+              kind: input["kind"],
+              repository: input["repository"],
+              number: input["number"],
+              tag: input["tag"],
+              id: input["id"],
+              site: input["site"],
+            },
             successStatus: 200,
             declaredStatuses: [400, 401, 404, 503],
             empty: false,

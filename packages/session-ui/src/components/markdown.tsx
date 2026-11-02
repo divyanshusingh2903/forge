@@ -49,6 +49,7 @@ import { createImagePreview } from "./image-preview"
 import { setupFragmentLinks } from "./markdown-fragment-links"
 import { markSessionLinks, setupSessionLinks } from "./markdown-session-links"
 import { markdownClipboardHtml } from "./markdown-clipboard"
+import { parseReference } from "./reference"
 
 type RenderedBlock =
   | (MarkdownCacheEntry & { key: string; mode: Exclude<Block["mode"], "code"> })
@@ -380,6 +381,13 @@ function markExternalLinkFavicons(root: HTMLDivElement) {
     }
 
     link.insertBefore(favicon, link.firstChild)
+  })
+}
+
+// Tags issue, pull request and merge request links so the session's reference popup can preview them.
+function markReferences(root: HTMLDivElement) {
+  root.querySelectorAll<HTMLAnchorElement>("a[href]").forEach((link) => {
+    if (parseReference(link.href)) link.dataset.reference = ""
   })
 }
 
@@ -1078,6 +1086,7 @@ function updateBlock(
 
   if (sessionLinks) markSessionLinks(source, sessionLinks)
   markExternalLinkFavicons(source)
+  markReferences(source)
 
   if (rendered) {
     rendered.renderer.update(source, block.mode === "live", rendered.raw !== block.raw)

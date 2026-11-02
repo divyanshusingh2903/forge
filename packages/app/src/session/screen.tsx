@@ -28,6 +28,7 @@ import { createMobileViews, MobileViewTabs } from "@/runtime/plugin/mobile"
 import { usePluginAttachment } from "@/runtime/plugin/host-apis"
 import { createMountedSession } from "@/runtime/plugin/mounted-session"
 import { useUsageExceededDialogs } from "./usage-exceeded-dialogs"
+import { SessionReferencePopup } from "./reference-popup"
 import { SessionErrorFallback } from "./route-error"
 import { createSessionScreenLayout } from "./screen-layout"
 import { PaneTabs, SideRegion } from "@/runtime/plugin/side-region"
@@ -63,6 +64,7 @@ export function SessionScreenView(props: { session: SessionModel }) {
         bindBackground={mounted.bindBackground}
         bindPrompt={mounted.bindPrompt}
       />
+      <SessionReferencePopup session={props.session} />
     </PluginLinks>
   )
 }

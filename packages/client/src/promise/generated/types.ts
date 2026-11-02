@@ -362,6 +362,39 @@ export type WebSearchID = string
 
 export type WebSearchResult = { url: string; title?: string; content?: string; time: { published?: number } }
 
+export type LinkPreviewResult = {
+  outcome: "ok" | "unavailable" | "forbidden" | "not-found"
+  title?: string
+  state?: string
+  stateType?: string
+  identifier?: string
+  summary?: string
+  author?: { name: string; avatarUrl?: string }
+  labels?: Array<{ name: string; color?: string }>
+  createdAt?: string
+  updatedAt?: string
+  closedAt?: string
+  mergedAt?: string
+  publishedAt?: string
+  comments?: number
+  head?: string
+  base?: string
+  additions?: number
+  deletions?: number
+  changedFiles?: number
+  tag?: string
+  assets?: number
+  downloads?: number
+  priority?: string
+  assignee?: string
+  project?: string
+  team?: string
+  issueType?: string
+  startDate?: string
+  targetDate?: string
+  initiatives?: Array<string>
+}
+
 export type UsageLimitsMeter = { percent: number; limited: boolean; resetsAt: number }
 
 export type McpProtocol = "legacy" | "auto" | "2026-07-28"
@@ -4779,6 +4812,26 @@ export type WebsearchQueryOutput = {
   location: LocationPublicRef
   data: { providerID: WebSearchID; results: Array<WebSearchResult> }
 }
+
+export type LinkPreviewResolveInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly kind:
+    | "github-issue"
+    | "github-pr"
+    | "github-release"
+    | "gitlab-issue"
+    | "gitlab-mr"
+    | "linear-issue"
+    | "linear-project"
+    | "jira-issue"
+  readonly repository?: string | undefined
+  readonly number?: number | undefined
+  readonly tag?: string | undefined
+  readonly id?: string | undefined
+  readonly site?: string | undefined
+}
+
+export type LinkPreviewResolveOutput = { location: LocationPublicRef; data: LinkPreviewResult }
 
 export type ExperimentalUsageLimitsInput = {
   readonly location?: { readonly directory?: string | undefined } | undefined

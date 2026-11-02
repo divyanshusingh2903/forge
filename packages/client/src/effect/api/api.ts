@@ -2738,6 +2738,66 @@ export interface WebsearchApi<E = never> {
   readonly query: WebsearchQueryOperation<E>
 }
 
+export type LinkPreviewResolveInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly kind:
+    | "github-issue"
+    | "github-pr"
+    | "github-release"
+    | "gitlab-issue"
+    | "gitlab-mr"
+    | "linear-issue"
+    | "linear-project"
+    | "jira-issue"
+  readonly repository?: string | undefined
+  readonly number?: number | undefined
+  readonly tag?: string | undefined
+  readonly id?: string | undefined
+  readonly site?: string | undefined
+}
+export type LinkPreviewResolveOutput = {
+  readonly location: Location.PublicRef
+  readonly data: {
+    readonly outcome: "ok" | "unavailable" | "forbidden" | "not-found"
+    readonly title?: string | undefined
+    readonly state?: string | undefined
+    readonly stateType?: string | undefined
+    readonly identifier?: string | undefined
+    readonly summary?: string | undefined
+    readonly author?: { readonly name: string; readonly avatarUrl?: string | undefined } | undefined
+    readonly labels?: ReadonlyArray<{ readonly name: string; readonly color?: string | undefined }> | undefined
+    readonly createdAt?: string | undefined
+    readonly updatedAt?: string | undefined
+    readonly closedAt?: string | undefined
+    readonly mergedAt?: string | undefined
+    readonly publishedAt?: string | undefined
+    readonly comments?: number | undefined
+    readonly head?: string | undefined
+    readonly base?: string | undefined
+    readonly additions?: number | undefined
+    readonly deletions?: number | undefined
+    readonly changedFiles?: number | undefined
+    readonly tag?: string | undefined
+    readonly assets?: number | undefined
+    readonly downloads?: number | undefined
+    readonly priority?: string | undefined
+    readonly assignee?: string | undefined
+    readonly project?: string | undefined
+    readonly team?: string | undefined
+    readonly issueType?: string | undefined
+    readonly startDate?: string | undefined
+    readonly targetDate?: string | undefined
+    readonly initiatives?: ReadonlyArray<string> | undefined
+  }
+}
+export type LinkPreviewResolveOperation<E = never> = (
+  input: LinkPreviewResolveInput,
+) => Effect.Effect<LinkPreviewResolveOutput, E>
+
+export interface LinkPreviewApi<E = never> {
+  readonly resolve: LinkPreviewResolveOperation<E>
+}
+
 export type ExperimentalUsageLimitsInput = {
   readonly location?: { readonly directory?: string | undefined } | undefined
 }
@@ -3051,6 +3111,7 @@ export interface AppApi<E = never> {
   readonly vcs: VcsApi<E>
   readonly debug: DebugApi<E>
   readonly websearch: WebsearchApi<E>
+  readonly linkPreview: LinkPreviewApi<E>
   readonly config: ConfigApi<E>
 
   /** @deprecated Use `client.experimental.generate`. Removed in the next minor. */

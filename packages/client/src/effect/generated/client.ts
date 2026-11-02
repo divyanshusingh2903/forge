@@ -309,6 +309,8 @@ import type {
   WebsearchProvidersOutput,
   WebsearchQueryInput,
   WebsearchQueryOutput,
+  LinkPreviewResolveInput,
+  LinkPreviewResolveOutput,
   ExperimentalUsageLimitsInput,
   ExperimentalUsageLimitsOutput,
   ConfigGetInput,
@@ -1912,6 +1914,23 @@ const adaptGroupWebsearch = (raw: RawClient["server.websearch"]) => ({
   query: EndpointWebsearchQuery(raw),
 })
 
+const EndpointLinkPreviewResolve = (raw: RawClient["server.linkPreview"]) => (input: LinkPreviewResolveInput) =>
+  preserveEffect<LinkPreviewResolveOutput>()(
+    raw["linkPreview.resolve"]({
+      query: { location: input["location"] },
+      payload: {
+        kind: input["kind"],
+        repository: input["repository"],
+        number: input["number"],
+        tag: input["tag"],
+        id: input["id"],
+        site: input["site"],
+      },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupLinkPreview = (raw: RawClient["server.linkPreview"]) => ({ resolve: EndpointLinkPreviewResolve(raw) })
+
 const EndpointExperimentalUsageLimits = (raw: RawClient["server.usage"]) => (input?: ExperimentalUsageLimitsInput) =>
   preserveEffect<ExperimentalUsageLimitsOutput>()(
     raw["usage.limits"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
@@ -1983,6 +2002,7 @@ const adaptClient = (raw: RawClient) => {
     vcs: adaptGroupVcs(raw["server.vcs"]),
     debug: adaptGroupDebug(raw["server.debug"]),
     websearch: adaptGroupWebsearch(raw["server.websearch"]),
+    linkPreview: adaptGroupLinkPreview(raw["server.linkPreview"]),
     config: adaptGroupConfig(raw["server.config"]),
   }
   return {

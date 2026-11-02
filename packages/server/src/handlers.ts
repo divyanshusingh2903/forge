@@ -23,6 +23,7 @@ import { ReferenceHandler } from "./handlers/reference"
 import { LocationHandler } from "./handlers/location"
 import { IntegrationHandler } from "./handlers/integration"
 import { WebSearchHandler } from "./handlers/websearch"
+import { LinkPreviewHandler } from "./handlers/link-preview"
 import { UsageHandler } from "./handlers/usage"
 import { McpHandler } from "./handlers/mcp"
 import { CredentialHandler } from "./handlers/credential"
@@ -48,6 +49,7 @@ export const handlers = Layer.mergeAll(
   ProviderHandler,
   IntegrationHandler,
   WebSearchHandler,
+  LinkPreviewHandler,
   UsageHandler,
   McpHandler,
   CredentialHandler,
