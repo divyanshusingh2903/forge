@@ -251,6 +251,7 @@ export default defineConfig({
           },
           items: [
             "tools",
+            "browser",
             "rules",
             "agents",
             "models",

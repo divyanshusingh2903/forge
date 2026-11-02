@@ -1,0 +1,130 @@
+---
+title: Browser
+description: Let agents navigate, read and interact with real web pages.
+---
+
+Browser use lets an agent open pages in a browser you can see, read what they render after JavaScript runs, and click, type and fill in them. It goes beyond [`webfetch`](/docs/tools#webfetch), which only downloads a page.
+
+The browser is the **Browser panel** in the Forge desktop app. There is nothing extra to install: the panel uses the Chromium that ships with Electron.
+
+---
+
+## Tools
+
+| Tool                 | What it does                                                                                  | Permission    |
+| -------------------- | --------------------------------------------------------------------------------------------- | ------------- |
+| `browser_navigate`   | Go to a URL, or go back, forward or reload. Returns the tab, URL, title and open tabs.        | `browser`     |
+| `browser_read`       | Read a tab as `markdown`, `text`, `html` or `interactive` (a list of actionable elements).     | `browser`     |
+| `browser_screenshot` | Capture a tab, a single element, or the top of the full page as an image.                     | `browser`     |
+| `browser_act`        | `click`, `type`, `fill`, `select`, `press`, `scroll` or `hover` on an element from a read.    | `browser_act` |
+
+To interact with a page, the agent reads it with `format: interactive`. That returns elements with refs such as `[e12] button "Submit"`. It then passes a ref to `browser_act` or `browser_screenshot`.
+
+---
+
+## Availability
+
+Live browsing needs the desktop app with the Browser panel open.
+
+| Environment                   | `browser_navigate`, `browser_act`, `browser_screenshot` | `browser_read`                                                    |
+| ----------------------------- | ------------------------------------------------------- | ----------------------------------------------------------------- |
+| Desktop app, panel open       | Works                                                   | Reads the live page                                               |
+| Desktop app, panel not open   | Fails with an error                                     | Falls back to a server-side fetch                                 |
+| Web app, CLI (`forge run`)    | Fails with an error                                     | Falls back to a server-side fetch                                 |
+
+- When the desktop app is connected, a tool call opens the panel. If no panel attaches within 10 seconds, the call fails with `The session browser panel is not open. Live browsing needs the Forge desktop app with the Browser panel open.`
+- The fetch fallback of `browser_read` says which path was used on a `source` line in its output (`live` or `fetched`). A fetched page has no JavaScript execution and none of your browser cookies.
+- `browser_read` with `format: interactive` has no fallback and fails without the panel.
+- `browser_screenshot` is only registered for models that accept images. Other models never see it.
+- The fallback fetch runs on the machine that hosts the Forge server. If you connect to a remote server, a `localhost` URL in a fetched read points at that server, not at your computer.
+
+---
+
+## Platforms
+
+The desktop app is built for macOS (Apple silicon and Intel), Windows (x64) and Linux. Browser use is the same Electron `<webview>` on each, and the repository's end-to-end tests run on Linux, Windows and macOS runners. No per-platform behaviour differences are documented for the browser.
+
+The web app shows the URL bar and an **Open externally** button instead of a viewport.
+
+---
+
+## Security
+
+### Permissions
+
+Reading and interacting are gated by two separate permissions, so you can allow one without the other.
+
+- `browser` covers `browser_navigate`, `browser_read` and `browser_screenshot`. The pattern is the URL, and choosing "always" in an approval remembers the origin.
+- `browser_act` covers `browser_act`. It defaults to `ask`, and "always" is also scoped to the origin.
+
+Both default to `ask` for the built-in agents. The one exception is the `plan` agent, which denies `browser_act` and keeps `browser` at `ask`.
+
+```json title="opencode.json"
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permission": {
+    "browser": {
+      "*": "ask",
+      "https://docs.example.com/*": "allow"
+    },
+    "browser_act": "ask"
+  }
+}
+```
+
+See [permissions](/docs/permissions) for the rule syntax.
+
+### What the panel enforces
+
+The panel runs in a sandboxed Electron `<webview>`:
+
+- Sandbox and context isolation are forced on, node integration is off and any preload script is removed. A webview that asks for another partition is refused.
+- Navigation, including redirects, is limited to `http:`, `https:` and `about:blank`. Other schemes such as `file:` are blocked.
+- Popups stay in the panel instead of opening new windows.
+- Downloads are cancelled.
+- Camera, microphone, location and every other device permission request is denied.
+
+Agents drive the page through Chrome DevTools Protocol commands sent by the app's main process, so clicks and key presses are real input events. Only a short allowlist of commands is sent: accessibility and DOM reads, input events, screenshots and a few focus and layout helpers. Navigation, network, cookie and storage commands are not on the list, and neither is evaluating arbitrary script. The list is in `packages/desktop/src/main/browser-debugger.ts`.
+
+Element refs are valid only until the page navigates. A stale ref returns an error telling the agent to run `browser_read` with `format: interactive` again.
+
+The app does not inject CSS into pages and does not force a dark theme. Pages that set no background are painted white.
+
+### Sign-ins and browser data
+
+All sessions share one persistent browser profile (`persist:forge-browser`). That means:
+
+- A site you sign in to in one session is signed in in every session, and stays signed in after you restart the app.
+- An agent that you allow to browse a site can act with that signed-in account. Use the `browser_act` permission and URL patterns to limit that.
+- The profile is separate from your regular browser.
+
+To sign out of everything, run **Clear browser data** from the command palette. It clears cookies and site storage for the session browser.
+
+---
+
+## What you see
+
+Each browser tool has its own row in the conversation:
+
+- **Navigate** shows the action and a link to the URL and title.
+- **Read page** shows the URL, then a tag with the source (`live` or `fetched`), the format when it is not `markdown`, and for interactive reads the number of elements. The content is in an expandable block.
+- **Screenshot** shows an inline preview that opens full size, with a `full page` tag when relevant.
+- **Interact** shows the action and the target element, such as `Fill textbox "Customer name:" "Test User"`.
+
+The approval card for a pending browser action shows the same readable action. Approving or denying it follows the usual [permission](/docs/permissions) flow.
+
+`forge run` prints one line per call, for example `Browser goto https://example.com`, `Browser read https://example.com (interactive)` and `Browser fill textbox "Customer name:" "Test User"`.
+
+The CLI has no Browser panel, so live browser actions cannot complete there, and `browser_read` falls back to a fetch. `forge run` also cannot ask you for approval. Without `--auto` it rejects every permission request and prints `auto-rejecting`. With `--auto` it approves them, but the action tools still fail for lack of a panel.
+
+---
+
+## Limitations
+
+These are not supported yet:
+
+- Downloads and uploads
+- File pickers
+- Multiple browser profiles
+
+For the browser's interface strings and their translations, see the [browser localization notes](https://github.com/divyanshusingh2903/forge/blob/main/packages/app/src/i18n/browser-localization.md).

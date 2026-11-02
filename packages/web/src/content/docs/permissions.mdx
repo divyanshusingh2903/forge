@@ -160,6 +160,8 @@ OpenCode permissions are keyed by tool name, plus a couple of safety guards:
 - `question` — asking the user questions during execution
 - `webfetch` — fetching a URL (matches the URL)
 - `websearch` — web search (matches the query)
+- `browser` — navigating, reading and screenshotting in the [session browser](/docs/browser) (matches the URL)
+- `browser_act` — clicking, typing and other interaction in the [session browser](/docs/browser) (matches the URL)
 - `external_directory` — triggered when a tool touches paths outside the project working directory
 - `doom_loop` — triggered when the same tool call repeats 3 times with identical input
 
