@@ -5,7 +5,8 @@ export type Reference =
   | { kind: "jira-issue"; site: string; id: string }
 
 const githubPaths = { issues: "github-issue", pull: "github-pr" } as const
-const gitlabPaths = { issues: "gitlab-issue", merge_requests: "gitlab-mr" } as const
+// GitLab links issues as work items on newer instances: group/project/-/work_items/1.
+const gitlabPaths = { issues: "gitlab-issue", work_items: "gitlab-issue", merge_requests: "gitlab-mr" } as const
 // Cycles and milestones are not recognised: the Linear MCP tools cannot resolve them from a bare URL.
 const linearPaths = { issue: "linear-issue", project: "linear-project" } as const
 const jiraKey = /^[A-Z][A-Z0-9_]*-\d+$/

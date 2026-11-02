@@ -23,6 +23,11 @@ describe("parseReference", () => {
       number: 42,
     })
     expect(parseReference("https://gitlab.com/group/app/-/issues/3")?.kind).toBe("gitlab-issue")
+    expect(parseReference("https://gitlab.com/group/app/-/work_items/1")).toEqual({
+      kind: "gitlab-issue",
+      repository: "group/app",
+      number: 1,
+    })
     expect(parseReference("https://gitlab.com/group/app/-/pipelines/3")).toBeUndefined()
   })
 

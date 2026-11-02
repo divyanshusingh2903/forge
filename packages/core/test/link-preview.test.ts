@@ -51,6 +51,36 @@ describe("LinkPreview mappers", () => {
     )
   })
 
+  test("maps a work item from the GitLab MCP server", () => {
+    expect(
+      LinkPreview.gitlabResult(
+        "gitlab-issue",
+        JSON.stringify({
+          iid: "1",
+          title: "Test Issue",
+          state: "OPEN",
+          createdAt: "2026-11-02T22:59:45Z",
+          updatedAt: "2026-11-02T22:59:45Z",
+          closedAt: null,
+          author: { name: "Divyanshu Singh", username: "divyanshusingh2903" },
+          workItemType: { name: "Issue" },
+          widgets: [
+            { type: "ASSIGNEES", assignees: { nodes: [] } },
+            { type: "LABELS", labels: { nodes: [{ title: "bug", color: "#dc143c" }] } },
+          ],
+        }),
+      ),
+    ).toEqual({
+      outcome: "ok",
+      title: "Test Issue",
+      state: "open",
+      author: { name: "divyanshusingh2903" },
+      labels: [{ name: "bug", color: "dc143c" }],
+      createdAt: "2026-11-02T22:59:45Z",
+      updatedAt: "2026-11-02T22:59:45Z",
+    })
+  })
+
   test("maps a Jira issue from the Atlassian MCP server", () => {
     expect(
       LinkPreview.jiraResult(

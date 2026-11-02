@@ -107,7 +107,23 @@ const layer = Layer.effect(
       }
       if (input.kind === "gitlab-issue" || input.kind === "gitlab-mr") {
         const route = gitlabRoute(input)
-        return route ? cli("glab", route, (body) => gitlabResult(input.kind, body)) : Effect.succeed(unavailable)
+        if (!route) return Effect.succeed(unavailable)
+        const mr = input.kind === "gitlab-mr"
+        const name = mr ? "get_merge_request" : "get_work_item"
+        const map = (body: string) => gitlabResult(input.kind, body)
+        // The GitLab MCP server when it is connected, and `glab` otherwise. Work item URLs also cover issues.
+        return mcp.tools().pipe(
+          Effect.flatMap((tools) =>
+            tools.some((item) => item.name === name && /gitlab/i.test(item.server))
+              ? tool(
+                  /gitlab/i,
+                  name,
+                  { url: `https://gitlab.com/${input.repository}/-/${mr ? "merge_requests" : "issues"}/${input.number}` },
+                  map,
+                )
+              : cli("glab", route, map),
+          ),
+        )
       }
       const route = githubRoute(input)
       if (!route) return Effect.succeed(unavailable)
@@ -205,12 +221,12 @@ export function gitlabResult(kind: Kind, body: string): Result | undefined {
     outcome: "ok",
     title: data.title,
     state,
-    author: author(pick(user?.username) ?? pick(user?.name), user?.avatar_url),
-    labels: labels(data.labels),
-    createdAt: text(data.created_at),
-    updatedAt: text(data.updated_at),
-    closedAt: text(data.closed_at),
-    mergedAt: text(data.merged_at),
+    author: author(pick(user?.username) ?? pick(user?.name), user?.avatar_url ?? user?.avatarUrl),
+    labels: labels(data.labels ?? workItemLabels(data.widgets)),
+    createdAt: text(data.created_at ?? data.createdAt),
+    updatedAt: text(data.updated_at ?? data.updatedAt),
+    closedAt: text(data.closed_at ?? data.closedAt),
+    mergedAt: text(data.merged_at ?? data.mergedAt),
     comments: number(data.user_notes_count),
     head: mr ? text(data.source_branch) : undefined,
     base: mr ? text(data.target_branch) : undefined,
@@ -299,12 +315,13 @@ function githubState(kind: Kind, data: Record<string, unknown>) {
   return state === "closed" && data.state_reason === "not_planned" ? "not-planned" : state
 }
 
-// GitLab says "opened" and "locked"; the popup speaks GitHub's open/closed/merged/draft vocabulary.
+// GitLab's REST API says "opened" and "locked", and its work items "OPEN" and "CLOSED"; the popup speaks GitHub's
+// open/closed/merged/draft vocabulary.
 function gitlabState(kind: Kind, data: Record<string, unknown>) {
-  const state = text(data.state)
+  const state = text(data.state)?.toLowerCase()
   if (state === "merged") return "merged"
   if (state === "closed" || state === "locked") return "closed"
-  if (state !== "opened") return
+  if (state !== "opened" && state !== "open") return
   return kind === "gitlab-mr" && data.draft === true ? "draft" : "open"
 }
 
@@ -379,6 +396,17 @@ function labels(value: unknown): Result["labels"] {
     return name ? [{ name, color: color && /^#?[0-9a-f]{6}$/i.test(color) ? color.replace(/^#/, "") : undefined }] : []
   })
   return items.length ? items : undefined
+}
+
+// Work items keep their labels in a LABELS widget, as nodes with a title and colour.
+function workItemLabels(widgets: unknown) {
+  if (!Array.isArray(widgets)) return
+  const nodes = record(widgets.map(record).find((item) => item?.type === "LABELS")?.labels)?.nodes
+  if (!Array.isArray(nodes)) return
+  return nodes.flatMap((item) => {
+    const label = record(item)
+    return label ? [{ name: label.title, color: label.color }] : []
+  })
 }
 
 // Release notes and descriptions are markdown; the popup only wants a short plain-text lead-in.
