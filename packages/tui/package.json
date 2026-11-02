@@ -11,7 +11,6 @@
     "typecheck:tsc": "tsc -b"
   },
   "exports": {
-    ".": "./src/index.tsx",
     "./config": "./src/config/index.tsx",
     "./config/keybind": "./src/config/keybind.ts",
     "./config/v1": "./src/config/v1/index.tsx",
