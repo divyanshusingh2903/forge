@@ -153,6 +153,7 @@ const setup: Plugin.Setup<typeof Terminal> = (ctx) => {
       title: ctx.t("tab.title"),
       icon: "terminal",
       keybind: "terminal.new",
+      header: true,
       order: 20,
       run() {
         const target = current()

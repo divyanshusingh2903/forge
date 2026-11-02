@@ -186,6 +186,7 @@ const setup: Plugin.Setup<typeof definition> = (ctx) => {
       title: ctx.t("tab.title"),
       icon: "globe",
       keybind: "browser.open",
+      header: true,
       order: 15,
       run: () => value.open(view),
     }

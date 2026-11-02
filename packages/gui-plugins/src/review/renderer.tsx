@@ -248,6 +248,7 @@ const setup: Plugin.Setup<typeof Review> = (ctx) => {
       description: count() > 0 ? ctx.plural("menu.count", count()) : undefined,
       icon: "review",
       keybind: "review.open",
+      header: true,
       order: 10,
       run: show,
     }

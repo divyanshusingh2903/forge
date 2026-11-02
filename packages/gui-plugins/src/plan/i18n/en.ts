@@ -15,7 +15,7 @@ export default {
   "quote.addWithoutComment": "Quote without comment",
   "quote.tooLong": "Selection too long",
   "quote.label": "Plan",
-  "indicator.drafting": "Planning",
+  "indicator.drafting": "Review Plan",
   "indicator.ready": "Plan ready",
   "indicator.open": "Open plan",
 }

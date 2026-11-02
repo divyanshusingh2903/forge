@@ -63,11 +63,25 @@ export function SessionContextUsage(props: {
     }
   })
 
-  const tokens = createMemo(() =>
-    new Intl.NumberFormat(i18n.locale(), { notation: "compact", maximumFractionDigits: 0 })
-      .format(context()?.total ?? 0)
-      .toLocaleLowerCase(i18n.locale()),
+  // The window of the model that last answered, or of the session's model before anything has answered.
+  const limit = createMemo(() => {
+    const ref =
+      lastAssistantWithUsage(messages(), info()?.revert?.messageID)?.model ??
+      info()?.model ??
+      messages().findLast((item) => item.type === "assistant")?.model
+    return (ref ? catalogModel(props.session, ref)?.model : undefined)?.limit.context || undefined
+  })
+
+  const compact = createMemo(
+    () => new Intl.NumberFormat(i18n.locale(), { notation: "compact", maximumFractionDigits: 1 }),
   )
+
+  // "20K / 500K", or just "20K" when the model's window is unknown.
+  const tokens = createMemo(() => {
+    const used = compact().format(context()?.total ?? 0)
+    const max = limit()
+    return max ? `${used} / ${compact().format(max)}` : used
+  })
 
   // A root session's cost includes its subagent sessions, as in the TUI.
   const spent = createMemo(() => (props.session.id ? props.session.server.data.session.cost(props.session.id) : 0))
@@ -140,7 +154,13 @@ export function SessionContextUsage(props: {
       </Tooltip>
       <Menu.Portal>
         <Menu.Content class="w-[200px] max-w-[calc(100vw-16px)]" aria-label={ctx.t("usage.view")}>
-          {menuRow(ctx.t("usage.tokens"), context()?.total.toLocaleString(i18n.locale()) ?? "0")}
+          {menuRow(
+            ctx.t("usage.tokens"),
+            [context()?.total ?? 0, limit()]
+              .filter((value) => value !== undefined)
+              .map((value) => value.toLocaleString(i18n.locale()))
+              .join(" / "),
+          )}
           <Show when={showCost()}>{menuRow(ctx.t("usage.cost"), cost())}</Show>
           {menuRow(ctx.t("usage.usage"), `${context()?.usage ?? 0}%`)}
           <Menu.Separator />

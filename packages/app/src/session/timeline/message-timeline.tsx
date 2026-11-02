@@ -36,6 +36,7 @@ import {
   SessionTitleHeader,
 } from "../session-identity-header"
 import { SessionHeaderSpacer } from "@/session/header/session-header"
+import { SessionLaunchers } from "@/session/header/session-launchers"
 import { SessionHeaderGap } from "@/session/header/drag-area"
 import { SessionWorkingIndicator } from "@/session/header/session-working-indicator"
 
@@ -553,6 +554,9 @@ function MessageTimelineView(
                   {(_id) => (
                     <>
                       {props.search}
+                      <Show when={!fit.compact}>
+                        <SessionLaunchers />
+                      </Show>
                       <PluginSlot
                         at="session.header"
                         input={{

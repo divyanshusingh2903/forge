@@ -104,6 +104,8 @@ export interface SessionPanelMenuItem extends MenuItemBase {
    * that are not already open. Omit it for an ordinary launcher item.
    */
   readonly primary?: true
+  /** Also shows the item as an icon button in the session header. Omit it to list the item only in launchers. */
+  readonly header?: true
   /** Runs the item. */
   run(): void
 }
