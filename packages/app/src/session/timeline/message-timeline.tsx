@@ -37,6 +37,7 @@ import {
 } from "../session-identity-header"
 import { SessionHeaderSpacer } from "@/session/header/session-header"
 import { SessionLaunchers } from "@/session/header/session-launchers"
+import { SessionOptionsContent } from "@/session/session-options"
 import { SessionHeaderGap } from "@/session/header/drag-area"
 import { SessionWorkingIndicator } from "@/session/header/session-working-indicator"
 
@@ -661,8 +662,8 @@ function MessageTimelineView(
                       aria-expanded={title.menuOpen}
                     />
                     <Menu.Portal>
-                      <Menu.Content
-                        class="session-options-menu w-max"
+                      <SessionOptionsContent
+                        class="w-max"
                         style={{ "min-width": "0" }}
                         onCloseAutoFocus={(event) => {
                           if (!title.pendingRename) return
@@ -670,23 +671,14 @@ function MessageTimelineView(
                           setTitle("pendingRename", false)
                           openTitleEditor()
                         }}
-                      >
-                        <Menu.Item
-                          onSelect={() => {
-                            setTitle("pendingRename", true)
-                            setTitle("menuOpen", false)
-                          }}
-                        >
-                          {language.t("common.rename")}
-                        </Menu.Item>
-                        <Menu.Item onSelect={() => void props.action.export(id)}>
-                          {language.t("common.export")}…
-                        </Menu.Item>
-                        <Menu.Separator />
-                        <Menu.Item onSelect={() => props.action.showDelete(id)}>
-                          {language.t("common.delete")}…
-                        </Menu.Item>
-                      </Menu.Content>
+                        close={() => setTitle("menuOpen", false)}
+                        rename={() => {
+                          setTitle("pendingRename", true)
+                          setTitle("menuOpen", false)
+                        }}
+                        export={() => void props.action.export(id)}
+                        delete={() => props.action.showDelete(id)}
+                      />
                     </Menu.Portal>
                   </Menu>
                 )}

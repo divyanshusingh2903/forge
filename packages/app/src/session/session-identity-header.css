@@ -1,7 +1,3 @@
-.session-options-menu [data-component="menu-v2-item"] {
-  padding-inline-end: 30px;
-}
-
 /* The location card takes the browser site popover's spacing. Its submenus render elsewhere and keep the menu's. */
 [data-component="menu-v2-content"][data-slot="session-location-card"] {
   gap: 2px;

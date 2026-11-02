@@ -1,7 +1,10 @@
 import { createSignal, For, Show } from "solid-js"
+import { createStore } from "solid-js/store"
 import { Schema } from "effect"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
+import { InlineInput } from "@opencode/ui/inline-input"
+import { Menu } from "@opencode/ui/menu"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { createHomeController } from "@/home/model"
 import { createHomeProjectsController } from "@/home/projects/controller"
@@ -13,6 +16,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { Persistence } from "@/runtime/persistence/schema"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { ServerConnection } from "@/runtime/server/registry"
+import { SessionOptionsContent } from "@/session/session-options"
 import { sessionLabel } from "@/session/title"
 import { useCurrentRoute } from "@/shell/state/layout"
 
@@ -203,6 +207,24 @@ function RailSession(props: {
   const isPinned = () => props.pinned.isPinned(props.server, props.record.session.id)
   const label = () => sessionLabel(props.record.session)
   const active = () => props.active(props.server, props.record.session.id)
+  const server = () => ServerConnection.Key.make(props.server)
+  const [ui, setUI] = createStore({ menu: false, pendingRename: false, draft: undefined as string | undefined })
+  let input: HTMLInputElement | undefined
+
+  const openEditor = () => {
+    setUI("draft", label())
+    requestAnimationFrame(() => {
+      input?.focus()
+      input?.select()
+    })
+  }
+
+  const saveEditor = async () => {
+    const draft = ui.draft
+    if (draft === undefined) return
+    setUI("draft", undefined)
+    await props.sessions.session.rename(server(), props.record.session, draft)
+  }
 
   return (
     <div
@@ -210,11 +232,36 @@ function RailSession(props: {
       data-home-row
       data-selected={active() ? "" : undefined}
     >
+      <Show when={ui.draft !== undefined}>
+        <InlineInput
+          ref={(element) => (input = element)}
+          data-component="project-rail-session-rename"
+          aria-label={language.t("common.rename")}
+          dir="auto"
+          value={ui.draft ?? ""}
+          class="absolute inset-y-0 right-1 z-10 min-w-0 rounded-[6px] bg-v2-background-bg-layer-03 text-v2-text-text-base [font-weight:440] outline-none"
+          style={{ left: props.flush ? "6px" : "28px", "--inline-input-shadow": "none" }}
+          onInput={(event) => setUI("draft", event.currentTarget.value)}
+          onKeyDown={(event) => {
+            event.stopPropagation()
+            if (event.isComposing || event.keyCode === 229) return
+            if (event.key === "Enter") {
+              event.preventDefault()
+              void saveEditor()
+            }
+            if (event.key === "Escape") {
+              event.preventDefault()
+              setUI("draft", undefined)
+            }
+          }}
+          onBlur={() => void saveEditor()}
+        />
+      </Show>
       <button
         type="button"
         data-component="project-rail-session"
         data-selected={active() ? "" : undefined}
-        class="flex h-7 w-full min-w-0 cursor-default items-center gap-2 rounded-[6px] bg-transparent pr-7 text-left text-v2-text-text-muted [font-weight:440] transition-[background-color,color] duration-[120ms] ease-in-out hover:bg-v2-background-bg-layer-01 hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base focus-visible:bg-v2-background-bg-layer-01 focus-visible:outline-none"
+        class="flex h-7 w-full min-w-0 cursor-default items-center gap-2 rounded-[6px] bg-transparent pr-14 text-left text-v2-text-text-muted [font-weight:440] transition-[background-color,color] duration-[120ms] ease-in-out hover:bg-v2-background-bg-layer-01 hover:text-v2-text-text-base data-[selected]:bg-v2-background-bg-layer-03 data-[selected]:text-v2-text-text-base focus-visible:bg-v2-background-bg-layer-01 focus-visible:outline-none"
         style={{ "padding-inline-start": props.flush ? "6px" : "28px" }}
         onClick={() => props.sessions.session.open(props.record.session)}
       >
@@ -224,15 +271,44 @@ function RailSession(props: {
         </Show>
         <span class="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap">{label()}</span>
       </button>
-      <div
-        class="absolute bottom-0 right-1 top-0 flex items-center opacity-0 group-hover/session:opacity-100 focus-within:opacity-100"
-        classList={{ "opacity-100": isPinned() }}
-      >
+      <div class="absolute bottom-0 right-1 top-0 flex items-center">
+        <Menu gutter={4} placement="bottom-start" open={ui.menu} onOpenChange={(open) => setUI("menu", open)}>
+          <Menu.Trigger
+            as={IconButton}
+            data-action="project-rail-options"
+            variant="ghost-muted"
+            size="small"
+            icon={<Icon name="outline-dots" size="small" />}
+            class="opacity-0 group-hover/session:opacity-100 focus-visible:opacity-100"
+            classList={{ "opacity-100": ui.menu }}
+            aria-label={language.t("common.moreOptions")}
+            aria-expanded={ui.menu}
+          />
+          <Menu.Portal>
+            <SessionOptionsContent
+              class="w-max"
+              style={{ "min-width": "0" }}
+              // Focus would return to the trigger and blur the rename field, so open it once the menu has closed.
+              onCloseAutoFocus={(event) => {
+                if (!ui.pendingRename) return
+                event.preventDefault()
+                setUI("pendingRename", false)
+                openEditor()
+              }}
+              close={() => setUI("menu", false)}
+              rename={() => setUI({ pendingRename: true, menu: false })}
+              export={() => void props.sessions.session.export(server(), props.record.session)}
+              delete={() => props.sessions.session.showDelete(server(), props.record.session)}
+            />
+          </Menu.Portal>
+        </Menu>
         <Tooltip placement="right" value={language.t(isPinned() ? "sidebar.rail.unpin" : "sidebar.rail.pin")}>
           <IconButton
             data-action="project-rail-pin"
             variant="ghost-muted"
             size="small"
+            class="opacity-0 group-hover/session:opacity-100 focus-visible:opacity-100"
+            classList={{ "opacity-100": isPinned() }}
             icon={<Icon name={isPinned() ? "pin-filled" : "pin"} size="small" />}
             aria-label={language.t(isPinned() ? "sidebar.rail.unpin" : "sidebar.rail.pin")}
             aria-pressed={isPinned()}
