@@ -3,6 +3,7 @@ export type Reference =
   | { kind: "github-release"; repository: string; tag: string }
   | { kind: "linear-issue" | "linear-project"; workspace: string; id: string }
   | { kind: "jira-issue"; site: string; id: string }
+  | { kind: "notion-page"; id: string }
 
 const githubPaths = { issues: "github-issue", pull: "github-pr" } as const
 // GitLab links issues as work items on newer instances: group/project/-/work_items/1.
@@ -10,8 +11,9 @@ const gitlabPaths = { issues: "gitlab-issue", work_items: "gitlab-issue", merge_
 // Cycles and milestones are not recognised: the Linear MCP tools cannot resolve them from a bare URL.
 const linearPaths = { issue: "linear-issue", project: "linear-project" } as const
 const jiraKey = /^[A-Z][A-Z0-9_]*-\d+$/
+const notionHosts = new Set(["notion.so", "www.notion.so", "app.notion.com"])
 
-// Only github.com, gitlab.com, linear.app and Atlassian Cloud sites are recognised, so no other host is ever resolved.
+// Only github.com, gitlab.com, linear.app, Atlassian Cloud and Notion are recognised, so no other host is ever resolved.
 export function parseReference(href: string): Reference | undefined {
   const url = URL.parse(href)
   if (!url || (url.protocol !== "https:" && url.protocol !== "http:")) return
@@ -20,17 +22,20 @@ export function parseReference(href: string): Reference | undefined {
   if (url.hostname === "gitlab.com") return gitlab(segments)
   if (url.hostname === "linear.app") return linear(segments)
   if (url.hostname.endsWith(".atlassian.net")) return jira(url, segments)
+  if (notionHosts.has(url.hostname) || url.hostname.endsWith(".notion.site")) return notion(url, segments)
 }
 
 export function referenceKey(reference: Reference) {
   if ("tag" in reference) return `${reference.kind}:${reference.repository}@${reference.tag}`.toLowerCase()
   if ("number" in reference) return `${reference.kind}:${reference.repository}#${reference.number}`.toLowerCase()
   if ("site" in reference) return `${reference.kind}:${reference.site}/${reference.id}`.toLowerCase()
+  if (!("workspace" in reference)) return `${reference.kind}:${reference.id}`
   return `${reference.kind}:${reference.workspace}/${reference.id}`.toLowerCase()
 }
 
 /** The short name a popup shows before its item loads, or when it cannot. */
 export function referenceLabel(reference: Reference) {
+  if (reference.kind === "notion-page") return "Notion"
   if ("tag" in reference) return `${reference.repository} ${reference.tag}`
   if ("number" in reference) return `${reference.repository} ${reference.kind === "gitlab-mr" ? "!" : "#"}${reference.number}`
   return reference.id
@@ -68,4 +73,14 @@ function jira(url: URL, segments: string[]): Reference | undefined {
   const id = segments[0] === "browse" ? segments[1] : url.searchParams.get("selectedIssue")
   if (!id || !jiraKey.test(id)) return
   return { kind: "jira-issue", site: url.hostname, id }
+}
+
+// Pages end in their ID: /Title-<id>, /workspace/Title-<id>, /p/<id>, or a dashed UUID. A `p` query names the page a
+// database row opens as a peek over its database, so it wins over the database's own ID.
+function notion(url: URL, segments: string[]): Reference | undefined {
+  const id = [url.searchParams.get("p"), segments.at(-1)]
+    .map((value) => value?.replaceAll("-", "").match(/[0-9a-f]{32}$/i)?.[0])
+    .find(Boolean)
+  if (!id) return
+  return { kind: "notion-page", id: id.toLowerCase() }
 }

@@ -28,6 +28,9 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
 
   const eyebrow = () => {
     const reference = props.reference
+    // A Notion page is placed by where it sits in the workspace, after its emoji.
+    if (reference.kind === "notion-page")
+      return [props.result.icon, props.result.path ?? referenceLabel(reference)].filter(Boolean).join(" ")
     if ("tag" in reference) return reference.repository
     if ("number" in reference) return referenceLabel(reference)
     const identifier = props.result.identifier ?? reference.id
@@ -123,6 +126,18 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
             {(item) => (
               <span data-slot="reference-card-fact" data-priority={item.priority ? "" : undefined}>
                 {item.text}
+              </span>
+            )}
+          </For>
+        </span>
+      </Show>
+
+      <Show when={props.result.fields?.length}>
+        <span data-slot="reference-card-facts">
+          <For each={props.result.fields}>
+            {(field) => (
+              <span data-slot="reference-card-fact">
+                {field.name}: {field.value}
               </span>
             )}
           </For>

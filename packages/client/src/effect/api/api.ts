@@ -2749,6 +2749,7 @@ export type LinkPreviewResolveInput = {
     | "linear-issue"
     | "linear-project"
     | "jira-issue"
+    | "notion-page"
   readonly repository?: string | undefined
   readonly number?: number | undefined
   readonly tag?: string | undefined
@@ -2788,6 +2789,9 @@ export type LinkPreviewResolveOutput = {
     readonly startDate?: string | undefined
     readonly targetDate?: string | undefined
     readonly initiatives?: ReadonlyArray<string> | undefined
+    readonly path?: string | undefined
+    readonly icon?: string | undefined
+    readonly fields?: ReadonlyArray<{ readonly name: string; readonly value: string }> | undefined
   }
 }
 export type LinkPreviewResolveOperation<E = never> = (

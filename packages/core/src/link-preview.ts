@@ -22,6 +22,8 @@ const SAFE_TAG = /^[\w.+@/-]{1,200}$/
 const LINEAR_IDENTIFIER = /^[A-Z][A-Z0-9]*-\d+$|^P-[A-Z0-9]+-\d+$/
 const JIRA_KEY = /^[A-Z][A-Z0-9_]*-\d+$/
 const JIRA_SITE = /^[a-z0-9][a-z0-9-]*\.atlassian\.net$/
+const NOTION_ID = /^[0-9a-f]{32}$/
+const MAX_FIELDS = 4
 // Avatars are only passed on from the code hosts' own CDNs, so a popup never loads an arbitrary image.
 const AVATAR_HOSTS = new Set(["avatars.githubusercontent.com", "gitlab.com", "secure.gravatar.com"])
 const MAX_LABELS = 6
@@ -104,6 +106,10 @@ const layer = Layer.effect(
         if (!input.id || !JIRA_KEY.test(input.id) || !input.site || !JIRA_SITE.test(input.site))
           return Effect.succeed(unavailable)
         return tool(/jira|atlassian/i, "getJiraIssue", { cloudId: input.site, issueIdOrKey: input.id }, jiraResult)
+      }
+      if (input.kind === "notion-page") {
+        if (!input.id || !NOTION_ID.test(input.id)) return Effect.succeed(unavailable)
+        return tool(/notion/i, "notion-fetch", { id: input.id }, notionResult)
       }
       if (input.kind === "gitlab-issue" || input.kind === "gitlab-mr") {
         const route = gitlabRoute(input)
@@ -295,6 +301,56 @@ export function linearResult(body: string): Result | undefined {
         ? data.initiatives.flatMap((item) => pick(item) ?? [])
         : undefined,
   })
+}
+
+// The Notion MCP server's fetch answers with JSON whose `text` wraps the page's properties and markdown content in
+// <properties> and <content> tags. Properties come flattened: `date:Due:start` for dates, `__YES__` for a checked box,
+// JSON arrays for multi-selects, and user:// or page URLs for people and relations, which carry no readable name.
+export function notionResult(body: string): Result | undefined {
+  const data = record(Option.getOrUndefined(JsonValue(body)))
+  const title = text(data?.title)
+  if (!data || !title) return
+  const page = text(data.text) ?? ""
+  const properties = record(Option.getOrUndefined(JsonValue(page.match(/<properties>([\s\S]*?)<\/properties>/)?.[1] ?? "")))
+  const values = Object.entries(properties ?? {}).flatMap(([key, value]) => {
+    const name = key.startsWith("date:") ? (key.endsWith(":start") ? key.split(":")[1] : undefined) : key
+    const shown = notionValue(value)
+    return name && shown && shown !== title ? [{ name, value: shown }] : []
+  })
+  const status = values.find((item) => /^status$/i.test(item.name))
+  const icon = record(data.icon)
+  return compact({
+    outcome: "ok",
+    title,
+    state: status?.value,
+    stateType: status ? notionStateType(status.value) : undefined,
+    path: text(data.path),
+    icon: text(icon?.emoji) ?? (typeof data.icon === "string" && !data.icon.includes("/") ? data.icon : undefined),
+    fields: values.some((item) => item !== status)
+      ? values.filter((item) => item !== status).slice(0, MAX_FIELDS)
+      : undefined,
+    updatedAt: text(data.page_last_edited_at),
+    summary: snippet(page.match(/<content>([\s\S]*?)<\/content>/)?.[1]?.replace(/<[^>]+>/g, " ")),
+  })
+}
+
+function notionValue(value: unknown): string | undefined {
+  if (typeof value === "number") return String(value)
+  const raw = text(value)
+  if (!raw || /^(user|page|collection):\/\/|^https?:\/\//.test(raw)) return
+  if (raw === "__YES__") return "Yes"
+  if (raw === "__NO__") return
+  const list = Option.getOrUndefined(JsonValue(raw))
+  if (!Array.isArray(list)) return raw
+  const names = list.flatMap((item) => notionValue(item) ?? [])
+  return names.length ? names.join(", ") : undefined
+}
+
+function notionStateType(name: string) {
+  if (/done|complete|shipped|closed|resolved/i.test(name)) return "completed"
+  if (/cancel|archiv|won.?t/i.test(name)) return "canceled"
+  if (/progress|doing|review|active|started/i.test(name)) return "started"
+  return "unstarted"
 }
 
 export function failureResult(message: string): Result {

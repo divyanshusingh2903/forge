@@ -7,7 +7,7 @@ const ReferencePopup = lazy(() =>
   import("@opencode/session-ui/reference-popup").then((module) => ({ default: module.ReferencePopup })),
 )
 
-/** Hover previews for the GitHub, GitLab, Linear and Jira links in the session, looked up where the session runs. */
+/** Hover previews for the GitHub, GitLab, Linear, Jira and Notion links in the session, looked up where the session runs. */
 export function SessionReferencePopup(props: { session: SessionModel }) {
   const sdk = useServerSDK()
 

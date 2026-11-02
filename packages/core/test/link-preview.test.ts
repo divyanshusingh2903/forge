@@ -111,6 +111,56 @@ describe("LinkPreview mappers", () => {
     expect(LinkPreview.jiraResult("not json")).toBeUndefined()
   })
 
+  test("maps a Notion page from the Notion MCP server", () => {
+    const text = [
+      '<page url="https://app.notion.com/p/36b86afd4db28057b82ec47ff146517e">',
+      "<properties>",
+      JSON.stringify({
+        Name: "Launch checklist",
+        Status: "In progress",
+        Owner: '["user://5c0d"]',
+        Tags: '["Launch","Q4"]',
+        "date:Due:start": "2026-11-20",
+        "date:Due:is_datetime": 0,
+        Shipped: "__NO__",
+        Reviewed: "__YES__",
+        Spec: "https://app.notion.com/p/41886afd4db28225889281c107e96307",
+      }),
+      "</properties>",
+      "<content>",
+      "# Launch checklist\n\n<table><tr><td>**Owner**</td></tr></table>\nShip the **v2** port.",
+      "</content>",
+      "</page>",
+    ].join("\n")
+    expect(
+      LinkPreview.notionResult(
+        JSON.stringify({
+          metadata: { type: "page" },
+          title: "Launch checklist",
+          icon: { type: "emoji", emoji: "🚀" },
+          path: "Home / Projects",
+          page_last_edited_at: "2026-11-02T18:17:27.225Z",
+          text,
+        }),
+      ),
+    ).toEqual({
+      outcome: "ok",
+      title: "Launch checklist",
+      state: "In progress",
+      stateType: "started",
+      path: "Home / Projects",
+      icon: "🚀",
+      fields: [
+        { name: "Tags", value: "Launch, Q4" },
+        { name: "Due", value: "2026-11-20" },
+        { name: "Reviewed", value: "Yes" },
+      ],
+      updatedAt: "2026-11-02T18:17:27.225Z",
+      summary: "Launch checklist Owner Ship the v2 port.",
+    })
+    expect(LinkPreview.notionResult(JSON.stringify({ name: "APIResponseError", status: 404 }))).toBeUndefined()
+  })
+
   test("classifies failures", () => {
     expect(LinkPreview.failureResult("HTTP 404: Not Found")).toEqual({ outcome: "not-found" })
     expect(LinkPreview.failureResult("To get started with GitHub CLI, please run: gh auth login")).toEqual({

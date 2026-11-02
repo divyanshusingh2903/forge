@@ -29,6 +29,16 @@ describe("parseReference", () => {
       number: 1,
     })
     expect(parseReference("https://gitlab.com/group/app/-/pipelines/3")).toBeUndefined()
+    const id = "36b86afd4db28057b82ec47ff146517e"
+    for (const href of [
+      `https://app.notion.com/p/${id}?pvs=204`,
+      `https://www.notion.so/acme/Launch-checklist-${id}`,
+      `https://acme.notion.site/36b86afd-4db2-8057-b82e-c47ff146517e`,
+      `https://www.notion.so/acme/84586afd4db28382a77301ef80983ffc?v=1&p=${id}`,
+    ])
+      expect(parseReference(href)).toEqual({ kind: "notion-page", id })
+    expect(parseReference("https://www.notion.so/acme/Launch-checklist")).toBeUndefined()
+    expect(parseReference("https://example.notion.dev/p/" + id)).toBeUndefined()
   })
 
   test("recognises Linear and Jira items", () => {

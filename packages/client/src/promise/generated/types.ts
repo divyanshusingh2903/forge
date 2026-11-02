@@ -393,6 +393,9 @@ export type LinkPreviewResult = {
   startDate?: string
   targetDate?: string
   initiatives?: Array<string>
+  path?: string
+  icon?: string
+  fields?: Array<{ name: string; value: string }>
 }
 
 export type UsageLimitsMeter = { percent: number; limited: boolean; resetsAt: number }
@@ -4824,6 +4827,7 @@ export type LinkPreviewResolveInput = {
     | "linear-issue"
     | "linear-project"
     | "jira-issue"
+    | "notion-page"
   readonly repository?: string | undefined
   readonly number?: number | undefined
   readonly tag?: string | undefined
