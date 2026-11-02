@@ -1,14 +1,19 @@
 import type { HomeProjectsController } from "./controller"
-import { HomeProjectsView } from "./view"
+import { HomeProjectsView, type HomeProjectsViewProps } from "./view"
 import type { HomeScrollController } from "../scroll"
 
 export function HomeProjects(props: {
   projects: HomeProjectsController
-  scroll: HomeScrollController
+  scroll?: HomeScrollController
   dropdown?: boolean
+  rail?: Pick<
+    HomeProjectsViewProps,
+    "rail" | "railActions" | "pinnedSection" | "projectSessions" | "sessionsOpen" | "onToggleSessions" | "projectHighlight"
+  >
 }) {
   return (
     <HomeProjectsView
+      {...props.rail}
       dropdown={props.dropdown}
       language={props.projects.copy.language}
       servers={props.projects.server.list()}
@@ -20,7 +25,7 @@ export function HomeProjects(props: {
       collapsed={props.projects.server.collapsed}
       canRevealProject={props.projects.project.canReveal}
       hasUnread={props.projects.project.hasUnread}
-      onWheel={props.scroll.viewport.containWheel}
+      onWheel={props.scroll?.viewport.containWheel ?? (() => undefined)}
       onChooseProject={props.projects.project.choose}
       onFocusServer={props.projects.server.focus}
       onAuthenticateServer={props.projects.server.authenticate}

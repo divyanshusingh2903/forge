@@ -2,9 +2,14 @@ import { Show, startTransition, Suspense, type ParentProps } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createMediaQuery } from "@solid-primitives/media"
 import { ResizeHandle } from "@opencode/ui/resize-handle"
+import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
+import { Tooltip } from "@opencode/ui/tooltip"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { prefersReducedMotion } from "@opencode/ui/motion"
 import { Titlebar } from "@/shell/titlebar/titlebar"
+import { ProjectRail } from "@/shell/project-rail/rail"
+import { useProjectRail } from "@/shell/project-rail/state"
 import { usePlatform } from "@/runtime/platform/platform"
 import { ToastRegion } from "@/shell/notifications/toast"
 import { UploadToastHost } from "@/composer/attachments/uploads"
@@ -49,16 +54,19 @@ export default function Layout(props: ParentProps) {
 
   const [state, setState] = createStore<{
     tabsWidth: number
+    railWidth: number
     tabsMount: HTMLElement | undefined
     tabsAside: HTMLElement | undefined
     tabsPanel: HTMLElement | undefined
   }>({
     tabsWidth: 276,
+    railWidth: 248,
     tabsMount: undefined,
     tabsAside: undefined,
     tabsPanel: undefined,
   })
 
+  const rail = useProjectRail()
   const verticalTabs = () => preferences.appearance.tabLayout() !== "horizontal" && !mobile()
 
   const toggleSidebar = () => preferences.appearance.setSidebarOpen(!preferences.appearance.sidebarOpen())
@@ -150,7 +158,7 @@ export default function Layout(props: ParentProps) {
   })
 
   command.register("sidebar", () =>
-    verticalTabs()
+    verticalTabs() || rail.available()
       ? [
           {
             ...sidebarToggleCommand,
@@ -285,6 +293,37 @@ export default function Layout(props: ParentProps) {
               />
             </Show>
           </aside>
+        </Show>
+        <Show when={rail.visible()}>
+          <aside
+            data-slot="project-rail"
+            class="relative z-10 h-full min-h-0 shrink-0 pb-[var(--shell-bottom-inset,8px)] ps-[var(--shell-inline-inset,8px)] pt-[var(--shell-top-inset,8px)]"
+            style={{ width: `${state.railWidth}px` }}
+          >
+            <ProjectRail onHide={rail.toggle} />
+            <ResizeHandle
+              class="-end-1"
+              direction="horizontal"
+              size={state.railWidth}
+              min={200}
+              max={420}
+              onResize={(width) => setState("railWidth", width)}
+            />
+          </aside>
+        </Show>
+        <Show when={rail.available() && !preferences.appearance.sidebarOpen()}>
+          <div class="absolute start-[calc(var(--shell-inline-inset,8px)+10px)] top-[calc(var(--shell-top-inset,8px)+10px)] z-20">
+            <Tooltip placement="bottom" value={language.t("sidebar.rail.show")}>
+              <IconButton
+                data-action="project-rail-show"
+                variant="ghost-muted"
+                size="large"
+                icon={<Icon name="layout-left" />}
+                aria-label={language.t("sidebar.rail.show")}
+                onClick={rail.toggle}
+              />
+            </Tooltip>
+          </div>
         </Show>
         {/* Size containment collapses percentage-height descendants in WebKit. */}
         <main

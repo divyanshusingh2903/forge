@@ -57,3 +57,21 @@
     mask-image: linear-gradient(to left, black 0, black calc(100% - 44px), transparent calc(100% - 36px));
   }
 }
+
+/* The sidebar sits on the shell's deeper surface, so its rows rest on that rather than the Home panel's. */
+[data-slot="project-rail"] [data-home-row] {
+  --home-row-surface: var(--v2-background-bg-deep);
+  --home-row-background: color-mix(
+    in srgb,
+    var(--home-row-surface) var(--home-row-opacity, 100%),
+    var(--v2-background-bg-deep)
+  );
+}
+
+[data-slot="project-rail"] [data-home-row]:is(:hover, :focus-within, :has([data-menu="true"])) {
+  --home-row-surface: var(--v2-background-bg-layer-01);
+}
+
+[data-slot="project-rail"] [data-home-row][data-selected] {
+  --home-row-surface: var(--v2-background-bg-layer-03);
+}

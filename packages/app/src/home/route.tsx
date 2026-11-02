@@ -9,9 +9,12 @@ import { createHomeScrollController } from "./scroll"
 import { createHomeSessionSearchController } from "./sessions/search"
 import { createHomeSessionsController } from "./sessions/controller"
 import { HomeSessions } from "./sessions/region"
+import { useProjectRail } from "@/shell/project-rail/state"
 
 export function Home() {
   const mobile = createMediaQuery("(max-width: 767px)")
+  // With the sidebar showing, it carries the projects and Settings/Help, so Home keeps only the sessions.
+  const rail = useProjectRail()
   const home = createHomeController()
   const projects = createHomeProjectsController(home)
   const sessions = createHomeSessionsController(home)
@@ -41,23 +44,26 @@ export function Home() {
         <div
           class={`
             mx-auto grid min-h-full w-full max-w-[1080px] grid-rows-[auto_minmax(0,1fr)] gap-4 px-3
-            max-md:grid-rows-[minmax(0,1fr)] lg:grid-cols-[280px_minmax(0,720px)] lg:grid-rows-1 lg:gap-8 lg:px-6
+            max-md:grid-rows-[minmax(0,1fr)] lg:grid-rows-1 lg:gap-8 lg:px-6
+            ${rail.visible() ? "lg:grid-cols-[minmax(0,720px)]" : "lg:grid-cols-[280px_minmax(0,720px)]"}
           `}
         >
-          <Show when={!mobile()}>
+          <Show when={!mobile() && !rail.visible()}>
             <HomeProjects projects={projects} scroll={scroll} />
           </Show>
           <HomeSessions sessions={sessions} search={search} scroll={scroll} />
         </div>
       </ScrollView>
-      <div class="hidden shrink-0 px-3 py-2 md:block lg:hidden">
-        <HomeUtilityNav
-          class="flex"
-          onOpenSettings={projects.utility.settings}
-          onOpenHelp={projects.utility.help}
-          language={projects.copy.language}
-        />
-      </div>
+      <Show when={!rail.visible()}>
+        <div class="hidden shrink-0 px-3 py-2 md:block lg:hidden">
+          <HomeUtilityNav
+            class="flex"
+            onOpenSettings={projects.utility.settings}
+            onOpenHelp={projects.utility.help}
+            language={projects.copy.language}
+          />
+        </div>
+      </Show>
     </div>
   )
 }

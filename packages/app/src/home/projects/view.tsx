@@ -70,6 +70,15 @@ export type HomeProjectsViewProps = {
   onHideProject: (server: ServerConnection.Any, project: LocalProject) => void
   onOpenSettings: () => void
   onOpenHelp: () => void
+  /** The persistent sidebar: no page grid, nested session lists, and a place for pinned sessions. */
+  rail?: boolean
+  railActions?: () => JSX.Element
+  pinnedSection?: () => JSX.Element
+  projectSessions?: (server: ServerConnection.Any, project: LocalProject) => JSX.Element
+  sessionsOpen?: (server: ServerConnection.Any, project: LocalProject) => boolean
+  onToggleSessions?: (server: ServerConnection.Any, project: LocalProject) => void
+  /** The sidebar marks the selected project only while no session is on screen. */
+  projectHighlight?: () => boolean
 }
 
 export function HomeProjectsView(props: HomeProjectsViewProps) {
@@ -172,7 +181,9 @@ function HomeProjectsPanel(props: HomeProjectsViewProps) {
       class={
         props.dropdown
           ? "flex max-h-[min(60dvh,calc(var(--kb-popper-content-available-height)-12px))] min-h-0 min-w-0 flex-col overflow-hidden"
-          : `
+          : props.rail
+            ? "flex h-full min-h-0 min-w-0 flex-col gap-2 overflow-hidden pt-2"
+            : `
         mt-2.5 flex min-h-0 min-w-0 flex-col gap-4 overflow-hidden
         lg:sticky lg:top-14 lg:mt-14 lg:h-[calc(100cqh-56px)] lg:self-start lg:pt-[52px]
       `
@@ -189,9 +200,12 @@ function HomeProjectsPanel(props: HomeProjectsViewProps) {
               edge (the shell's 8px inset plus the grid's 12px padding) keeps the row's 6px padding after the toggle,
               which lines the label up with the icons that follow it in the session and settings headers. */}
           <div class="flex min-w-0 items-center">
-            <CollapsedSidebarToggleSpace start={20} class="lg:hidden" />
+            <Show when={!props.rail}>
+              <CollapsedSidebarToggleSpace start={20} class="lg:hidden" />
+            </Show>
             <div class="text-v2-text-text-muted [font-weight:530]">{props.language.t("home.projects")}</div>
           </div>
+          <div class="flex items-center">
           <Show when={props.servers.length === 1}>
             <Tooltip placement="bottom" value={props.language.t("home.project.add")}>
               <IconButton
@@ -206,8 +220,11 @@ function HomeProjectsPanel(props: HomeProjectsViewProps) {
               />
             </Tooltip>
           </Show>
+          {props.railActions?.()}
+          </div>
         </div>
       </Show>
+      {props.pinnedSection?.()}
       <div data-slot="home-projects-scroll" class="flex min-h-0 min-w-0 shrink flex-col">
         <div
           data-slot="home-projects-viewport"
@@ -317,7 +334,7 @@ function HomeProjectsPanel(props: HomeProjectsViewProps) {
         </div>
       </div>
       <HomeUtilityNav
-        class="mb-8 mt-4 hidden shrink-0 lg:flex"
+        class={props.rail ? "mb-2 mt-1 flex shrink-0" : "mb-8 mt-4 hidden shrink-0 lg:flex"}
         onOpenSettings={props.onOpenSettings}
         onOpenHelp={props.onOpenHelp}
         language={props.language}
@@ -556,15 +573,20 @@ function HomeProjectSlot(props: HomeProjectListProps & { worktree: string }) {
   )
 
   return (
-    <HomeProjectRow
-      {...props}
-      project={project()}
-      server={props.server}
-      selected={
-        props.selection.server === ServerConnection.key(props.server) && props.selection.directory === props.worktree
-      }
-      unread={props.hasUnread(props.server, project())}
-    />
+    <div class="flex min-w-0 flex-col gap-0.5">
+      <HomeProjectRow
+        {...props}
+        project={project()}
+        server={props.server}
+        selected={
+          (!props.rail || !!props.projectHighlight?.()) &&
+          props.selection.server === ServerConnection.key(props.server) &&
+          props.selection.directory === props.worktree
+        }
+        unread={props.hasUnread(props.server, project())}
+      />
+      <Show when={props.sessionsOpen?.(props.server, project())}>{props.projectSessions?.(props.server, project())}</Show>
+    </div>
   )
 }
 
@@ -615,10 +637,31 @@ function HomeProjectRow(
         props.onSetContextMenuOpen(contextMenuID(), true)
       }}
     >
+      <Show when={props.onToggleSessions}>
+        <button
+          type="button"
+          data-action="sidebar-project-sessions-toggle"
+          class="absolute left-0 top-0 z-10 flex h-7 w-7 cursor-default items-center justify-center rounded-[6px] bg-transparent text-v2-icon-icon-muted hover:text-v2-icon-icon-base focus-visible:outline-none"
+          aria-label={props.language.t(
+            props.sessionsOpen?.(props.server, props.project)
+              ? "sidebar.rail.sessions.hide"
+              : "sidebar.rail.sessions.show",
+          )}
+          aria-expanded={props.sessionsOpen?.(props.server, props.project)}
+          onClick={() => props.onToggleSessions?.(props.server, props.project)}
+        >
+          <Icon
+            name="chevron-down"
+            class="transition-transform duration-150 ease-in-out"
+            style={{ transform: `rotate(${props.sessionsOpen?.(props.server, props.project) ? 0 : -90}deg)` }}
+          />
+        </button>
+      </Show>
       <HomeProjectNavButton
         type="button"
         data-component="home-project-row"
         class="disabled:opacity-60"
+        style={props.onToggleSessions ? { "padding-inline-start": "28px" } : undefined}
         data-selected={props.selected ? "" : undefined}
         aria-current={props.selected ? "page" : undefined}
         disabled={serverUnreachable()}
@@ -722,7 +765,7 @@ function HomeProjectNavButton(props: JSX.ButtonHTMLAttributes<HTMLButtonElement>
   )
 }
 
-function HomeProjectAvatar(props: { project: LocalProject; outline?: boolean }) {
+export function HomeProjectAvatar(props: { project: LocalProject; outline?: boolean }) {
   const name = createMemo(() => displayName(props.project))
 
   return (

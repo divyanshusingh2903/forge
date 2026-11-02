@@ -86,6 +86,29 @@ export function createHomeSessionsController(home: HomeController) {
   )
 
   const records = createMemo(() => allRecords().slice(0, HOME_SESSION_LIMIT))
+
+  // The sidebar lists sessions under every project of the focused server, whatever Home has selected.
+  const sidebarRecords = createMemo(() =>
+    buildHomeSessionRecords({
+      sessions: indexedSessions,
+      projectDirectories: () => undefined,
+      projects: home.project.list,
+      resolveProject: (session) => home.server.focusedContext()?.projects.forSession(session),
+    }),
+  )
+  const sidebarByProject = createMemo(() => {
+    const map = new Map<string, HomeSessionRecord[]>()
+
+    for (const record of sidebarRecords()) {
+      const key = pathKey(record.project.worktree)
+      const list = map.get(key)
+
+      if (list) list.push(record)
+      else map.set(key, [record])
+    }
+
+    return map
+  })
   const groups = createMemo(() => groupSessions(records(), language))
   const prefetched = new Set<string>()
 
@@ -300,6 +323,10 @@ export function createHomeSessionsController(home: HomeController) {
       groups,
       loading: () => sessionLoad.isPending,
       searchRecords: allRecords,
+      sidebar: {
+        forProject: (worktree: string) => sidebarByProject().get(pathKey(worktree)) ?? [],
+        find: (id: string) => sidebarRecords().find((record) => record.session.id === id),
+      },
     },
     platform: {
       desktop: platform.platform === "desktop",
