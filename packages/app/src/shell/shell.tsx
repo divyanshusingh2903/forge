@@ -58,12 +58,16 @@ export default function Layout(props: ParentProps) {
     tabsMount: HTMLElement | undefined
     tabsAside: HTMLElement | undefined
     tabsPanel: HTMLElement | undefined
+    railAside: HTMLElement | undefined
+    railPanel: HTMLElement | undefined
   }>({
     tabsWidth: 276,
     railWidth: 248,
     tabsMount: undefined,
     tabsAside: undefined,
     tabsPanel: undefined,
+    railAside: undefined,
+    railPanel: undefined,
   })
 
   const rail = useProjectRail()
@@ -146,6 +150,26 @@ export default function Layout(props: ParentProps) {
       paintSidebarContents()
     },
     whenDocked: sidebarMotion.whenSettled,
+  })
+
+  let railSheet: HTMLDivElement | undefined
+
+  // The hidden Projects rail peeks from the window's edge or its show button, and docks from its own header button.
+  // It has no docking flight, so the peek hands off at once.
+  const railPeek = createSidebarPeek({
+    available: () => rail.available() && !rail.open(),
+    open: () => rail.available() && rail.open(),
+    aside: () => state.railAside,
+    panel: () => state.railPanel,
+    controls: "project-rail",
+    paint: (shown) => {
+      if (!railSheet) return
+      const rtl = document.documentElement.dir === "rtl"
+      railSheet.style.transform =
+        shown === undefined || shown === 1 ? "" : `translateX(${(rtl ? 100 : -100) * (1 - shown)}%)`
+      railSheet.style.opacity = shown === undefined ? "" : panelOpacity(1 - shown)
+    },
+    whenDocked: (run) => run(),
   })
 
   guardClosingFocus({
@@ -295,21 +319,49 @@ export default function Layout(props: ParentProps) {
             </Show>
           </aside>
         </Show>
-        <Show when={rail.visible()}>
+        <Show when={rail.available()}>
+          {/* Zero wide while hidden, so a peek floats the rail over the content without moving the layout. */}
           <aside
+            id="project-rail"
             data-slot="project-rail"
-            class="relative z-10 h-full min-h-0 shrink-0 pb-[var(--shell-bottom-inset,8px)] ps-[var(--shell-inline-inset,8px)] pt-[var(--shell-top-inset,8px)]"
-            style={{ width: `${state.railWidth}px` }}
+            data-peek={railPeek.shown() ? "" : undefined}
+            ref={(element) => setState("railAside", element)}
+            class="relative z-30 h-full min-h-0 shrink-0"
+            style={{ width: rail.open() ? `${state.railWidth}px` : "0px" }}
           >
-            <ProjectRail onHide={rail.toggle} />
-            <ResizeHandle
-              class="-end-1"
-              direction="horizontal"
-              size={state.railWidth}
-              min={200}
-              max={420}
-              onResize={(width) => setState("railWidth", width)}
-            />
+            {/* Skipped rather than unmounted while hidden: a peek measures the panel before it shows it. */}
+            {/* The panel holds still, so the peek can measure it, while the sheet inside it slides. */}
+            <div
+              ref={(element) => setState("railPanel", element)}
+              data-slot="project-rail-panel"
+              class="absolute inset-y-0 start-0"
+              classList={{ "[content-visibility:hidden]": !rail.open() && !railPeek.shown() }}
+              style={{ width: `${state.railWidth}px` }}
+            >
+              <div
+                ref={railSheet}
+                data-slot="project-rail-sheet"
+                class="absolute inset-0 flex min-h-0 flex-col pb-[var(--shell-bottom-inset,8px)] ps-[var(--shell-inline-inset,8px)] pt-[var(--shell-top-inset,8px)]"
+                classList={{
+                  "bg-v2-background-bg-deep pe-2 shadow-[var(--v2-elevation-floating)]": railPeek.shown(),
+                }}
+              >
+                <ProjectRail
+                  peeking={railPeek.shown()}
+                  onHide={() => preferences.appearance.setProjectRailOpen(!rail.open())}
+                />
+              </div>
+            </div>
+            <Show when={rail.open()}>
+              <ResizeHandle
+                class="-end-1"
+                direction="horizontal"
+                size={state.railWidth}
+                min={200}
+                max={420}
+                onResize={(width) => setState("railWidth", width)}
+              />
+            </Show>
           </aside>
         </Show>
         <Show when={rail.available() && !rail.open()}>
@@ -317,6 +369,7 @@ export default function Layout(props: ParentProps) {
             <Tooltip placement="bottom" value={language.t("sidebar.rail.show")}>
               <IconButton
                 data-action="project-rail-show"
+                aria-controls="project-rail"
                 variant="ghost-muted"
                 size="large"
                 icon={<Icon name="layout-left" />}

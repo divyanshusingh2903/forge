@@ -15,8 +15,6 @@ const dwell = { edge: 40, toggle: 500 }
 /** Whether any session in the vertical sidebar draws its unread dot, published by the sidebar's tab strip. */
 export const [sidebarUnread, setSidebarUnread] = createSignal(false)
 
-const toggles = 'button[aria-controls="vertical-tabs-sidebar"]'
-
 const menus = '[data-component="menu-v2-content"], [role="menu"]'
 
 // A drag in progress, or a dialog over the app, which no peek should open under.
@@ -66,7 +64,10 @@ export function createSidebarPeek(input: {
   paint: (shown: number | undefined) => void
   /** Runs `run` once the docked sidebar's flight lands. */
   whenDocked: (run: () => void) => void
+  /** The id the sidebar's toggles name in `aria-controls`; resting on one outside the sidebar peeks it. */
+  controls?: string
 }) {
+  const toggles = `button[aria-controls="${input.controls ?? "vertical-tabs-sidebar"}"]`
   const [shown, setShown] = createSignal(false)
   // Percent shown, so the spring's rest threshold stays well under a pixel.
   const motion = new Spring(0)

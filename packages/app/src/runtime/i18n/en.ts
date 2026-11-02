@@ -759,6 +759,7 @@ export const dict = {
   "sidebar.rail.label": "Projects sidebar",
   "sidebar.rail.hide": "Hide sidebar",
   "sidebar.rail.show": "Show sidebar",
+  "sidebar.rail.dock": "Keep sidebar open",
   "sidebar.rail.pinned": "Pinned",
   "sidebar.rail.pin": "Pin session",
   "sidebar.rail.unpin": "Unpin session",

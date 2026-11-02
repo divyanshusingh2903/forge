@@ -23,7 +23,7 @@ const ProjectRailSchema = Schema.Struct({
 const SESSIONS_PER_PROJECT = 8
 
 /** The persistent Projects sidebar: projects with their sessions underneath, and pinned sessions on top. */
-export function ProjectRail(props: { onHide: () => void }) {
+export function ProjectRail(props: { onHide: () => void; peeking?: boolean }) {
   const language = useLanguage()
   const home = createHomeController()
   const projects = createHomeProjectsController(home)
@@ -58,15 +58,16 @@ export function ProjectRail(props: { onHide: () => void }) {
       rail={{
         rail: true,
         projectHighlight: () => route().type !== "session",
+        // While the rail floats over the content, its header button keeps it open instead of hiding it.
         railActions: () => (
-          <Tooltip placement="bottom" value={language.t("sidebar.rail.hide")}>
+          <Tooltip placement="bottom" value={language.t(props.peeking ? "sidebar.rail.dock" : "sidebar.rail.hide")}>
             <IconButton
-              data-action="project-rail-hide"
+              data-action={props.peeking ? "project-rail-dock" : "project-rail-hide"}
               variant="ghost-muted"
               size="large"
               class="titlebar-icon [&_[data-slot=icon-svg]]:text-v2-icon-icon-muted"
               icon={<Icon name="layout-left" />}
-              aria-label={language.t("sidebar.rail.hide")}
+              aria-label={language.t(props.peeking ? "sidebar.rail.dock" : "sidebar.rail.hide")}
               onClick={props.onHide}
             />
           </Tooltip>
