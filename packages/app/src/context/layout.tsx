@@ -82,6 +82,7 @@ type SessionView = {
   todoCollapsed?: boolean
   browserTabs?: BrowserTab[]
   browserActiveTab?: string
+  browserOpened?: boolean
 }
 
 type TabHandoff = {
@@ -835,7 +836,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         const terminalOpened = createMemo(() => store.terminal?.opened ?? false)
         const reviewPanelOpened = createMemo(() => store.review?.panelOpened ?? DEFAULT_REVIEW_PANEL_OPENED)
         const reviewPanelSource = createMemo(() => (reviewPanelOpened() ? ephemeral.reviewPanelSource : "other"))
-        const browserPanelOpened = createMemo(() => store.browser?.panelOpened ?? false)
+        const browserPanelOpened = createMemo(() => Boolean(s().browserOpened))
         const browserTabs = createMemo<BrowserTab[]>(() => {
           const list = s().browserTabs
           if (list && list.length > 0) return list
@@ -876,13 +877,13 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         }
 
         function setBrowserPanelOpened(next: boolean) {
-          const current = store.browser
-          if (!current) {
-            setStore("browser", { panelOpened: next })
-            return
+          const session = key()
+          if (!store.sessionView[session]) {
+            setStore("sessionView", session, { scroll: {}, browserOpened: next })
+          } else {
+            setStore("sessionView", session, "browserOpened", next)
           }
-          if ((current.panelOpened ?? false) === next) return
-          setStore("browser", "panelOpened", next)
+          prune(session)
         }
 
         function setReviewPanelOpened(next: boolean, source: ReviewPanelSource) {

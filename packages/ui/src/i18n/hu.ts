@@ -142,6 +142,8 @@ export const dict: Record<string, string> = {
   "ui.tool.task": "Feladat",
   "ui.tool.browser.navigate": "Navigálás",
   "ui.tool.browser.read": "Oldal olvasása",
+  "ui.tool.browser.screenshot": "Képernyőkép",
+  "ui.tool.browser.act": "Interakció",
   "ui.tool.browser.source.live": "élő",
   "ui.tool.browser.source.fetched": "letöltve",
   "ui.tool.webfetch": "Webfetch",

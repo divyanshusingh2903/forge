@@ -139,6 +139,8 @@ export const dict: Record<string, string> = {
   "ui.tool.task": "ተግባር",
   "ui.tool.browser.navigate": "ሂድ",
   "ui.tool.browser.read": "ገጽ አንብብ",
+  "ui.tool.browser.screenshot": "Screenshot",
+  "ui.tool.browser.act": "መስተጋብር",
   "ui.tool.browser.source.live": "ቀጥታ",
   "ui.tool.browser.source.fetched": "የመጣ",
   "ui.tool.webfetch": "Webfetch",

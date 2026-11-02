@@ -141,6 +141,7 @@ const layer = Layer.effect(
           bash: "ask",
           edit: "ask",
           browser: "ask",
+          browser_act: "ask",
           doom_loop: "ask",
           external_directory: {
             "*": "ask",
@@ -185,6 +186,7 @@ const layer = Layer.effect(
               Permission.fromConfig({
                 question: "allow",
                 present_plan: "allow",
+                browser_act: "deny",
                 task: {
                   general: "deny",
                 },
@@ -231,6 +233,7 @@ const layer = Layer.effect(
                 webfetch: "allow",
                 websearch: "allow",
                 browser: "ask",
+                browser_act: "deny",
                 read: "allow",
                 external_directory: readonlyExternalDirectory,
               }),

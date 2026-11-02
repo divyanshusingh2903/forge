@@ -681,10 +681,30 @@ export type SessionBrowserNavigateCommand = {
 
 export type SessionBrowserReadCommand = {
   type: "read"
-  format: "markdown" | "text" | "html"
+  format: "markdown" | "text" | "html" | "interactive"
 }
 
-export type SessionBrowserCommand = SessionBrowserNavigateCommand | SessionBrowserReadCommand
+export type SessionBrowserScreenshotCommand = {
+  type: "screenshot"
+  ref?: string
+  fullPage?: boolean
+}
+
+export type SessionBrowserActCommand = {
+  type: "act"
+  action: "click" | "type" | "fill" | "select" | "press" | "scroll" | "hover"
+  ref?: string
+  text?: string
+  value?: string
+  key?: string
+  direction?: "up" | "down" | "left" | "right"
+}
+
+export type SessionBrowserCommand =
+  | SessionBrowserNavigateCommand
+  | SessionBrowserReadCommand
+  | SessionBrowserScreenshotCommand
+  | SessionBrowserActCommand
 
 export type SessionStatus =
   | {
@@ -1712,6 +1732,7 @@ export type PermissionConfig =
       webfetch?: PermissionActionConfig
       websearch?: PermissionActionConfig
       browser?: PermissionRuleConfig
+      browser_act?: PermissionRuleConfig
       lsp?: PermissionRuleConfig
       doom_loop?: PermissionActionConfig
       skill?: PermissionRuleConfig
@@ -10756,6 +10777,8 @@ export type SessionBrowserResultData = {
     title?: string
     html?: string
     text?: string
+    image?: string
+    mime?: string
   }
   path: {
     sessionID: string

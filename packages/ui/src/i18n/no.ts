@@ -127,6 +127,8 @@ export const dict: Record<Keys, string> = {
   "ui.tool.grep": "Grep",
   "ui.tool.browser.navigate": "Naviger",
   "ui.tool.browser.read": "Les side",
+  "ui.tool.browser.screenshot": "Skjermbilde",
+  "ui.tool.browser.act": "Samhandle",
   "ui.tool.browser.source.live": "live",
   "ui.tool.browser.source.fetched": "hentet",
   "ui.tool.webfetch": "Webhenting",

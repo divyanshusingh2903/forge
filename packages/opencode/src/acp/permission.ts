@@ -145,7 +145,11 @@ function permissionTitle(toolName: string, input: ToolInput) {
     case "webfetch":
     case "browser_navigate":
     case "browser_read":
+    case "browser_screenshot":
       return stringValue(input.url)
+
+    case "browser_act":
+      return [stringValue(input.action), stringValue(input.ref)].filter(Boolean).join(" ") || undefined
 
     case "websearch":
       return stringValue(input.query)

@@ -118,7 +118,11 @@ const layer = Layer.effect(
     })
 
     const resolve = Effect.fn("Browser.resolve")(function* (sessionID: SessionID, input: ResultInput) {
-      if (byteLength(input.html) > MAX_CONTENT_BYTES || byteLength(input.text) > MAX_CONTENT_BYTES) {
+      if (
+        byteLength(input.html) > MAX_CONTENT_BYTES ||
+        byteLength(input.text) > MAX_CONTENT_BYTES ||
+        byteLength(input.image) > MAX_CONTENT_BYTES
+      ) {
         return yield* new PayloadTooLargeError({ message: "Browser page content exceeds 5MB limit" })
       }
       const waiter = sessions.get(sessionID)?.waiters.get(input.requestID)

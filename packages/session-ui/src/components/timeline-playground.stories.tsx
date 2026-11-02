@@ -479,7 +479,42 @@ const TOOL_SAMPLES = {
       source: "live",
     },
   },
-
+  browser_screenshot: {
+    tool: "browser_screenshot",
+    input: {},
+    output: 'Captured screenshot of "Local Dev Dashboard" (http://localhost:3000/dashboard)',
+    title: "Local Dev Dashboard",
+    metadata: {
+      url: "http://localhost:3000/dashboard",
+      title: "Local Dev Dashboard",
+      tabID: "tab-1",
+    },
+    attachments: [
+      {
+        type: "file",
+        mime: "image/svg+xml",
+        url: "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='400' height='200'><rect width='400' height='200' fill='%23222'/><text x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23fff' font-family='sans-serif' font-size='18'>Browser Screenshot</text></svg>",
+      },
+    ],
+  },
+  browser_act: {
+    tool: "browser_act",
+    input: { action: "click", ref: "e3" },
+    output: [
+      "Action: click e3",
+      "URL: http://localhost:3000/dashboard",
+      "Title: Local Dev Dashboard",
+      "Tab: tab-1",
+    ].join("\n"),
+    title: "click e3",
+    metadata: {
+      action: "click",
+      ref: "e3",
+      url: "http://localhost:3000/dashboard",
+      title: "Local Dev Dashboard",
+      tabID: "tab-1",
+      navigated: false,
+    },
   },
   websearch: {
     tool: "websearch",
@@ -1892,7 +1927,7 @@ function Playground() {
                 Never completes, so the activity indicator keeps animating
               </div>
               <div style={{ display: "flex", "flex-wrap": "wrap", gap: "4px" }}>
-                <For each={["bash", "edit", "browser_navigate", "browser_read", "webfetch", "websearch"] as const}>
+                <For each={["bash", "edit", "browser_navigate", "browser_read", "browser_screenshot", "browser_act", "webfetch", "websearch"] as const}>
                   {(key) => (
                     <button style={btnStyle} onClick={() => addTool(key, "running")}>
                       {key}

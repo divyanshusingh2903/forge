@@ -24,6 +24,7 @@ const AVAILABLE_PERMISSIONS = [
   "grep",
   "webfetch",
   "browser",
+  "browser_act",
   "task",
   "todowrite",
   "websearch",

@@ -520,6 +520,20 @@ export function getToolInfo(
         title: i18n.t("ui.tool.browser.read"),
         subtitle: (typeof metadata?.title === "string" && metadata.title) || (typeof metadata?.url === "string" ? metadata.url : undefined),
       }
+    case "browser_screenshot":
+      return {
+        icon: "browser",
+        title: i18n.t("ui.tool.browser.screenshot"),
+        subtitle: (typeof metadata?.title === "string" && metadata.title) || (typeof metadata?.url === "string" ? metadata.url : undefined),
+      }
+    case "browser_act":
+      return {
+        icon: "browser",
+        title: i18n.t("ui.tool.browser.act"),
+        subtitle:
+          [input.action, input.ref].filter((item) => typeof item === "string" && item).join(" ") ||
+          (typeof metadata?.url === "string" ? metadata.url : undefined),
+      }
     case "webfetch":
       return {
         icon: "window-cursor",
@@ -2069,6 +2083,67 @@ ToolRegistry.register({
         }
       >
         <Show when={props.output?.trim()}>
+          <ToolResponse output={props.output} />
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "browser_screenshot",
+  render(props) {
+    const i18n = useI18n()
+    const dialog = useDialog()
+    const pending = createMemo(() => props.status === "pending" || props.status === "running")
+    const url = createMemo(() => (typeof props.metadata.url === "string" ? props.metadata.url : ""))
+    const label = createMemo(() => (typeof props.metadata.title === "string" && props.metadata.title) || url())
+    const image = createMemo(() =>
+      props.attachments?.find((attachment) => attachment.mime?.startsWith("image/")),
+    )
+
+    const openPreview = (imgUrl: string) => {
+      dialog.show(() => <ImagePreview src={imgUrl} alt={label() || i18n.t("ui.tool.browser.screenshot")} />)
+    }
+
+    return (
+      <BasicTool
+        {...props}
+        hideDetails={props.hideDetails || (!pending() && !image() && !props.output?.trim())}
+        defaultOpen={props.defaultOpen ?? true}
+        icon="browser"
+        trigger={
+          <BrowserToolTrigger
+            title={i18n.t("ui.tool.browser.screenshot")}
+            pending={pending()}
+            url={url()}
+            label={label()}
+          />
+        }
+      >
+        <Show when={image()}>
+          {(attachment) => (
+            <div data-component="browser-screenshot-preview">
+              <button
+                type="button"
+                data-slot="browser-screenshot-button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openPreview(attachment().url)
+                }}
+                aria-label={label() || i18n.t("ui.tool.browser.screenshot")}
+              >
+                <img
+                  src={attachment().url}
+                  alt={label() || i18n.t("ui.tool.browser.screenshot")}
+                  data-slot="browser-screenshot-image"
+                  loading="lazy"
+                />
+              </button>
+            </div>
+          )}
+        </Show>
+        <Show when={!image() && props.output?.trim()}>
           <ToolResponse output={props.output} />
         </Show>
       </BasicTool>

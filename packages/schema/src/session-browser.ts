@@ -30,7 +30,7 @@ export const AttachInput = Schema.Struct({
 }).annotate({ identifier: "SessionBrowserAttachInput" })
 export type AttachInput = Schema.Schema.Type<typeof AttachInput>
 
-export const ReadFormat = Schema.Literals(["markdown", "text", "html"])
+export const ReadFormat = Schema.Literals(["markdown", "text", "html", "interactive"])
 export type ReadFormat = Schema.Schema.Type<typeof ReadFormat>
 
 export const NavigateAction = Schema.Literals(["goto", "back", "forward", "reload"])
@@ -48,10 +48,35 @@ export const ReadCommand = Schema.Struct({
   format: ReadFormat,
 }).annotate({ identifier: "SessionBrowserReadCommand" })
 
-export const Command = Schema.Union([NavigateCommand, ReadCommand]).annotate({ identifier: "SessionBrowserCommand" })
+export const ScreenshotCommand = Schema.Struct({
+  type: Schema.Literal("screenshot"),
+  ref: Schema.optional(Schema.String),
+  fullPage: Schema.optional(Schema.Boolean),
+}).annotate({ identifier: "SessionBrowserScreenshotCommand" })
+
+export const ActAction = Schema.Literals(["click", "type", "fill", "select", "press", "scroll", "hover"])
+export type ActAction = Schema.Schema.Type<typeof ActAction>
+
+export const ScrollDirection = Schema.Literals(["up", "down", "left", "right"])
+export type ScrollDirection = Schema.Schema.Type<typeof ScrollDirection>
+
+export const ActCommand = Schema.Struct({
+  type: Schema.Literal("act"),
+  action: ActAction,
+  ref: Schema.optional(Schema.String),
+  text: Schema.optional(Schema.String),
+  value: Schema.optional(Schema.String),
+  key: Schema.optional(Schema.String),
+  direction: Schema.optional(ScrollDirection),
+}).annotate({ identifier: "SessionBrowserActCommand" })
+
+export const Command = Schema.Union([NavigateCommand, ReadCommand, ScreenshotCommand, ActCommand]).annotate({
+  identifier: "SessionBrowserCommand",
+})
 export type Command = Schema.Schema.Type<typeof Command>
 
-// One flat result shape for every command keeps the reply route simple; `html`/`text` are only set by reads.
+// One flat result shape for every command keeps the reply route simple; `html`/`text` are only set by reads
+// (and `text` by actions and screenshots that report a detail) and `image`/`mime` are only set by screenshots.
 export const ResultInput = Schema.Struct({
   requestID: Schema.String,
   ok: Schema.Boolean,
@@ -61,6 +86,8 @@ export const ResultInput = Schema.Struct({
   title: Schema.optional(Schema.String),
   html: Schema.optional(Schema.String),
   text: Schema.optional(Schema.String),
+  image: Schema.optional(Schema.String),
+  mime: Schema.optional(Schema.String),
 }).annotate({ identifier: "SessionBrowserResultInput" })
 export type ResultInput = Schema.Schema.Type<typeof ResultInput>
 

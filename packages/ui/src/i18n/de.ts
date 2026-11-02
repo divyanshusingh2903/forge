@@ -134,6 +134,8 @@ export const dict = {
   "ui.tool.grep": "Grep",
   "ui.tool.browser.navigate": "Navigieren",
   "ui.tool.browser.read": "Seite lesen",
+  "ui.tool.browser.screenshot": "Screenshot",
+  "ui.tool.browser.act": "Interagieren",
   "ui.tool.browser.source.live": "live",
   "ui.tool.browser.source.fetched": "abgerufen",
   "ui.tool.webfetch": "Web-Abruf",

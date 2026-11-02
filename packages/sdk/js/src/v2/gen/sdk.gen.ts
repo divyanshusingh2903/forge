@@ -4549,6 +4549,8 @@ export class Session2 extends HeyApiClient {
       title?: string
       html?: string
       text?: string
+      image?: string
+      mime?: string
     },
     options?: Options<never, ThrowOnError>,
   ) {
@@ -4568,6 +4570,8 @@ export class Session2 extends HeyApiClient {
             { in: "body", key: "title" },
             { in: "body", key: "html" },
             { in: "body", key: "text" },
+            { in: "body", key: "image" },
+            { in: "body", key: "mime" },
           ],
         },
       ],

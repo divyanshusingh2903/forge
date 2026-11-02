@@ -164,6 +164,8 @@ export const dict: Record<string, string> = {
   "ui.tool.task": "Завдання",
   "ui.tool.browser.navigate": "Перейти",
   "ui.tool.browser.read": "Прочитати сторінку",
+  "ui.tool.browser.screenshot": "Знімок екрана",
+  "ui.tool.browser.act": "Взаємодія",
   "ui.tool.browser.source.live": "наживо",
   "ui.tool.browser.source.fetched": "отримано",
   "ui.tool.webfetch": "Веб-отримання",

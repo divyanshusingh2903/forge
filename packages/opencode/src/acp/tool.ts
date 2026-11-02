@@ -46,6 +46,7 @@ export function toToolKind(toolName: string): ToolKind {
     case "webfetch":
     case "browser_navigate":
     case "browser_read":
+    case "browser_screenshot":
       return "fetch"
 
     case "edit":
@@ -66,6 +67,9 @@ export function toToolKind(toolName: string): ToolKind {
 
     case "task":
       return "think"
+
+    case "browser_act":
+      return "other"
 
     default:
       return "other"

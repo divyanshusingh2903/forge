@@ -156,6 +156,10 @@ describe("Browser.Service", () => {
         browser.resolve(sessionID, { requestID: "req", ok: true, html: "x".repeat(Browser.MAX_CONTENT_BYTES + 1) }),
       )
       expect(Exit.isFailure(exit)).toBe(true)
+      const imageExit = yield* Effect.exit(
+        browser.resolve(sessionID, { requestID: "req", ok: true, image: "x".repeat(Browser.MAX_CONTENT_BYTES + 1) }),
+      )
+      expect(Exit.isFailure(imageExit)).toBe(true)
     }),
   )
 

@@ -3,10 +3,23 @@ import type { DesktopTheme } from "@opencode-ai/ui/theme/types"
 import oc2ThemeJson from "../../../ui/src/theme/themes/oc-2.json"
 import { randomUUID } from "node:crypto"
 import { rmSync } from "node:fs"
-import { app, BrowserWindow, dialog, net, nativeImage, nativeTheme, protocol, screen, session, shell } from "electron"
+import {
+  app,
+  BrowserWindow,
+  dialog,
+  net,
+  nativeImage,
+  nativeTheme,
+  protocol,
+  screen,
+  session,
+  shell,
+  webContents,
+} from "electron"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { TitlebarTheme } from "../preload/types"
+import { sendBrowserCdpCommand } from "./browser-debugger"
 import { exportDebugLogs, write as writeLog } from "./logging"
 import { getStore, removeStoreFile } from "./store"
 import { manageWindowState, readWindowState, resolveWindowState } from "./window-bounds"
@@ -27,6 +40,9 @@ const rendererPermissions = new Set([clipboardWritePermission, notificationPermi
 // The embedded session browser shares a single persistent partition across sessions
 // so cookies and logins stay signed in; users can clear it via the "Clear browser data" command.
 const browserPartition = "persist:forge-browser"
+const maxScreenshotDimension = 1920
+const maxScreenshotBytes = 5 * 1024 * 1024
+const screenshotJpegQuality = 80
 let browserPartitionConfigured = false
 const oc2Theme = oc2ThemeJson as DesktopTheme
 const oc2Background = {
@@ -130,8 +146,10 @@ export function setTitlebar(win: BrowserWindow, theme: Partial<TitlebarTheme> = 
   // Align it with the app theme so a light app on a dark system does not get
   // the dark-appearance border and shadow. A "system" scheme must map to
   // "system" (not the resolved mode) or prefers-color-scheme stops tracking
-  // OS appearance changes in the renderer.
-  if (process.platform === "darwin") nativeTheme.themeSource = theme.scheme ?? theme.mode ?? "system"
+  // OS appearance changes in the renderer. Browser panel pages also read
+  // prefers-color-scheme from nativeTheme, so sync it on every platform or a
+  // light app on a dark system renders dark pages over the panel's white canvas.
+  nativeTheme.themeSource = theme.scheme ?? theme.mode ?? "system"
   updateTitlebar(win)
 }
 
@@ -268,6 +286,52 @@ export function openLocalFileURL(value: string) {
 
 export async function clearBrowserStorageData() {
   await session.fromPartition(browserPartition).clearStorageData()
+}
+
+function requireBrowserGuest(host: Electron.WebContents, guestWebContentsId: number) {
+  const guest = webContents.fromId(guestWebContentsId)
+  if (!guest || guest.isDestroyed() || guest.hostWebContents?.id !== host.id) {
+    throw new Error("Browser tab is not available")
+  }
+  if (guest.session !== session.fromPartition(browserPartition)) {
+    throw new Error("Invalid browser tab session")
+  }
+  return guest
+}
+
+export async function sendBrowserTabCdpCommand(
+  host: Electron.WebContents,
+  guestWebContentsId: unknown,
+  method: unknown,
+  params: unknown,
+) {
+  if (typeof guestWebContentsId !== "number" || !Number.isInteger(guestWebContentsId)) {
+    throw new Error("Browser tab is not available")
+  }
+  return sendBrowserCdpCommand(requireBrowserGuest(host, guestWebContentsId).debugger, method, params)
+}
+
+export async function captureBrowserTab(host: Electron.WebContents, guestWebContentsId: number) {
+  const guest = requireBrowserGuest(host, guestWebContentsId)
+  const captured = await guest.capturePage()
+  const size = captured.getSize()
+  if (captured.isEmpty() || size.width === 0 || size.height === 0) {
+    throw new Error("Browser tab produced an empty screenshot")
+  }
+  const scale = Math.min(1, maxScreenshotDimension / size.width, maxScreenshotDimension / size.height)
+  const scaled =
+    scale < 1
+      ? captured.resize({
+          width: Math.max(1, Math.round(size.width * scale)),
+          height: Math.max(1, Math.round(size.height * scale)),
+          quality: "good",
+        })
+      : captured
+  const image = scaled.toJPEG(screenshotJpegQuality).toString("base64")
+  if (Buffer.byteLength(image, "utf8") > maxScreenshotBytes) {
+    throw new Error("Screenshot exceeds 5MB limit")
+  }
+  return { image, mime: "image/jpeg" as const }
 }
 
 function configureBrowserPartition() {

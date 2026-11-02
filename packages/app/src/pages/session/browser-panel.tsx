@@ -4,6 +4,7 @@ import type { SessionBrowserCommand } from "@opencode-ai/sdk/v2/client"
 import { Button } from "@opencode-ai/ui/button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
+import { Spinner } from "@opencode-ai/ui/spinner"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { useLanguage } from "@/context/language"
@@ -13,9 +14,12 @@ import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
 import { useSync } from "@/context/sync"
 import { useSessionLayout } from "@/pages/session/session-layout"
+import { captureScreenshot, runBrowserAction } from "./browser-actions"
+import { formatInteractiveElements } from "./browser-interactive"
 
 const LEASE_RENEW_INTERVAL_MS = 10_000
 const MAX_CONTENT_BYTES = 5 * 1024 * 1024
+const ACTION_SETTLE_MS = 250
 // Chromium reports a superseded navigation (redirect, new load) as a failed load with this code.
 const ERR_ABORTED = -3
 
@@ -30,6 +34,7 @@ type WebviewElement = HTMLElement & {
   canGoForward: () => boolean
   getURL: () => string
   getTitle: () => string
+  getWebContentsId: () => number
   executeJavaScript: <T>(code: string, userGesture?: boolean) => Promise<T>
 }
 
@@ -48,6 +53,8 @@ type BrowserResult = {
   title?: string
   html?: string
   text?: string
+  image?: string
+  mime?: string
 }
 
 export function normalizeBrowserUrl(raw: string): string | undefined {
@@ -87,7 +94,31 @@ function formatTabLabel(tab: BrowserTab, newTabLabel: string): string {
   return tab.url
 }
 
-export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
+export function resolveBrowserGotoTab(input: {
+  url: string
+  tabID?: string
+  newTab?: boolean
+  tabs: BrowserTab[]
+  activeTab?: BrowserTab
+  addTab: (url?: string) => string
+}): string {
+  const { url, tabID, newTab, tabs, activeTab, addTab } = input
+  if (tabID && tabs.some((tab) => tab.id === tabID)) return tabID
+  const candidatePool = activeTab ? [activeTab, ...tabs] : tabs
+  if (newTab) {
+    const empty = candidatePool.find((tab) => !tab.url)
+    return empty?.id ?? addTab("")
+  }
+  const exact = tabs.find((tab) => tab.url === url)
+  if (exact) return exact.id
+  const origin = URL.parse(url)?.origin
+  const sameOrigin =
+    candidatePool.find((tab) => tab.url && URL.parse(tab.url)?.origin === origin) ??
+    candidatePool.find((tab) => !tab.url)
+  return sameOrigin?.id ?? addTab("")
+}
+
+export function SessionBrowserPanel(props: { stacked?: boolean; resizing?: boolean } = {}) {
   const language = useLanguage()
   const platform = usePlatform()
   const sdk = useSDK()
@@ -121,6 +152,9 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
   const pendingTargetUrl = new Map<string, string>()
   const pendingNavigation = new Map<string, { requestID: string; sessionID: string }>()
   const idleWaiters = new Map<string, Array<() => void>>()
+  // Per tab: ref (e1, e2, …) → backend DOM node id from the last interactive read. Dropped when the page
+  // navigates, so a stale ref is never resolved against a different document.
+  const interactiveRefs = new Map<string, Map<string, number>>()
   let urlInputRef: HTMLInputElement | undefined
 
   const activeRuntime = createMemo(() => runtime[activeTabId()])
@@ -200,6 +234,23 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
       await whenIdle(tabId)
       const el = webviewRefs.get(tabId)
       if (!el) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not loaded` })
+      if (command.format === "interactive") {
+        if (!platform.sendBrowserCdpCommand) {
+          return reply(id, requestID, { ok: false, error: "Interactive reads are only supported in the desktop app" })
+        }
+        const webContentsId = el.getWebContentsId()
+        await platform.sendBrowserCdpCommand(webContentsId, "Accessibility.enable")
+        const tree = await platform.sendBrowserCdpCommand(webContentsId, "Accessibility.getFullAXTree")
+        const elements = formatInteractiveElements(tree)
+        interactiveRefs.set(tabId, elements.refs)
+        return reply(id, requestID, {
+          ok: true,
+          tabID: tabId,
+          url: el.getURL(),
+          title: el.getTitle() || undefined,
+          text: truncateToMaxBytes(elements.text),
+        })
+      }
       const page = await el.executeJavaScript<{ url: string; title: string; content: string }>(
         command.format === "text"
           ? `({ url: location.href, title: document.title, content: document.body ? document.body.innerText : "" })`
@@ -215,10 +266,82 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
       })
     }
 
+    if (command.type === "screenshot") {
+      const tabId = tabID ?? activeTabId()
+      if (!tabs().some((tab) => tab.id === tabId)) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not open` })
+      if (!platform.captureBrowserTab) return reply(id, requestID, { ok: false, error: "Screenshots are only supported in the desktop app" })
+      view().browser.setActiveTab(tabId)
+      await whenIdle(tabId)
+      const el = webviewRefs.get(tabId)
+      if (!el) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not loaded` })
+      if (command.ref || command.fullPage) {
+        const sendCdp = platform.sendBrowserCdpCommand
+        if (!sendCdp) {
+          return reply(id, requestID, { ok: false, error: "Element and full-page screenshots are only supported in the desktop app" })
+        }
+        const shot = await captureScreenshot(
+          (method, params) => sendCdp(el.getWebContentsId(), method, params),
+          { ref: command.ref, fullPage: command.fullPage },
+          interactiveRefs.get(tabId),
+        )
+        return reply(id, requestID, {
+          ok: true,
+          tabID: tabId,
+          url: el.getURL(),
+          title: el.getTitle() || undefined,
+          image: shot.image,
+          mime: shot.mime,
+          text: shot.detail,
+        })
+      }
+      const captured = await platform.captureBrowserTab(el.getWebContentsId())
+      return reply(id, requestID, {
+        ok: true,
+        tabID: tabId,
+        url: el.getURL(),
+        title: el.getTitle() || undefined,
+        image: captured.image,
+        mime: captured.mime,
+      })
+    }
+
+    if (command.type === "act") {
+      const tabId = tabID ?? activeTabId()
+      if (!tabs().some((tab) => tab.id === tabId)) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not open` })
+      const sendCdp = platform.sendBrowserCdpCommand
+      if (!sendCdp) return reply(id, requestID, { ok: false, error: "Browser actions are only supported in the desktop app" })
+      view().browser.setActiveTab(tabId)
+      await whenIdle(tabId)
+      const el = webviewRefs.get(tabId)
+      if (!el) return reply(id, requestID, { ok: false, error: `Tab "${tabId}" is not loaded` })
+      const detail = await runBrowserAction(
+        (method, params) => sendCdp(el.getWebContentsId(), method, params),
+        command,
+        interactiveRefs.get(tabId),
+      )
+      // Give a click that starts a navigation time to begin loading, then wait for the page to settle.
+      await new Promise((resolve) => setTimeout(resolve, ACTION_SETTLE_MS))
+      await whenIdle(tabId)
+      return reply(id, requestID, {
+        ok: true,
+        tabID: tabId,
+        url: el.getURL(),
+        title: el.getTitle() || undefined,
+        text: detail,
+      })
+    }
+
     if (command.action === "goto") {
       const url = command.url ? normalizeBrowserUrl(command.url) : undefined
       if (!url) return reply(id, requestID, { ok: false, error: "Invalid URL" })
-      const tabId = resolveGotoTab(url, tabID, command.newTab)
+      const tabId = resolveGotoTab({
+        url,
+        tabID,
+        newTab: command.newTab,
+        tabs: tabs(),
+        activeTab: activeTab(),
+        addTab,
+      })
       view().browser.setActiveTab(tabId)
       return navigateTab(tabId, url, { requestID, sessionID: id })
     }
@@ -239,18 +362,14 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
   }
 
   // Prefer a tab already on this URL or origin, then an empty tab, so the agent leaves unrelated tabs alone.
-  const resolveGotoTab = (url: string, tabID: string | undefined, newTab: boolean | undefined) => {
-    const open = tabs()
-    if (tabID && open.some((tab) => tab.id === tabID)) return tabID
-    if (newTab) return view().browser.addTab("")
-    const exact = open.find((tab) => tab.url === url)
-    if (exact) return exact.id
-    const origin = URL.parse(url)?.origin
-    const sameOrigin =
-      [activeTab(), ...open].find((tab) => tab.url && URL.parse(tab.url)?.origin === origin) ??
-      [activeTab(), ...open].find((tab) => !tab.url)
-    return sameOrigin?.id ?? view().browser.addTab("")
-  }
+  const resolveGotoTab = (input: {
+    url: string
+    tabID?: string
+    newTab?: boolean
+    tabs: BrowserTab[]
+    activeTab?: BrowserTab
+    addTab: (url?: string) => string
+  }) => resolveBrowserGotoTab(input)
 
   const whenIdle = (tabId: string) =>
     new Promise<void>((resolve) => {
@@ -302,9 +421,13 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
       if (!runtime[tabId]?.loading) flushIdle(tabId)
     }
 
-    const onStartLoading = () => setRuntime(tabId, "loading", true)
+    const onStartLoading = () => {
+      interactiveRefs.delete(tabId)
+      setRuntime(tabId, "loading", true)
+    }
 
     const onNavigate = (event: Event & { url?: string }) => {
+      if (event.type === "did-navigate") interactiveRefs.delete(tabId)
       if (isHttpUrl(event.url)) {
         view().browser.setUrl(event.url, tabId)
         if (tabId === activeTabId() && !inputFocused()) setInputValue(event.url)
@@ -367,6 +490,7 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
       if (request) void reply(request.sessionID, request.requestID, { ok: false, tabID: tabId, error: "The tab was closed" })
       pendingNavigation.delete(tabId)
       pendingTargetUrl.delete(tabId)
+      interactiveRefs.delete(tabId)
       // Release waiters; they find no webview and report the tab as not loaded.
       flushIdle(tabId)
       setRuntime(tabId, undefined)
@@ -380,8 +504,17 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
     navigateTab(activeTabId(), normalized)
   }
 
+  // Kobalte Tabs sees the new active ID before the new trigger registers and "repairs" the selection by
+  // calling onChange with the first tab, so ignore selection changes until the current update settles.
+  let addingTab = false
+  const addTab = () => {
+    addingTab = true
+    queueMicrotask(() => (addingTab = false))
+    return view().browser.addTab("")
+  }
+
   const handleAddTab = () => {
-    view().browser.addTab("")
+    addTab()
     setInputValue("")
     requestAnimationFrame(() => urlInputRef?.focus())
   }
@@ -412,36 +545,43 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
         <Tabs
           variant="normal"
           value={activeTabId()}
-          onChange={(id) => view().browser.setActiveTab(id)}
+          onChange={(id) => {
+            if (!addingTab) view().browser.setActiveTab(id)
+          }}
           class="flex-1 min-w-0 !h-10 !flex-none"
         >
           <Tabs.List class="h-10 overflow-x-auto no-scrollbar">
-            <For each={tabs()}>
-              {(tab) => (
-                <Tabs.Trigger
-                  value={tab.id}
-                  onMiddleClick={() => handleCloseTab(tab.id)}
-                  closeButton={
-                    <Tooltip value={language.t("browser.closeTab")} placement="bottom">
-                      <IconButton
-                        icon="close-small"
-                        variant="ghost"
-                        class="h-5 w-5"
-                        onClick={(event: MouseEvent) => {
-                          event.stopPropagation()
-                          handleCloseTab(tab.id)
-                        }}
-                        aria-label={language.t("browser.closeTab")}
-                      />
-                    </Tooltip>
-                  }
-                >
-                  <span class="flex items-center gap-1.5 max-w-40 truncate">
-                    <Icon name="browser" size="small" class="shrink-0 text-icon-weak" />
-                    <span class="truncate">{formatTabLabel(tab, language.t("browser.newTab"))}</span>
-                  </span>
-                </Tabs.Trigger>
-              )}
+            {/* Keyed by ID like the webviews: a recreated trigger briefly unregisters the selected tab and
+                Kobalte falls back to the first one. */}
+            <For each={tabIds()}>
+              {(tabId) => {
+                const tab = () => tabs().find((item) => item.id === tabId) ?? { id: tabId, url: "" }
+                return (
+                  <Tabs.Trigger
+                    value={tabId}
+                    onMiddleClick={() => handleCloseTab(tabId)}
+                    closeButton={
+                      <Tooltip value={language.t("browser.closeTab")} placement="bottom">
+                        <IconButton
+                          icon="close-small"
+                          variant="ghost"
+                          class="h-5 w-5"
+                          onClick={(event: MouseEvent) => {
+                            event.stopPropagation()
+                            handleCloseTab(tabId)
+                          }}
+                          aria-label={language.t("browser.closeTab")}
+                        />
+                      </Tooltip>
+                    }
+                  >
+                    <span class="flex items-center gap-1.5 max-w-40 truncate">
+                      <Icon name="browser" size="small" class="shrink-0 text-icon-weak" />
+                      <span class="truncate">{formatTabLabel(tab(), language.t("browser.newTab"))}</span>
+                    </span>
+                  </Tabs.Trigger>
+                )
+              }}
             </For>
             <Tooltip value={language.t("browser.newTab")} placement="bottom">
               <IconButton
@@ -489,14 +629,27 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
             />
           </Tooltip>
           <Tooltip value={language.t("browser.reload")} placement="bottom">
-            <IconButton
-              icon="reset"
-              variant="ghost"
-              class="h-6 w-6 shrink-0"
-              disabled={!storedUrl()}
-              onClick={() => activeWebview()?.reload()}
-              aria-label={language.t("browser.reload")}
-            />
+            <Show
+              when={loading()}
+              fallback={
+                <IconButton
+                  icon="reset"
+                  variant="ghost"
+                  class="h-6 w-6 shrink-0"
+                  disabled={!storedUrl()}
+                  onClick={() => activeWebview()?.reload()}
+                  aria-label={language.t("browser.reload")}
+                />
+              }
+            >
+              <div
+                class="h-6 w-6 shrink-0 flex items-center justify-center"
+                role="status"
+                aria-label={language.t("browser.reload")}
+              >
+                <Spinner class="size-3.5 text-icon-weak" />
+              </div>
+            </Show>
           </Tooltip>
         </Show>
 
@@ -567,9 +720,13 @@ export function SessionBrowserPanel(props: { stacked?: boolean } = {}) {
                   ref={(el) => bindWebview(tabId, el)}
                   partition="persist:forge-browser"
                   src="about:blank"
-                  class="size-full flex-1 min-h-0"
+                  // Pages without their own background are transparent, so paint white like a normal browser
+                  // instead of letting the app theme show through. The webview also swallows mouse events,
+                  // which stalls panel resize drags that cross it.
+                  class="size-full flex-1 min-h-0 bg-white"
                   classList={{
                     hidden: !isActive() || !hasContent(),
+                    "pointer-events-none": props.resizing,
                   }}
                 />
               )

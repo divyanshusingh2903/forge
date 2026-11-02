@@ -30,7 +30,7 @@ import type { ReadTool } from "@/tool/read"
 import type { SkillTool } from "@/tool/skill"
 import type { TaskTool } from "@/tool/task"
 import type { TodoWriteTool } from "@/tool/todo"
-import type { BrowserNavigateTool, BrowserReadTool } from "@/tool/browser"
+import type { BrowserActTool, BrowserNavigateTool, BrowserReadTool, BrowserScreenshotTool } from "@/tool/browser"
 import type { WebFetchTool } from "@/tool/webfetch"
 import { webSearchProviderLabel, type WebSearchTool } from "@/tool/websearch"
 import type { WriteTool } from "@/tool/write"
@@ -109,6 +109,8 @@ type ToolDefs = {
   lsp: typeof LspTool
   browser_navigate: typeof BrowserNavigateTool
   browser_read: typeof BrowserReadTool
+  browser_screenshot: typeof BrowserScreenshotTool
+  browser_act: typeof BrowserActTool
   webfetch: typeof WebFetchTool
   websearch: typeof WebSearchTool
   skill: typeof SkillTool
@@ -364,6 +366,22 @@ function runBrowserRead(p: ToolProps<typeof BrowserReadTool>): ToolInline {
   return {
     icon: "%",
     title: `Browser read${url ? ` ${url}` : ""}${source}`,
+  }
+}
+
+function runBrowserScreenshot(p: ToolProps<typeof BrowserScreenshotTool>): ToolInline {
+  const url = p.metadata.url || ""
+  return {
+    icon: "%",
+    title: `Browser screenshot${url ? ` ${url}` : ""}`,
+  }
+}
+
+function runBrowserAct(p: ToolProps<typeof BrowserActTool>): ToolInline {
+  const url = p.metadata.url || ""
+  return {
+    icon: "%",
+    title: `Browser ${p.input.action ?? "act"}${p.input.ref ? ` ${p.input.ref}` : ""}${url ? ` ${url}` : ""}`,
   }
 }
 
@@ -947,6 +965,16 @@ function scrollBrowserReadStart(p: ToolProps<typeof BrowserReadTool>): string {
   return `% Browser read${url ? ` ${url}` : ""}`
 }
 
+function scrollBrowserScreenshotStart(p: ToolProps<typeof BrowserScreenshotTool>): string {
+  const url = p.metadata.url || ""
+  return `% Browser screenshot${url ? ` ${url}` : ""}`
+}
+
+function scrollBrowserActStart(p: ToolProps<typeof BrowserActTool>): string {
+  const url = p.metadata.url || ""
+  return `% Browser ${p.input.action ?? "act"}${p.input.ref ? ` ${p.input.ref}` : ""}${url ? ` ${url}` : ""}`
+}
+
 function scrollWebSearchStart(p: ToolProps<typeof WebSearchTool>): string {
   const title = webSearchProviderLabel(p.metadata.provider)
   const query = p.input.query ?? ""
@@ -1034,13 +1062,26 @@ function permWebfetch(p: ToolPermissionProps<typeof WebFetchTool>): ToolPermissi
 }
 
 function permBrowser(
-  p: ToolPermissionProps<typeof BrowserNavigateTool> | ToolPermissionProps<typeof BrowserReadTool>,
+  p:
+    | ToolPermissionProps<typeof BrowserNavigateTool>
+    | ToolPermissionProps<typeof BrowserReadTool>
+    | ToolPermissionProps<typeof BrowserScreenshotTool>,
 ): ToolPermissionInfo {
   const url = p.patterns[0] || ""
   return {
     icon: "%",
     title: url ? `Browser ${url}` : "Browser",
     lines: url ? [`URL: ${url}`] : [],
+  }
+}
+
+function permBrowserAct(p: ToolPermissionProps<typeof BrowserActTool>): ToolPermissionInfo {
+  const url = p.patterns[0] || ""
+  const action = `${p.input.action ?? "act"}${p.input.ref ? ` ${p.input.ref}` : ""}`
+  return {
+    icon: "%",
+    title: `Browser ${action}${url ? ` ${url}` : ""}`,
+    lines: [`Action: ${action}`, ...(url ? [`URL: ${url}`] : [])],
   }
 }
 
@@ -1259,6 +1300,28 @@ const TOOL_RULES = {
       start: scrollBrowserReadStart,
     },
     permission: permBrowser,
+  },
+  browser_screenshot: {
+    view: {
+      output: false,
+      final: false,
+    },
+    run: runBrowserScreenshot,
+    scroll: {
+      start: scrollBrowserScreenshotStart,
+    },
+    permission: permBrowser,
+  },
+  browser_act: {
+    view: {
+      output: false,
+      final: false,
+    },
+    run: runBrowserAct,
+    scroll: {
+      start: scrollBrowserActStart,
+    },
+    permission: permBrowserAct,
   },
   webfetch: {
     view: {

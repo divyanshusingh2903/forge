@@ -141,6 +141,8 @@ export const dict = {
   "ui.tool.task": "လုပ်ဆောင်စရာ",
   "ui.tool.browser.navigate": "သွားပါ",
   "ui.tool.browser.read": "စာမျက်နှာဖတ်ပါ",
+  "ui.tool.browser.screenshot": "Screenshot",
+  "ui.tool.browser.act": "အပြန်အလှန်ဆက်သွယ်",
   "ui.tool.browser.source.live": "တိုက်ရိုက်",
   "ui.tool.browser.source.fetched": "ရယူပြီး",
   "ui.tool.webfetch": "Webfetch",

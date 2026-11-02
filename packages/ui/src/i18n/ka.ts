@@ -140,6 +140,8 @@ export const dict: Record<string, string> = {
   "ui.tool.task": "ამოცანა",
   "ui.tool.browser.navigate": "გადასვლა",
   "ui.tool.browser.read": "გვერდის წაკითხვა",
+  "ui.tool.browser.screenshot": "Screenshot",
+  "ui.tool.browser.act": "ურთიერთქმედება",
   "ui.tool.browser.source.live": "პირდაპირ",
   "ui.tool.browser.source.fetched": "მიღებული",
   "ui.tool.webfetch": "Webfetch",
