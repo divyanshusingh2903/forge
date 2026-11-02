@@ -104,6 +104,14 @@ const FALLBACK_LIST_TIMEOUT = "5 seconds"
 
 // MCP elicitations are Location-scoped, not Session-scoped: the server cannot attribute them to a
 // persisted session row, so their forms are owned by this opaque sentinel session identifier.
+// Prints the GitHub CLI's token for github.com, logging in through the browser first when it has none. Login output
+// goes to stderr so only the token reaches stdout.
+const githubCli = [
+  'command -v gh >/dev/null || { echo "GitHub CLI (gh) is not installed. Get it from https://cli.github.com" >&2; exit 1; }',
+  "gh auth token -h github.com 2>/dev/null && exit 0",
+  "gh auth login --web -h github.com --skip-ssh-key >&2 && gh auth token -h github.com",
+].join("\n")
+
 const GLOBAL_ELICITATION_SESSION_ID = "global"
 const URL_ELICITATION_FIELD_KEY = "elicitation"
 // Connections remain Location-scoped, but shared remote endpoints should not receive concurrent startup bursts.
@@ -272,6 +280,18 @@ export const layer = (options?: Options) =>
                 }),
             })
             editor.method.update({ integrationID, method: { type: "key", label: "Access token" } })
+            // GitHub's MCP accepts the GitHub CLI's token, so reuse its login, or start one. Without a terminal
+            // `gh auth login --web` prints the one-time code and URL to stderr, which the attempt reports while it waits.
+            if (URL.parse(remote.url)?.hostname === "api.githubcopilot.com")
+              editor.method.update({
+                integrationID,
+                method: {
+                  id: Integration.MethodID.make(suffix + "_gh"),
+                  type: "command",
+                  label: "GitHub CLI",
+                  command: ["sh", "-c", githubCli],
+                },
+              })
           })
           .pipe(Scope.provide(scope))
       })

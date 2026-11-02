@@ -1,4 +1,4 @@
-import { Show } from "solid-js"
+import { Show, createResource, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useMutation } from "@tanstack/solid-query"
 import { Button } from "@opencode/ui/button"
@@ -14,8 +14,9 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { showToast } from "@/shell/notifications/toast"
 
 /**
- * Signs an MCP server in without dynamic client registration, such as GitHub: with an access token sent as a Bearer
- * header, or with the client of a pre-registered OAuth app. Both are stored as credentials, never in config.
+ * Signs an MCP server in without dynamic client registration, such as GitHub: with the GitHub CLI's login, an access
+ * token sent as a Bearer header, or the client of a pre-registered OAuth app. All are stored as credentials, never in
+ * config.
  */
 export function DialogMcpConfigure(props: { name: string; integrationID: string; directory: string }) {
   const dialog = useDialog()
@@ -25,18 +26,82 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
   const language = useLanguage()
 
   const [form, setForm] = createStore({
-    mode: "token" as "token" | "oauth",
+    mode: "cli" as "cli" | "token" | "oauth",
     token: "",
     clientID: "",
     clientSecret: "",
     error: undefined as string | undefined,
+    // stderr of the running `gh auth login`, which carries the one-time code and URL.
+    output: "",
+    attemptID: undefined as string | undefined,
   })
 
   const location = () => ({ directory: props.directory })
+  const [integration] = createResource(() =>
+    sdk.api.integration
+      .get({ integrationID: props.integrationID, location: location() })
+      .then((response) => response.data),
+  )
+  const cliMethod = () => integration()?.methods.find((item) => item.type === "command")
+  // Servers without a CLI sign-in open on the token tab once their methods load.
+  const mode = () => (form.mode === "cli" && integration.state === "ready" && !cliMethod() ? "token" : form.mode)
+  const code = () => form.output.match(/\b[A-Z0-9]{4}-[A-Z0-9]{4}\b/)?.[0]
+  const url = () => form.output.match(/https:\/\/\S+/)?.[0]
+
+  // Closing the dialog stops a login still waiting for the browser.
+  let closed = false
+  onCleanup(() => {
+    closed = true
+    if (form.attemptID)
+      void sdk.api.integration.command
+        .cancel({ integrationID: props.integrationID, attemptID: form.attemptID, location: location() })
+        .catch(() => undefined)
+  })
+
+  const signInWithCli = async () => {
+    const method = cliMethod()
+    if (method?.type !== "command") throw new Error(language.t("mcp.configure.cli.unavailable"))
+    const started = await sdk.api.integration.command.connect({
+      integrationID: props.integrationID,
+      methodID: method.id,
+      location: location(),
+    })
+    setForm({ attemptID: started.data.attemptID, output: "" })
+    while (!closed) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      const result = await sdk.api.integration.command.status({
+        integrationID: props.integrationID,
+        attemptID: started.data.attemptID,
+        location: location(),
+      })
+      if (result.data.status === "pending") {
+        setForm("output", result.data.message ?? "")
+        continue
+      }
+      setForm("attemptID", undefined)
+      if (result.data.status === "complete") return
+      throw new Error(
+        result.data.status === "failed" ? result.data.message : language.t("provider.connect.command.expired"),
+      )
+    }
+  }
+
+  const copyAndOpen = () => {
+    const value = code()
+    const link = url()
+    if (value)
+      void (platform.writeClipboardText?.(value) ?? navigator.clipboard.writeText(value)).catch(() => undefined)
+    if (link) platform.openExternal(link)
+  }
 
   const save = useMutation(() => ({
     mutationFn: async () => {
-      if (form.mode === "token") {
+      if (mode() === "cli") {
+        await signInWithCli()
+        await sdk.api.experimental.mcp.connect({ server: props.name, location: location() })
+        return
+      }
+      if (mode() === "token") {
         await sdk.api.integration.connect.key({
           integrationID: props.integrationID,
           key: form.token.trim(),
@@ -71,17 +136,24 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
         variant: "success",
         icon: "circle-check",
         title: language.t(
-          form.mode === "token" ? "mcp.configure.toast.saved" : "mcp.configure.toast.signingIn",
+          mode() === "cli"
+            ? "mcp.configure.toast.cli"
+            : mode() === "token"
+              ? "mcp.configure.toast.saved"
+              : "mcp.configure.toast.signingIn",
           { name: mcpDisplayName(props.name) },
         ),
       })
     },
-    onError: (error) =>
+    onError: (error) => {
+      setForm({ attemptID: undefined, output: "" })
+      if (closed) return
       showToast({
         variant: "error",
         title: language.t("common.requestFailed"),
         description: error instanceof Error ? error.message : String(error),
-      }),
+      })
+    },
   }))
 
   const submit = (event: SubmitEvent) => {
@@ -89,10 +161,9 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
 
     if (save.isPending) return
 
-    if (form.mode === "token" && !form.token.trim())
-      return setForm("error", language.t("mcp.configure.token.required"))
+    if (mode() === "token" && !form.token.trim()) return setForm("error", language.t("mcp.configure.token.required"))
 
-    if (form.mode === "oauth" && !form.clientID.trim())
+    if (mode() === "oauth" && !form.clientID.trim())
       return setForm("error", language.t("mcp.configure.oauth.clientId.required"))
     setForm("error", undefined)
     save.mutate()
@@ -113,32 +184,65 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
         <form onSubmit={submit} class="flex flex-col gap-4 px-6 pb-5">
           <Tabs
             variant="pill"
-            value={form.mode}
+            value={mode()}
             onChange={(value) => {
-              if (value === "token" || value === "oauth") setForm({ mode: value, error: undefined })
+              if (save.isPending) return
+              if (value === "cli" || value === "token" || value === "oauth") setForm({ mode: value, error: undefined })
             }}
           >
             <Tabs.List>
+              <Show when={cliMethod()}>
+                <Tabs.Trigger value="cli">{language.t("mcp.configure.mode.cli")}</Tabs.Trigger>
+              </Show>
               <Tabs.Trigger value="token">{language.t("mcp.configure.mode.token")}</Tabs.Trigger>
               <Tabs.Trigger value="oauth">{language.t("mcp.configure.mode.oauth")}</Tabs.Trigger>
             </Tabs.List>
           </Tabs>
-          <Show
-            when={form.mode === "oauth"}
-            fallback={
-              <TextField
-                autofocus
-                type="password"
-                label={language.t("mcp.configure.token.label")}
-                placeholder={language.t("mcp.configure.token.placeholder")}
-                description={language.t("mcp.configure.token.description")}
-                value={form.token}
-                onChange={(value) => setForm("token", value)}
-                validationState={form.error ? "invalid" : undefined}
-                error={form.error}
-              />
-            }
-          >
+          <Show when={mode() === "cli"}>
+            <div class="flex flex-col gap-3">
+              <span class="text-13-regular text-v2-text-text-muted">{language.t("mcp.configure.cli.description")}</span>
+              <Show when={save.isPending}>
+                <Show
+                  when={code()}
+                  fallback={
+                    <span class="text-13-regular text-v2-text-text-muted">
+                      {language.t("mcp.configure.cli.waiting")}
+                    </span>
+                  }
+                >
+                  {(value) => (
+                    <div class="flex flex-col gap-2 rounded-md bg-v2-background-bg-layer-03 px-3 py-3">
+                      <span class="text-12-regular text-v2-text-text-muted">
+                        {language.t("mcp.configure.cli.code")}
+                      </span>
+                      <span class="font-mono text-[20px] leading-7 tracking-[2px] text-v2-text-text-base select-all">
+                        {value()}
+                      </span>
+                      <div>
+                        <Button type="button" variant="neutral" size="small" onClick={copyAndOpen}>
+                          {language.t("mcp.configure.cli.open")}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </Show>
+              </Show>
+            </div>
+          </Show>
+          <Show when={mode() === "token"}>
+            <TextField
+              autofocus
+              type="password"
+              label={language.t("mcp.configure.token.label")}
+              placeholder={language.t("mcp.configure.token.placeholder")}
+              description={language.t("mcp.configure.token.description")}
+              value={form.token}
+              onChange={(value) => setForm("token", value)}
+              validationState={form.error ? "invalid" : undefined}
+              error={form.error}
+            />
+          </Show>
+          <Show when={mode() === "oauth"}>
             <TextField
               autofocus
               label={language.t("mcp.configure.oauth.clientId.label")}
@@ -161,9 +265,15 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
             <Button type="button" variant="ghost" size="large" onClick={() => dialog.close()}>
               {language.t("common.cancel")}
             </Button>
-            <Button type="submit" variant="contrast" size="large" disabled={save.isPending}>
+            <Button type="submit" variant="contrast" size="large" disabled={save.isPending || integration.loading}>
               {language.t(
-                save.isPending ? "common.saving" : form.mode === "token" ? "common.save" : "dialog.mcp.signIn",
+                save.isPending
+                  ? mode() === "cli"
+                    ? "dialog.mcp.signingIn"
+                    : "common.saving"
+                  : mode() === "token"
+                    ? "common.save"
+                    : "dialog.mcp.signIn",
               )}
             </Button>
           </div>
