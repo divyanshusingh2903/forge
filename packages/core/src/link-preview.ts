@@ -5,6 +5,7 @@ import { makeLocationNode } from "@opencode/util/effect/app-node"
 import { AppProcess } from "@opencode/util/process"
 import { Context, Deferred, Duration, Effect, Layer, Option, Schema } from "effect"
 import { ChildProcess } from "effect/process"
+import { Credential } from "./credential.js"
 import { Mcp } from "./mcp/index.js"
 
 export const Kind = LinkPreview.Kind
@@ -39,12 +40,27 @@ const layer = Layer.effect(
   Effect.gen(function* () {
     const process = yield* AppProcess.Service
     const mcp = yield* Mcp.Service
+    const credentials = yield* Credential.Service
     const cache = new Map<string, Entry>()
 
+    // The access token the GitHub MCP signed in with, so `gh` works even where its own login is missing or another
+    // account's, such as under a separate XDG config directory.
+    const githubToken = Effect.fnUntraced(function* () {
+      const server = (yield* mcp.servers()).find((item) => item.integrationID && /github/i.test(item.name))
+      if (!server?.integrationID) return undefined
+      const value = (yield* credentials.list(server.integrationID)).at(-1)?.value
+      return value?.type === "key" ? value.key : undefined
+    })
+
     // GitHub and GitLab go through their CLIs, which hold the user's existing sign-in for each host.
-    const cli = Effect.fnUntraced(function* (command: string, route: string, map: (body: string) => Result | undefined) {
+    const cli = Effect.fnUntraced(function* (
+      command: string,
+      route: string,
+      map: (body: string) => Result | undefined,
+      env?: Record<string, string>,
+    ) {
       return yield* process
-        .run(ChildProcess.make(command, ["api", route], { stdin: "ignore", extendEnv: true }), {
+        .run(ChildProcess.make(command, ["api", route], { stdin: "ignore", extendEnv: true, env }), {
           timeout: REQUEST_TIMEOUT,
           maxOutputBytes: 1_000_000,
         })
@@ -94,7 +110,12 @@ const layer = Layer.effect(
         return route ? cli("glab", route, (body) => gitlabResult(input.kind, body)) : Effect.succeed(unavailable)
       }
       const route = githubRoute(input)
-      return route ? cli("gh", route, (body) => githubResult(input.kind, body)) : Effect.succeed(unavailable)
+      if (!route) return Effect.succeed(unavailable)
+      return githubToken().pipe(
+        Effect.flatMap((token) =>
+          cli("gh", route, (body) => githubResult(input.kind, body), token ? { GH_TOKEN: token } : undefined),
+        ),
+      )
     }
 
     return Service.of({
@@ -119,7 +140,7 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeLocationNode({ service: Service, layer, deps: [AppProcess.node, Mcp.node] })
+export const node = makeLocationNode({ service: Service, layer, deps: [AppProcess.node, Mcp.node, Credential.node] })
 
 const unavailable: Result = { outcome: "unavailable" }
 
@@ -262,8 +283,9 @@ export function linearResult(body: string): Result | undefined {
 
 export function failureResult(message: string): Result {
   if (/\b404\b|not found|does not exist/i.test(message)) return { outcome: "not-found" }
-  if (/\b40[13]\b|forbidden|unauthori[sz]ed|permission|auth login|not logged in/i.test(message))
-    return { outcome: "forbidden" }
+  // A CLI that is not signed in is unavailable rather than forbidden, so the lookup retries once the user signs in.
+  if (/auth login|not logged in|GH_TOKEN/i.test(message)) return unavailable
+  if (/\b40[13]\b|forbidden|unauthori[sz]ed|permission/i.test(message)) return { outcome: "forbidden" }
   return unavailable
 }
 

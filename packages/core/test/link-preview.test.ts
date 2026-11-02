@@ -84,6 +84,9 @@ describe("LinkPreview mappers", () => {
   test("classifies failures", () => {
     expect(LinkPreview.failureResult("HTTP 404: Not Found")).toEqual({ outcome: "not-found" })
     expect(LinkPreview.failureResult("To get started with GitHub CLI, please run: gh auth login")).toEqual({
+      outcome: "unavailable",
+    })
+    expect(LinkPreview.failureResult("HTTP 403: Resource not accessible by integration")).toEqual({
       outcome: "forbidden",
     })
     expect(LinkPreview.failureResult("connection reset")).toEqual({ outcome: "unavailable" })
