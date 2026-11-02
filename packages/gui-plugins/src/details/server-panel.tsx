@@ -3,6 +3,7 @@ import { Button } from "@opencode/ui/button"
 import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
 import { ErrorDetails } from "@opencode/ui/error-details"
 import { Icon } from "@opencode/ui/icon"
+import { McpIcon, mcpDisplayName } from "@opencode/ui/mcp-icon"
 import { Switch } from "@opencode/ui/switch"
 import { showToast } from "@opencode/ui/toast"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -29,16 +30,17 @@ import { configuredLsps } from "./configured-lsp"
 import { builtinContext } from "@opencode/plugin/gui/builtin"
 import { createFlyoutMotion } from "./flyout-motion"
 
+// MCPs have their own header button beside the context usage, so the Extensions menu lists the rest.
 const services = [
-  { type: "mcp", icon: "mcp", label: "mcp" },
   { type: "plugins", icon: "cube", label: "plugins" },
   { type: "skills", icon: "graduation-cap", label: "skills" },
   { type: "lsp", icon: "code-slash", label: "lsp" },
 ] as const
 
-type Service = (typeof services)[number]["type"]
+type MenuService = (typeof services)[number]["type"]
+type Service = MenuService | "mcp"
 
-type ServiceProps = {
+export type ServiceProps = {
   session: MountedSession
   directory: string
   shown: boolean
@@ -47,7 +49,7 @@ type ServiceProps = {
 }
 
 /** One service's list: its load state, what its row summarises, and the list itself. */
-type ServiceSource = {
+export type ServiceSource = {
   readonly loading: boolean
   readonly ready: boolean
   readonly error: boolean
@@ -58,6 +60,9 @@ type ServiceSource = {
   /** The actions under the list, outside its scroll box so they stay in view. */
   Footer: Component
 }
+
+// Must match the app's `manualSignIn`: servers whose sign-in starts in the app's setup dialog.
+const manualSignIn: ReadonlySet<string> = new Set(["github"])
 
 // How long a pointer may rest inside the safe triangle before the row under it takes over.
 const AIM_TIMEOUT = 100
@@ -115,19 +120,18 @@ function ServiceMenu(props: ServiceProps & { mobile?: boolean; name: string }) {
   )
 
   // A signal, not a store field: a store would wrap the scope object and never match it.
-  const [open, setOpen] = createSignal<{ readonly scope: object; readonly service: Service }>()
+  const [open, setOpen] = createSignal<{ readonly scope: object; readonly service: MenuService }>()
 
   const [menu, setMenu] = createStore<{
     // The pane on show, kept through the flyout's exit so it fades out with its list.
-    pane: Service | undefined
+    pane: MenuService | undefined
     // Where the trigger row sits in the flyout's containing block, and the room around it in the viewport.
     anchor: { row: number; above: number; below: number }
-    heights: Partial<Record<Service, number>>
-    overflow: Partial<Record<Service, boolean>>
+    heights: Partial<Record<MenuService, number>>
+    overflow: Partial<Record<MenuService, boolean>>
   }>({ pane: undefined, anchor: { row: 0, above: 0, below: 0 }, heights: {}, overflow: {} })
 
-  const sources: Record<Service, ServiceSource> = {
-    mcp: useMcp(props, () => close()),
+  const sources: Record<MenuService, ServiceSource> = {
     plugins: useCatalog(props, "plugins"),
     skills: useCatalog(props, "skills"),
     lsp: useLsp(props),
@@ -143,23 +147,23 @@ function ServiceMenu(props: ServiceProps & { mobile?: boolean; name: string }) {
   // Beside its row, kept inside the viewport.
   const offset = () => Math.max(-menu.anchor.above, Math.min(menu.anchor.row - 2, menu.anchor.below - height()))
 
-  const rows: Partial<Record<Service, HTMLButtonElement>> = {}
-  const panes: Partial<Record<Service, HTMLElement>> = {}
-  const scrollers: Partial<Record<Service, HTMLElement>> = {}
+  const rows: Partial<Record<MenuService, HTMLButtonElement>> = {}
+  const panes: Partial<Record<MenuService, HTMLElement>> = {}
+  const scrollers: Partial<Record<MenuService, HTMLElement>> = {}
   let flyout: HTMLDivElement | undefined
   let surface: HTMLDivElement | undefined
   // The flyout's containing block in the viewport, measured when a list opens and on scroll or resize, so pointer
   // moves never read layout.
   const bounds = { left: 0, right: 0, top: 0 }
   // Each list refreshes the first time it shows after the flyout opens.
-  const refreshed = new Set<Service>()
+  const refreshed = new Set<MenuService>()
   // The two latest pointer positions at least 2px apart, which give the pointer's heading.
   const trail = { x: 0, y: 0, px: 0, py: 0 }
   let pending: ReturnType<typeof setTimeout> | undefined
   onCleanup(() => clearTimeout(pending))
 
   // Places the flyout beside a row: where the row sits in the containing block, and the room around it.
-  const measure = (service: Service) => {
+  const measure = (service: MenuService) => {
     const row = rows[service]
     const box = flyout?.offsetParent
 
@@ -178,7 +182,7 @@ function ServiceMenu(props: ServiceProps & { mobile?: boolean; name: string }) {
     return true
   }
 
-  const activate = (service: Service, focus = false) => {
+  const activate = (service: MenuService, focus = false) => {
     clearTimeout(pending)
 
     if (!flyout || !surface) return
@@ -557,7 +561,7 @@ function useLsp(props: ServiceProps): ServiceSource {
   }
 }
 
-function useMcp(props: ServiceProps, close: () => void): ServiceSource {
+export function useMcp(props: ServiceProps, close: () => void): ServiceSource {
   const ctx = usePlugin()
   const data = () => props.session.server.data
 
@@ -637,6 +641,12 @@ function useMcp(props: ServiceProps, close: () => void): ServiceSource {
 
             const follow = () => {
               if (failure()) return showError(server().name)
+
+              // GitHub has no dynamic client registration, so its sign-in asks for a token or an OAuth app first.
+              if (server().status.status === "needs_auth" && manualSignIn.has(server().name)) {
+                close()
+                return builtinContext(ctx).layout.command("mcp.github.signIn")
+              }
               change(server().status.status === "needs_auth" || !enabled())
             }
 
@@ -654,7 +664,8 @@ function useMcp(props: ServiceProps, close: () => void): ServiceSource {
                     label={ctx.t("mcp.error.actionLabel", { name: server().name })}
                     onClick={() => showError(server().name)}
                   />
-                  <TruncatedText text={server().name} class="session-summary-label" />
+                  <McpIcon id={server().name} class="session-mcp-icon" />
+                  <TruncatedText text={mcpDisplayName(server().name)} class="session-summary-label" />
                 </span>
                 <span class="session-mcp-trailing" onClick={(event) => event.stopPropagation()}>
                   <Show
@@ -881,7 +892,7 @@ function StatusDot(props: { status: string; error?: string; label?: string; onCl
   )
 }
 
-function ServiceBody(props: { source: ServiceSource; children: JSX.Element }) {
+export function ServiceBody(props: { source: ServiceSource; children: JSX.Element }) {
   const ctx = usePlugin()
 
   return (
@@ -911,7 +922,7 @@ function ServiceBody(props: { source: ServiceSource; children: JSX.Element }) {
 }
 
 // Shown once the list is, as ServiceBody shows it.
-function ServiceFooter(props: { source: ServiceSource }) {
+export function ServiceFooter(props: { source: ServiceSource }) {
   return (
     <Show when={(props.source.ready || !props.source.loading) && !props.source.error}>
       <props.source.Footer />
@@ -1101,7 +1112,12 @@ function useMcpToggle(session: MountedSession, directory: () => string) {
       await source.location.mcp.server.sync(ref)
       const current = source.location.mcp.server.list(ref)?.find((item) => item.name === input.name)
 
-      if (input.enabled && current?.status.status === "needs_auth" && current.integrationID) {
+      if (
+        input.enabled &&
+        current?.status.status === "needs_auth" &&
+        current.integrationID &&
+        !manualSignIn.has(input.name)
+      ) {
         const integration = await client.integration.get({ integrationID: current.integrationID, location: ref })
         const method = integration.data?.methods.find((item) => item.type === "oauth" && !item.form?.length)
 

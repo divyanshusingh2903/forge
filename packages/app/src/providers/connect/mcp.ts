@@ -13,6 +13,9 @@ export type McpControls = {
   change: (name: string, enabled: boolean) => void
 }
 
+/** Servers whose OAuth has no dynamic client registration; they sign in through DialogMcpConfigure instead. */
+export const manualSignIn: ReadonlySet<string> = new Set(["github"])
+
 export function useMcpToggle(directory?: Accessor<string | undefined>, onSuccess?: () => void) {
   const data = useData()
   const serverSDK = useServerSDK()
@@ -49,7 +52,7 @@ export function useMcpToggle(directory?: Accessor<string | undefined>, onSuccess
       await data.location.mcp.server.sync(ref)
       const current = data.location.mcp.server.list(ref)?.find((item) => item.name === name)
 
-      if (enabled && current?.status.status === "needs_auth" && current.integrationID) {
+      if (enabled && current?.status.status === "needs_auth" && current.integrationID && !manualSignIn.has(name)) {
         const integration = await serverSDK.api.integration.get({ integrationID: current.integrationID, location: ref })
         const method = integration.data?.methods.find((item) => item.type === "oauth" && !item.form?.length)
 

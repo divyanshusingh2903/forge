@@ -97,6 +97,7 @@ import BrowserPlugin from "@opencode/plugin-browser"
 import { CommandPlugin } from "./command.js"
 import { IdentityPlugin } from "./identity.js"
 import { ForgeModePlugin } from "./forge-mode.js"
+import { ForgeMcpPlugin } from "./forge-mcp.js"
 import { ForgePlanPlugin } from "./forge-plan.js"
 import { GoalPlugin } from "./goal.js"
 import { ModelsDevPlugin } from "./models-dev.js"
@@ -230,6 +231,7 @@ const pre = [
   ToolInputRepairPlugin.Plugin,
   ConfigWorktreePlugin.Plugin,
   ConfigMcpPlugin.Plugin,
+  ForgeMcpPlugin.Plugin,
   McpCodeModeDefaultsPlugin.Plugin,
   WellKnownPlugin.Plugin,
   VcsGitPlugin.Plugin,

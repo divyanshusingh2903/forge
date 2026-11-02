@@ -243,13 +243,12 @@ export const serverSettings: Entry<SettingsServerTab | "servers">[] = [
   { tab: "workspaces", label: "settings.tab.workspaces", keywords: "workspaces disk usage cleanup delete" },
   { tab: "providers", label: "settings.providers.title", keywords: "connect api key credentials" },
   { tab: "models", label: "settings.models.title", keywords: "model picker visibility" },
-  { tab: "extensions", label: "settings.tab.extensions" },
   {
-    tab: "extensions",
-    subtab: "mcps",
-    label: "settings.extensions.tab.mcps",
-    keywords: "model context protocol tools",
+    tab: "mcps",
+    label: "settings.tab.mcps",
+    keywords: "model context protocol tools github gitlab linear notion sentry jira",
   },
+  { tab: "extensions", label: "settings.tab.extensions" },
   {
     tab: "extensions",
     subtab: "plugins",

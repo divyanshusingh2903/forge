@@ -307,6 +307,13 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     )
   }
 
+  const signInGithub = () => {
+    void openDialog(
+      () => import("@/providers/connect/mcp-dialog"),
+      (x) => dialog.show(() => <x.DialogSelectMcpSignIn name="github" />),
+    )
+  }
+
   const sessionProject = () => projectSettingsKey(serverSDK.scope, actions.session.data.info()?.projectID)
 
   const autoAccepting = () => settings.permissions.autoApproves(sessionProject())
@@ -576,6 +583,13 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       keybind: "mod+;",
       slash: "mcp",
       onSelect: chooseMcp,
+    }),
+    // The session's MCP popover opens GitHub's token or OAuth app setup through this command.
+    mcpCommand({
+      id: "mcp.github.signIn",
+      title: language.t("mcp.configure.title", { name: "GitHub" }),
+      hidden: true,
+      onSelect: signInGithub,
     }),
   ]
 

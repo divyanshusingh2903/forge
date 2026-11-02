@@ -334,6 +334,8 @@ export const authorize = (input: {
   readonly config: typeof ConfigMCP.Remote.Type
   readonly integrationID: Integration.ID
   readonly methodID: Integration.MethodID
+  /** A pre-registered client entered at sign-in, for servers without dynamic client registration. */
+  readonly client?: { readonly client_id: string; readonly client_secret?: string }
 }) =>
   Effect.gen(function* () {
     const fields = { server: input.name, methodID: input.methodID, oauthAttemptID: crypto.randomUUID() }
@@ -343,11 +345,15 @@ export const authorize = (input: {
     const credentials = yield* Credential.Service
     const fetchFn = yield* loggedFetch({ server: input.name }).pipe(Effect.annotateLogs(fields))
     yield* Effect.logInfo("mcp oauth authorization started", fields)
-    const oauth = input.config.oauth || undefined
+    const config = input.client ? { ...input.config, oauth: { ...input.config.oauth, ...input.client } } : input.config
+    const oauth = config.oauth || undefined
     const store = memoryStore()
     // Reuse the client registered by an earlier login; the SDK discards it if the issuer changed.
     const previous = (yield* credentials.list(input.integrationID)).at(-1)?.value
-    if (previous?.type === "oauth") {
+    // The entered client is saved with the tokens, so later refreshes find it without config.
+    const client = input.client
+    if (client) yield* Effect.promise(() => store.saveClientInformation(client))
+    if (!client && previous?.type === "oauth") {
       const client = clientFromCredential(previous)
       if (client) yield* Effect.promise(() => store.saveClientInformation(client))
     }
@@ -451,7 +457,7 @@ export const authorize = (input: {
 
     let authorizationUrl: URL | undefined
     const oauthProvider = provider({
-      config: input.config,
+      config,
       store,
       clientMetadataUrl: cimd ? CLIENT_METADATA_URL : undefined,
       discovery: { ...discovery, resourceMetadataUrl: resourceMetadataUrl?.toString() },

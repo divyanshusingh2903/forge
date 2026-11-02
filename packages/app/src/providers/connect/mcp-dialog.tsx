@@ -8,12 +8,15 @@ import { useWorkspaceLocation } from "@/workspaces/location"
 import { Button } from "@opencode/ui/button"
 import { Dialog, DialogBody, DialogHeader, DialogTitle, DialogTitleGroup } from "@opencode/ui/dialog"
 import { Icon } from "@opencode/ui/icon"
+import { McpIcon, mcpDisplayName } from "@opencode/ui/mcp-icon"
+import { useDialog } from "@opencode/ui/context/dialog"
 import { ErrorDetails } from "@opencode/ui/error-details"
 import { SearchList } from "@opencode/ui/search-list"
 import { Switch } from "@opencode/ui/switch"
 import { TruncatedText } from "@opencode/ui/truncated-text"
 import { useLanguage } from "@/runtime/i18n/language"
-import { useMcpToggle } from "@/providers/connect/mcp"
+import { manualSignIn, useMcpToggle } from "@/providers/connect/mcp"
+import { DialogMcpConfigure } from "@/providers/connect/mcp-configure"
 import { usePlatform } from "@/runtime/platform/platform"
 import { showToast } from "@/shell/notifications/toast"
 import "@/shell/commands/dialog.css"
@@ -33,9 +36,26 @@ export const DialogSelectMcp: Component = () => {
   return <DialogMcp directory={sdk().directory} />
 }
 
+/** The sign-in setup of `name` in the current workspace, for servers without dynamic client registration. */
+export const DialogSelectMcpSignIn: Component<{ name: string }> = (props) => {
+  const location = useWorkspaceLocation()
+  const data = useData()
+
+  const integrationID = () =>
+    data.location.mcp.server.list({ directory: location().directory })?.find((server) => server.name === props.name)
+      ?.integrationID
+
+  return (
+    <Show when={integrationID()}>
+      {(id) => <DialogMcpConfigure name={props.name} integrationID={id()} directory={location().directory} />}
+    </Show>
+  )
+}
+
 /** Lists the MCP servers of `directory`; `server` opens directly on that server's error. */
 export const DialogMcp: Component<{ directory: string; server?: string }> = (props) => {
   const data = useData()
+  const dialog = useDialog()
   const directory = () => props.directory
   const toggle = useMcpToggle(directory)
 
@@ -54,6 +74,9 @@ export const DialogMcp: Component<{ directory: string; server?: string }> = (pro
       pending={toggle.isPending}
       target={target()}
       onToggle={(input) => toggle.mutate(input)}
+      onConfigure={(name, integrationID) =>
+        dialog.show(() => <DialogMcpConfigure name={name} integrationID={integrationID} directory={directory()} />)
+      }
     />
   )
 }
@@ -64,6 +87,8 @@ export function McpDialog(props: {
   pending: boolean
   target?: string
   onToggle: (input: string | { name: string; enabled: boolean }) => void
+  /** Opens the sign-in setup of a server without dynamic client registration. */
+  onConfigure?: (name: string, integrationID: string) => void
 }) {
   const language = useLanguage()
   const platform = usePlatform()
@@ -251,7 +276,8 @@ export function McpDialog(props: {
                     <span class="mcp-dialog-status" aria-hidden="true">
                       <span class="mcp-status-dot" data-status={status()?.status} />
                     </span>
-                    <TruncatedText text={item().name} class="mcp-dialog-name" />
+                    <McpIcon id={item().name} class="size-4 shrink-0 text-v2-icon-icon-base" />
+                    <TruncatedText text={mcpDisplayName(item().name)} class="mcp-dialog-name" />
                   </span>
                   <div class="mcp-trailing" onClick={(event) => event.stopPropagation()}>
                     <Show when={error()}>
@@ -289,7 +315,13 @@ export function McpDialog(props: {
                         disabled={busy()}
                         aria-busy={busy()}
                         aria-label={language.t("dialog.mcp.signIn.open", { name: item().name })}
-                        onClick={() => toggleServer(item().name)}
+                        onClick={() => {
+                          const integrationID = server()?.integrationID
+
+                          if (integrationID && props.onConfigure && manualSignIn.has(item().name))
+                            return props.onConfigure(item().name, integrationID)
+                          toggleServer(item().name)
+                        }}
                       >
                         {language.t(busy() ? "dialog.mcp.signingIn" : "dialog.mcp.signIn")}
                       </Button>

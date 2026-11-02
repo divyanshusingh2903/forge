@@ -19,6 +19,7 @@ import { Location } from "../location.js"
 import { waitForAbort } from "@opencode/util/process"
 import { State } from "../state.js"
 import type { McpClient } from "./client.js"
+import { McpToggles } from "./toggles.js"
 
 export const ServerName = Schema.String.pipe(Schema.brand("MCP.ServerName"))
 export type ServerName = typeof ServerName.Type
@@ -179,6 +180,7 @@ export const layer = (options?: Options) =>
       const forms = yield* Form.Service
       const integration = yield* Integration.Service
       const credentials = yield* Credential.Service
+      const toggles = yield* McpToggles.Service
       const root = yield* Effect.scope
       const fork = yield* FiberSet.makeRuntime<never, void, never>()
       // Server scopes close in parallel on shutdown, so one slow server's stop grace does not delay
@@ -240,6 +242,36 @@ export const layer = (options?: Options) =>
                   )
                 }),
             })
+            // Servers without dynamic client registration (GitHub) sign in with a pre-registered OAuth app, or with
+            // an access token sent as a Bearer header instead of OAuth.
+            const appMethodID = Integration.MethodID.make(suffix + "_app")
+            editor.method.update({
+              integrationID,
+              method: {
+                id: appMethodID,
+                type: "oauth",
+                label: "OAuth app",
+                form: [
+                  { key: "client_id", type: "string", title: "Client ID", required: true },
+                  { key: "client_secret", type: "string", title: "Client secret" },
+                ],
+              },
+              authorize: (answer) =>
+                Effect.gen(function* () {
+                  const { McpOAuth } = yield* Effect.promise(() => import("./oauth.js"))
+                  return yield* McpOAuth.authorize({
+                    name,
+                    config: remote,
+                    integrationID,
+                    methodID: appMethodID,
+                    client: {
+                      client_id: String(answer.client_id ?? ""),
+                      client_secret: answer.client_secret ? String(answer.client_secret) : undefined,
+                    },
+                  }).pipe(Effect.provideService(Credential.Service, credentials))
+                }),
+            })
+            editor.method.update({ integrationID, method: { type: "key", label: "Access token" } })
           })
           .pipe(Scope.provide(scope))
       })
@@ -461,13 +493,21 @@ export const layer = (options?: Options) =>
           yield* bus.publish(McpEvent.StatusChanged, { server: name })
           const scope = yield* Scope.fork(servers)
           entry.scope = scope
-          const authProvider = yield* connectProvider(entry)
+          // An access token replaces OAuth: it rides as a Bearer header and the server never sees an auth provider.
+          const token = entry.integrationID
+            ? (yield* credentials.list(entry.integrationID)).at(-1)?.value
+            : undefined
+          const config =
+            token?.type === "key" && entry.config.type === "remote"
+              ? { ...entry.config, headers: { ...entry.config.headers, Authorization: `Bearer ${token.key}` } }
+              : entry.config
+          const authProvider = config === entry.config ? yield* connectProvider(entry) : undefined
           const { McpClient } = yield* Effect.promise(() => import("./client.js"))
           // List tools as part of connect so a failure here marks the server failed rather than
           // leaving it connected with a silently empty tool list and no path to recover.
           const load = McpClient.connect(
             name,
-            entry.config,
+            config,
             location.directory,
             authProvider,
             elicitation,
@@ -539,7 +579,7 @@ export const layer = (options?: Options) =>
         entries.set(name, entry)
         yield* Effect.gen(function* () {
           yield* register(name, entry)
-          if (serverConfig.disabled) {
+          if (yield* disabled(name, serverConfig)) {
             entry.status = { status: "disabled" }
             yield* bus.publish(McpEvent.StatusChanged, { server: name })
             return
@@ -659,6 +699,11 @@ export const layer = (options?: Options) =>
         )
       })
 
+      // A saved toggle wins over `disabled` in config, so the user's choice holds in every project and across restarts.
+      const disabled = Effect.fnUntraced(function* (name: ServerName, serverConfig: Mcp.ServerConfig) {
+        return !((yield* toggles.get(name)) ?? !serverConfig.disabled)
+      })
+
       let applied: Map<ServerName, Mcp.ServerConfig> | undefined
       const overrides = new Map<ServerName, Mcp.ServerConfig | false>()
       const reconcileLock = Semaphore.makeUnsafe(1)
@@ -677,7 +722,7 @@ export const layer = (options?: Options) =>
 
           // Initial connections stay asynchronous so one slow server does not block Location startup.
           for (const [name, entry] of entries) {
-            if (entry.config.disabled) {
+            if (yield* disabled(name, entry.config)) {
               entry.status = { status: "disabled" }
               entry.startup.openUnsafe()
               yield* bus.publish(McpEvent.StatusChanged, { server: name })
@@ -728,6 +773,26 @@ export const layer = (options?: Options) =>
         bus.subscribe(Credential.Event.Switched).pipe(
           Stream.filter((event) => owned.has(event.data.integrationID)),
           Stream.runForEach((event) => Effect.sync(() => fork(reconnect(event.data.integrationID)))),
+        ),
+      )
+      // Follow toggles saved in other Locations. The Location that saved one already matches it, so this is a no-op there.
+      fork(
+        toggles.changes.pipe(
+          Stream.runForEach((change) =>
+            Effect.sync(() => {
+              const name = ServerName.make(change.server)
+              fork(
+                Effect.gen(function* () {
+                  const entry = entries.get(name)
+                  if (!entry || (entry.status.status === "disabled") !== change.enabled) return
+                  yield* stopServer(name, entry)
+                  if (change.enabled) return yield* startServer(name, entry)
+                  entry.status = { status: "disabled" }
+                  yield* bus.publish(McpEvent.StatusChanged, { server: name })
+                }).pipe(locks.withLock(name)),
+              )
+            }),
+          ),
         ),
       )
       const state: State.Interface<Data, Editor> = State.create<Data, Editor>({
@@ -785,6 +850,7 @@ export const layer = (options?: Options) =>
             yield* stopServer(name, target.entry)
             yield* startServer(name, target.entry)
           }).pipe(locks.withLock(name))
+          yield* toggles.set(name, true)
         }),
         disconnect: Effect.fn("MCP.disconnect")(function* (server) {
           const name = ServerName.make(server)
@@ -794,6 +860,7 @@ export const layer = (options?: Options) =>
             target.entry.status = { status: "disabled" }
             yield* bus.publish(McpEvent.StatusChanged, { server: name })
           }).pipe(locks.withLock(name))
+          yield* toggles.set(name, false)
         }),
         remove: Effect.fn("MCP.remove")(function* (server) {
           const name = ServerName.make(server)
@@ -944,7 +1011,7 @@ export function configured(options?: Options) {
   return makeLocationNode({
     service: Service,
     layer: layer(options),
-    deps: [Location.node, Environment.node, Bus.node, Form.node, Integration.node, Credential.node],
+    deps: [Location.node, Environment.node, Bus.node, Form.node, Integration.node, Credential.node, McpToggles.node],
   })
 }
 

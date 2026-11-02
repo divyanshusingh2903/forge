@@ -101,7 +101,7 @@ describe("settings search ranking", () => {
       "Default environment",
     ])
     expect(rankSettings("mcps", index()).map((item) => item.view)).toEqual([
-      { type: "root", server: "local", tab: "extensions", target: undefined, subtab: "mcps" },
+      { type: "root", server: "local", tab: "mcps", target: undefined, subtab: undefined },
     ])
     expect(rankSettings("project name", index())).toEqual([])
     expect(rankSettings("startup", index())).toEqual([])

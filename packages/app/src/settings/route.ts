@@ -7,6 +7,7 @@ export type SettingsRootTab =
   | "workspaces"
   | "providers"
   | "models"
+  | "mcps"
   | "extensions"
   | "servers"
   | "experimental"
@@ -18,7 +19,7 @@ declare const pluginTab: unique symbol
 export type SettingsPluginTab = string & { readonly [pluginTab]: true }
 
 /** Root pages that show one server's settings: the selected server, or the default one. */
-export type SettingsServerTab = "projects" | "workspaces" | "providers" | "models" | "extensions"
+export type SettingsServerTab = "projects" | "workspaces" | "providers" | "models" | "mcps" | "extensions"
 
 export type SettingsProjectTab = "general" | "workspaces" | "extensions"
 
@@ -52,6 +53,7 @@ const rootTabs: Record<SettingsRootTab, true> = {
   workspaces: true,
   providers: true,
   models: true,
+  mcps: true,
   extensions: true,
   servers: true,
   experimental: true,
@@ -91,10 +93,13 @@ export function parseSettingsView(
 
   // The desktop's Plugins page is now the Plugins tab of Extensions, so links to it and `layout.settings("plugins")`
   // land there.
+  // MCPs left the Extensions page for their own, so links to the old MCPs tab land there.
+  if (!project && tab === "extensions" && subtab === "mcps") return { type: "root", tab: "mcps", server, ...transient }
+
   if (!project && tab === "plugins") return { type: "root", tab: "extensions", server, subtab: "plugins", ...transient }
 
   if (!project && isRootTab(tab))
-    return { type: "root", tab, server, subtab: nested === "lsps" ? undefined : nested, ...transient }
+    return { type: "root", tab, server, subtab: nested === "lsps" || nested === "mcps" ? undefined : nested, ...transient }
 
   if (!project && pluginTabs && isPluginTab(tab, pluginTabs))
     return { type: "root", tab, server, subtab: undefined, ...transient }

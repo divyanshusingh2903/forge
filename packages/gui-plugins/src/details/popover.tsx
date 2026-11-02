@@ -6,6 +6,7 @@ import { Tooltip } from "@opencode/ui/tooltip"
 import { onCleanup, Show, Suspense, type Component, type ParentProps } from "solid-js"
 import { Command, createVisitState, usePlugin, type MountedSession } from "@opencode/plugin/gui"
 import type { DetailsPanelProps } from "./panel"
+import type { McpPanelProps } from "./mcp-panel"
 
 /** Every mounted details popover, so a shortcut finds the one on screen. */
 export type DetailsMenus = Set<{ trigger: () => HTMLButtonElement | undefined; toggle: () => void }>
@@ -120,5 +121,37 @@ function DetailsPopover(
         </Popover.Content>
       </Popover.Portal>
     </Popover>
+  )
+}
+
+/** The MCP button beside the context usage: the session server's MCPs, out of the Extensions menu. */
+export function McpHeader(props: { session: MountedSession; panel: Component<McpPanelProps> }) {
+  const ctx = usePlugin()
+  const Panel = props.panel
+  const [open, setOpen] = createVisitState(false)
+
+  return (
+    <Show when={props.session.project}>
+      <Popover placement="bottom-end" gutter={8} overflowPadding={16} open={open()} onOpenChange={setOpen}>
+        <Tooltip placement="bottom" value={ctx.t("mcp")}>
+          <Popover.Trigger
+            as={IconButton}
+            icon={<Icon name="mcp" />}
+            variant="ghost-muted"
+            size="large"
+            state={open() ? "pressed" : undefined}
+            aria-label={ctx.t("mcp")}
+            aria-expanded={open()}
+          />
+        </Tooltip>
+        <Popover.Portal>
+          <Popover.Content class="z-50 border-0 bg-transparent outline-none" aria-label={ctx.t("mcp")}>
+            <Suspense>
+              <Panel session={props.session} shown={open()} onClose={() => setOpen(false)} />
+            </Suspense>
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover>
+    </Show>
   )
 }

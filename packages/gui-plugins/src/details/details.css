@@ -467,6 +467,13 @@ button.session-service-dot {
   height: 6px;
 }
 
+.session-mcp-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  color: var(--v2-icon-icon-base);
+}
+
 /* The 16px switch sits 6px from the row's top, bottom and end. */
 .session-mcp-row {
   padding-inline-end: 6px;
@@ -552,4 +559,19 @@ button.session-service-dot {
   .session-service-dot::before {
     animation: none;
   }
+}
+
+/* The header's MCP list, styled like an Extensions flyout pane. */
+.session-mcp-popover {
+  display: grid;
+  width: 280px;
+  max-width: calc(100vw - 32px);
+  padding: 2px 0;
+  border-radius: 6px;
+  background: var(--v2-background-bg-layer-01);
+  box-shadow: var(--v2-elevation-floating);
+  color: var(--v2-text-text-base);
+  font-size: 13px;
+  font-weight: 440;
+  line-height: var(--line-height-compact);
 }

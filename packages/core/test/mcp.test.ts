@@ -28,6 +28,8 @@ import { EnvironmentUnavailable } from "@opencode/core/environment/unavailable"
 import { Location } from "@opencode/core/location"
 import { Mcp } from "@opencode/core/mcp/index"
 import { McpClient } from "@opencode/core/mcp/client"
+import { McpToggles } from "@opencode/core/mcp/toggles"
+import { KV } from "@opencode/core/kv"
 import { McpStdio } from "@opencode/core/mcp/stdio"
 import { Permission } from "@opencode/core/permission"
 import { AbsolutePath } from "@opencode/core/schema"
@@ -301,6 +303,8 @@ function resourceMcpLayer(
     subscribe?: Bus.Interface["subscribe"]
     environment?: Layer.Layer<Environment.Service>
     published?: string[]
+    credentials?: Credential.Interface["list"]
+    toggles?: Layer.Layer<McpToggles.Service>
   },
 ) {
   const directory = AbsolutePath.make(import.meta.dir)
@@ -361,6 +365,7 @@ function resourceMcpLayer(
         }),
         Layer.mock(Integration.Service, {
           revision: () => 0,
+          transform: () => Effect.succeed({ dispose: Effect.void }),
           connection: {
             active: unusedIntegration,
             resolve: unusedIntegration,
@@ -383,9 +388,23 @@ function resourceMcpLayer(
             cancel: unusedIntegration,
           },
         }),
-        Layer.mock(Credential.Service, {}),
+        Layer.mock(Credential.Service, overrides?.credentials ? { list: overrides.credentials } : {}),
+        overrides?.toggles ?? memoryToggles(),
         overrides?.environment ?? hostEnvironmentLayer,
       ),
+    ),
+  )
+}
+
+// The toggle store over an in-memory KV, so each test starts with no saved choices.
+function memoryToggles() {
+  const values = new Map<string, KV.Value>()
+  return McpToggles.layer.pipe(
+    Layer.provide(
+      Layer.mock(KV.Service, {
+        get: (key) => Effect.sync(() => values.get(key)),
+        set: (key, value) => Effect.sync(() => void values.set(key, value)),
+      }),
     ),
   )
 }
@@ -2041,6 +2060,74 @@ test("reconciles only changed MCP server config", async () => {
   )
 })
 
+testEffect(Layer.empty).live("sends a stored access token as a Bearer header instead of OAuth", () =>
+  Effect.gen(function* () {
+    const seen: Array<string | null> = []
+    const server = yield* resourceServer({
+      respond: (request) => {
+        seen.push(request.headers.get("authorization"))
+        return undefined
+      },
+    })
+
+    yield* Effect.gen(function* () {
+      const service = yield* Mcp.Service
+      expect(yield* settled(service)).toEqual({ status: "connected" })
+      expect(seen.length).toBeGreaterThan(0)
+      expect(seen.every((value) => value === "Bearer ghp_test")).toBe(true)
+    }).pipe(
+      Effect.provide(
+        resourceMcpLayer(new ConfigMCP.Remote({ type: "remote", url: server.url }), undefined, undefined, {
+          credentials: (integrationID) =>
+            Effect.succeed([
+              new Credential.Info({
+                id: Credential.ID.make("cred_token"),
+                integrationID,
+                label: "token",
+                value: { type: "key", key: "ghp_test" },
+              }),
+            ]),
+        }),
+      ),
+    )
+  }),
+)
+
+testEffect(Layer.empty).live("applies a saved toggle in every Location and to Locations started later", () =>
+  Effect.gen(function* () {
+    // The stateless server serves every Location's client at once.
+    const server = yield* resourceServer({ modern: true })
+    const toggles = Layer.succeedContext(yield* Layer.build(memoryToggles()))
+    const config = new ConfigMCP.Remote({
+      type: "remote",
+      url: server.url,
+      oauth: false,
+      protocol: "2026-07-28",
+      disabled: true,
+    })
+    const start = Layer.build(resourceMcpLayer(config, undefined, undefined, { toggles })).pipe(
+      Effect.map((context) => Context.get(context, Mcp.Service)),
+    )
+    const status = (service: Mcp.Interface, expected: string) =>
+      settled(service).pipe(
+        Effect.flatMap((status) => (status?.status === expected ? Effect.void : Effect.fail(status))),
+        Effect.retry({ times: 200, schedule: Schedule.spaced("10 millis") }),
+      )
+
+    const first = yield* start
+    const second = yield* start
+    yield* status(second, "disabled")
+
+    yield* first.connect("resources")
+    yield* status(second, "connected")
+    yield* status(yield* start, "connected")
+
+    yield* second.disconnect("resources")
+    yield* status(first, "disabled")
+    yield* status(yield* start, "disabled")
+  }),
+)
+
 testEffect(Layer.empty).live("keeps MCP config snapshots stable during an in-flight replacement", () =>
   Effect.gen(function* () {
     const started = yield* Deferred.make<void>()
@@ -2096,6 +2183,7 @@ const shutdownIt = testEffect(
       Form.node,
       Environment.node,
       Location.node,
+      McpToggles.node,
     ]),
     [
       Location.node.replace(

@@ -1,7 +1,7 @@
 import { lazy, onCleanup, Show, Suspense } from "solid-js"
 import { Panel, Slot, Style, usePanel, type Plugin } from "@opencode/plugin/gui"
 import type Details from "./index"
-import { DetailsHeader, type DetailsMenus } from "./popover"
+import { DetailsHeader, McpHeader, type DetailsMenus } from "./popover"
 import { BuiltinSlot, onIdle } from "@opencode/plugin/gui/builtin"
 
 const setup: Plugin.Setup<typeof Details> = (ctx) => {
@@ -9,13 +9,10 @@ const setup: Plugin.Setup<typeof Details> = (ctx) => {
 
   const menus: DetailsMenus = new Set()
 
-  const DetailsPanel = lazy(() =>
-    Promise.all([import("./panel"), import("./details.css?inline")]).then(([panel, css]) => {
-      ctx.add(Style, css.default)
-
-      return panel
-    }),
-  )
+  // Both popovers share the stylesheet, added by whichever opens first.
+  const styles = once(() => import("./details.css?inline").then((css) => void ctx.add(Style, css.default)))
+  const DetailsPanel = lazy(() => Promise.all([import("./panel"), styles()]).then(([panel]) => panel))
+  const McpPanel = lazy(() => Promise.all([import("./mcp-panel"), styles()]).then(([panel]) => panel))
 
   const LocationMenu = lazy(() => import("./location-menu"))
   const LocationWorkspace = lazy(() => import("./location-workspace"))
@@ -24,10 +21,18 @@ const setup: Plugin.Setup<typeof Details> = (ctx) => {
   onCleanup(
     onIdle(() => {
       void DetailsPanel.preload()
+      void McpPanel.preload()
       void LocationMenu.preload()
       void LocationWorkspace.preload()
     }),
   )
+
+  // Between the context usage (order 10) and the details button.
+  ctx.add(Slot, {
+    at: "session.header",
+    order: 15,
+    render: (input) => <McpHeader session={input.session} panel={McpPanel} />,
+  })
 
   ctx.add(Slot, {
     at: "session.header",
@@ -88,6 +93,12 @@ const setup: Plugin.Setup<typeof Details> = (ctx) => {
 
     return panel
   })
+}
+
+function once<T>(run: () => Promise<T>) {
+  let pending: Promise<T> | undefined
+
+  return () => (pending ??= run())
 }
 
 export default setup
