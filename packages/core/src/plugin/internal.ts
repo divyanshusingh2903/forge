@@ -96,7 +96,8 @@ import { AgentPlugin } from "./agent.js"
 import BrowserPlugin from "@opencode/plugin-browser"
 import { CommandPlugin } from "./command.js"
 import { IdentityPlugin } from "./identity.js"
-import { PlanPlugin } from "./plan.js"
+import { ForgeModePlugin } from "./forge-mode.js"
+import { ForgePlanPlugin } from "./forge-plan.js"
 import { GoalPlugin } from "./goal.js"
 import { ModelsDevPlugin } from "./models-dev.js"
 import { McpCodeModeDefaultsPlugin } from "./mcp-codemode-defaults.js"
@@ -233,7 +234,9 @@ const pre = [
   WellKnownPlugin.Plugin,
   VcsGitPlugin.Plugin,
   AgentPlugin.Plugin,
-  PlanPlugin.Plugin,
+  // Forge replaces upstream's Plan agent with one that writes a plan file and presents it for review.
+  ForgePlanPlugin.Plugin,
+  ForgeModePlugin.Plugin,
   CommandPlugin.Plugin,
   GoalPlugin.Plugin,
   SkillPlugin.Plugin,
