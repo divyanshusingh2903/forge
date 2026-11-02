@@ -508,6 +508,18 @@ export function getToolInfo(
         title: i18n.t("ui.tool.grep"),
         subtitle: input.pattern,
       }
+    case "browser_navigate":
+      return {
+        icon: "browser",
+        title: i18n.t("ui.tool.browser.navigate"),
+        subtitle: (typeof metadata?.title === "string" && metadata.title) || input.url,
+      }
+    case "browser_read":
+      return {
+        icon: "browser",
+        title: i18n.t("ui.tool.browser.read"),
+        subtitle: (typeof metadata?.title === "string" && metadata.title) || (typeof metadata?.url === "string" ? metadata.url : undefined),
+      }
     case "webfetch":
       return {
         icon: "window-cursor",
@@ -1960,6 +1972,104 @@ ToolRegistry.register({
           >
             <Markdown text={props.output!} />
           </div>
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+function BrowserToolTrigger(props: { title: string; pending: boolean; url: string; label: string; tag?: string }) {
+  return (
+    <div data-slot="basic-tool-tool-info-structured">
+      <div data-slot="basic-tool-tool-info-main">
+        <span data-slot="basic-tool-tool-title">
+          <TextShimmer text={props.title} active={props.pending} />
+        </span>
+        <Show when={!props.pending && props.url}>
+          <a
+            data-slot="basic-tool-tool-subtitle"
+            class="clickable subagent-link"
+            href={props.url}
+            data-reference={parseReference(props.url) ? "" : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {props.label}
+          </a>
+        </Show>
+        <Show when={!props.pending && props.tag}>
+          {(tag) => (
+            <span
+              data-slot="basic-tool-browser-source"
+              class="text-11-regular text-text-weak px-1.5 py-0.5 rounded bg-surface-base shrink-0"
+            >
+              {tag()}
+            </span>
+          )}
+        </Show>
+      </div>
+      <Show when={!props.pending && props.url}>
+        <div data-component="tool-action">
+          <Icon name="square-arrow-top-right" size="small" />
+        </div>
+      </Show>
+    </div>
+  )
+}
+
+ToolRegistry.register({
+  name: "browser_navigate",
+  render(props) {
+    const i18n = useI18n()
+    const pending = createMemo(() => props.status === "pending" || props.status === "running")
+    const url = createMemo(() => (typeof props.metadata.url === "string" && props.metadata.url) || props.input.url || "")
+    return (
+      <BasicTool
+        {...props}
+        hideDetails
+        icon="browser"
+        trigger={
+          <BrowserToolTrigger
+            title={i18n.t("ui.tool.browser.navigate")}
+            pending={pending()}
+            url={url()}
+            label={(typeof props.metadata.title === "string" && props.metadata.title) || url()}
+          />
+        }
+      />
+    )
+  },
+})
+
+ToolRegistry.register({
+  name: "browser_read",
+  render(props) {
+    const i18n = useI18n()
+    const pending = createMemo(() => props.status === "pending" || props.status === "running")
+    const url = createMemo(() => (typeof props.metadata.url === "string" ? props.metadata.url : ""))
+    const tag = createMemo(() => {
+      if (props.metadata.source === "live") return i18n.t("ui.tool.browser.source.live")
+      if (props.metadata.source === "fetched") return i18n.t("ui.tool.browser.source.fetched")
+    })
+    return (
+      <BasicTool
+        {...props}
+        hideDetails={props.hideDetails || !props.output?.trim()}
+        defaultOpen={props.defaultOpen ?? true}
+        icon="browser"
+        trigger={
+          <BrowserToolTrigger
+            title={i18n.t("ui.tool.browser.read")}
+            pending={pending()}
+            url={url()}
+            label={(typeof props.metadata.title === "string" && props.metadata.title) || url()}
+            tag={tag()}
+          />
+        }
+      >
+        <Show when={props.output?.trim()}>
+          <ToolResponse output={props.output} />
         </Show>
       </BasicTool>
     )

@@ -59,6 +59,7 @@ function directoryState() {
     },
     session_diff: {},
     todo: {},
+    browser: {},
     permission: {},
     question: {},
     mcp_ready: true,

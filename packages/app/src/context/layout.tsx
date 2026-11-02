@@ -21,6 +21,7 @@ import { createSessionKeyReader, ensureSessionKey, pruneSessionKeys } from "./la
 import { requireServerKey } from "@/utils/session-route"
 import { type DraftTab, useTabs } from "./tabs"
 import { closeSessionTab, openSessionTab, previewSessionTab, type SessionTabs } from "./layout-tabs"
+import { resolveRightPanelToggle } from "@/pages/session/session-panel-layout"
 
 export { createSessionKeyReader, ensureSessionKey, pruneSessionKeys }
 
@@ -65,6 +66,12 @@ export function getProjectAvatarVariant(key?: string): ProjectAvatarVariant {
   return "gray"
 }
 
+export type BrowserTab = {
+  id: string
+  url: string
+  title?: string
+}
+
 type SessionView = {
   scroll: Record<string, SessionScroll>
   reviewOpen?: string[]
@@ -73,6 +80,8 @@ type SessionView = {
   pendingMessage?: string
   pendingMessageAt?: number
   todoCollapsed?: boolean
+  browserTabs?: BrowserTab[]
+  browserActiveTab?: string
 }
 
 type TabHandoff = {
@@ -285,6 +294,9 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           diffStyle: "split" as ReviewDiffStyle,
           panelOpened: DEFAULT_REVIEW_PANEL_OPENED,
         },
+        browser: {
+          panelOpened: false,
+        },
         fileTree: {
           opened: false,
           width: DEFAULT_FILE_TREE_WIDTH,
@@ -309,6 +321,7 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
     const [ephemeral, setEphemeral] = createStore({
       reviewPanelSource: "other" as ReviewPanelSource,
       sessionTabPreview: {} as Record<string, string | undefined>,
+      browserActivity: {} as Record<string, boolean | undefined>,
     })
 
     const MAX_SESSION_KEYS = 50
@@ -368,9 +381,11 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       scroll.drop(drop)
       dropSessionState(drop)
       setEphemeral(
-        "sessionTabPreview",
         produce((draft) => {
-          for (const key of drop) delete draft[key]
+          for (const key of drop) {
+            delete draft.sessionTabPreview[key]
+            delete draft.browserActivity[key]
+          }
         }),
       )
 
@@ -820,6 +835,33 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
         const terminalOpened = createMemo(() => store.terminal?.opened ?? false)
         const reviewPanelOpened = createMemo(() => store.review?.panelOpened ?? DEFAULT_REVIEW_PANEL_OPENED)
         const reviewPanelSource = createMemo(() => (reviewPanelOpened() ? ephemeral.reviewPanelSource : "other"))
+        const browserPanelOpened = createMemo(() => store.browser?.panelOpened ?? false)
+        const browserTabs = createMemo<BrowserTab[]>(() => {
+          const list = s().browserTabs
+          if (list && list.length > 0) return list
+          return [{ id: "default", url: "" }]
+        })
+        const browserActiveTabId = createMemo(() => {
+          const list = browserTabs()
+          const active = s().browserActiveTab
+          if (active && list.some((tab) => tab.id === active)) return active
+          return list[0]?.id ?? "default"
+        })
+        const browserActiveTab = createMemo(
+          () => browserTabs().find((tab) => tab.id === browserActiveTabId()) ?? browserTabs()[0]!,
+        )
+
+        function writeBrowserTabs(session: string, nextTabs: BrowserTab[], nextActiveId: string) {
+          if (!store.sessionView[session]) {
+            setStore("sessionView", session, { scroll: {}, browserTabs: nextTabs, browserActiveTab: nextActiveId })
+          } else {
+            batch(() => {
+              setStore("sessionView", session, "browserTabs", nextTabs)
+              setStore("sessionView", session, "browserActiveTab", nextActiveId)
+            })
+          }
+          prune(session)
+        }
 
         function setTerminalOpened(next: boolean) {
           const current = store.terminal
@@ -833,25 +875,63 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
           setStore("terminal", "opened", next)
         }
 
+        function setBrowserPanelOpened(next: boolean) {
+          const current = store.browser
+          if (!current) {
+            setStore("browser", { panelOpened: next })
+            return
+          }
+          if ((current.panelOpened ?? false) === next) return
+          setStore("browser", "panelOpened", next)
+        }
+
         function setReviewPanelOpened(next: boolean, source: ReviewPanelSource) {
           const nextSource = next ? source : "other"
+          const resolved = resolveRightPanelToggle(
+            { review: reviewPanelOpened(), browser: browserPanelOpened() },
+            { type: "review", open: next },
+          )
           const current = store.review
           if (!current) {
             batch(() => {
-              setStore("review", { diffStyle: "split" as ReviewDiffStyle, panelOpened: next })
+              setStore("review", { diffStyle: "split" as ReviewDiffStyle, panelOpened: resolved.review })
               setEphemeral("reviewPanelSource", nextSource)
+              setBrowserPanelOpened(resolved.browser)
             })
             return
           }
 
           const value = current.panelOpened ?? DEFAULT_REVIEW_PANEL_OPENED
-          if (value === next) {
-            if (ephemeral.reviewPanelSource !== nextSource) setEphemeral("reviewPanelSource", nextSource)
+          if (value === resolved.review) {
+            batch(() => {
+              if (ephemeral.reviewPanelSource !== nextSource) setEphemeral("reviewPanelSource", nextSource)
+              setBrowserPanelOpened(resolved.browser)
+            })
             return
           }
           batch(() => {
-            setStore("review", "panelOpened", next)
+            setStore("review", "panelOpened", resolved.review)
             setEphemeral("reviewPanelSource", nextSource)
+            setBrowserPanelOpened(resolved.browser)
+          })
+        }
+
+        function applyBrowserPanelToggle(open: boolean, auto = false) {
+          const session = key()
+          const resolved = resolveRightPanelToggle(
+            {
+              review: reviewPanelOpened(),
+              browser: browserPanelOpened(),
+              files: store.fileTree?.opened ?? false,
+            },
+            { type: "browser", open, auto },
+          )
+          batch(() => {
+            if (resolved.review !== reviewPanelOpened()) {
+              setReviewPanelOpened(resolved.review, "other")
+            }
+            setBrowserPanelOpened(resolved.browser)
+            setEphemeral("browserActivity", session, resolved.activity || undefined)
           })
         }
 
@@ -898,6 +978,78 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
             toggle() {
               setReviewPanelOpened(!reviewPanelOpened(), "other")
             },
+          },
+          browserPanel: {
+            opened: browserPanelOpened,
+            open() {
+              applyBrowserPanelToggle(true)
+            },
+            openAuto() {
+              applyBrowserPanelToggle(true, true)
+            },
+            close() {
+              applyBrowserPanelToggle(false)
+            },
+            toggle() {
+              applyBrowserPanelToggle(!browserPanelOpened())
+            },
+          },
+          browser: {
+            tabs: browserTabs,
+            activeTabId: browserActiveTabId,
+            activeTab: browserActiveTab,
+            setUrl(url: string, tabId: string) {
+              const list = browserTabs()
+              const existing = list.find((tab) => tab.id === tabId)
+              if (existing?.url === url) return
+              const nextTabs = existing
+                ? list.map((tab) => (tab.id === tabId ? { ...tab, url } : tab))
+                : [...list, { id: tabId, url }]
+              writeBrowserTabs(key(), nextTabs, browserActiveTabId())
+            },
+            setTitle(title: string | undefined, tabId: string) {
+              const list = browserTabs()
+              const existing = list.find((tab) => tab.id === tabId)
+              if (!existing || existing.title === title) return
+              writeBrowserTabs(
+                key(),
+                list.map((tab) => (tab.id === tabId ? { ...tab, title } : tab)),
+                browserActiveTabId(),
+              )
+            },
+            setActiveTab(tabId: string) {
+              const session = key()
+              const list = browserTabs()
+              if (!list.some((tab) => tab.id === tabId)) return
+              if (s().browserActiveTab === tabId) return
+              writeBrowserTabs(session, list, tabId)
+            },
+            addTab(url = "") {
+              const session = key()
+              const list = browserTabs()
+              const id = crypto.randomUUID()
+              const nextTabs = [...list, { id, url }]
+              writeBrowserTabs(session, nextTabs, id)
+              return id
+            },
+            closeTab(tabId: string) {
+              const session = key()
+              const list = browserTabs()
+              if (list.length <= 1) {
+                const resetId = crypto.randomUUID()
+                writeBrowserTabs(session, [{ id: resetId, url: "" }], resetId)
+                applyBrowserPanelToggle(false)
+                return
+              }
+              const idx = list.findIndex((tab) => tab.id === tabId)
+              if (idx === -1) return
+              const nextTabs = list.filter((tab) => tab.id !== tabId)
+              const currentActive = browserActiveTabId()
+              const nextActive =
+                currentActive === tabId ? (nextTabs[idx]?.id ?? nextTabs[idx - 1]?.id ?? nextTabs[0]!.id) : currentActive
+              writeBrowserTabs(session, nextTabs, nextActive)
+            },
+            activity: createMemo(() => Boolean(ephemeral.browserActivity[key()])),
           },
           review: {
             mode: reviewMode,

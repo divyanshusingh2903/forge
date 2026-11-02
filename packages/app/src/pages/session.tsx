@@ -87,6 +87,7 @@ import {
   sessionPanelWidthMax,
 } from "@/pages/session/session-panel-width"
 import { SessionSidePanel } from "@/pages/session/session-side-panel"
+import { SessionBrowserPanel } from "@/pages/session/browser-panel"
 import { sessionPanelLayout } from "@/pages/session/session-panel-layout"
 import { SessionReviewEmptyChangesV2 } from "@opencode-ai/session-ui/v2/session-review-empty-changes-v2"
 import { SessionReviewEmptyNoGitV2 } from "@opencode-ai/session-ui/v2/session-review-empty-no-git-v2"
@@ -478,6 +479,19 @@ export default function Page() {
     }
   })
 
+  // Agent navigation opens the browser panel, or badges the header when another panel is open. The panel runs
+  // and clears the command itself, so a command left in the store only reopens the panel while it is still fresh.
+  const openedForBrowserCommand = new Set<string>()
+  createEffect(() => {
+    const id = params.id
+    if (!id) return
+    const pending = sync().data.browser[id]?.command
+    if (!pending || pending.command.type !== "navigate" || pending.expiresAt < Date.now()) return
+    if (openedForBrowserCommand.has(pending.requestID)) return
+    openedForBrowserCommand.add(pending.requestID)
+    untrack(() => view().browserPanel.openAuto())
+  })
+
   createEffect(() => {
     if (!prompt.ready()) return
     untrack(() => {
@@ -550,11 +564,13 @@ export default function Page() {
   const isDesktop = createMediaQuery("(min-width: 768px)")
   const size = createSizing()
   const desktopReviewOpen = createMemo(() => isDesktop() && view().reviewPanel.opened())
+  const desktopBrowserOpen = createMemo(() => isDesktop() && view().browserPanel.opened() && !!params.id)
   const desktopV2ReviewOpen = createMemo(() => newSessionDesign() && desktopReviewOpen() && !!params.id)
+  const desktopV2BrowserOpen = createMemo(() => newSessionDesign() && desktopBrowserOpen())
   const terminalOpen = createMemo(() => view().terminal.opened())
   const desktopTerminalOpen = createMemo(() => isDesktop() && terminalOpen())
   const desktopInlineTerminalOnlyOpen = createMemo(
-    () => newSessionDesign() && desktopTerminalOpen() && !desktopV2ReviewOpen(),
+    () => newSessionDesign() && desktopTerminalOpen() && !desktopV2ReviewOpen() && !desktopV2BrowserOpen(),
   )
   const desktopFileTreeOpen = createMemo(
     () =>
@@ -565,7 +581,9 @@ export default function Page() {
       }),
   )
   const desktopSessionResizeOpen = createMemo(() =>
-    newSessionDesign() ? desktopV2ReviewOpen() || desktopTerminalOpen() : desktopReviewOpen(),
+    newSessionDesign()
+      ? desktopV2ReviewOpen() || desktopV2BrowserOpen() || desktopTerminalOpen()
+      : desktopReviewOpen() || desktopBrowserOpen(),
   )
   const desktopSidePanelOpen = createMemo(() => desktopSessionResizeOpen() || desktopFileTreeOpen())
   let panelRow: HTMLDivElement | undefined
@@ -603,10 +621,13 @@ export default function Page() {
     if (desktopSessionResizeOpen()) return `${sessionPanelResizedWidth()}px`
     return `calc(100% - ${layout.fileTree.width()}px)`
   })
-  const centered = createMemo(() => isDesktop() && (newSessionDesign() || !desktopReviewOpen()))
+  const centered = createMemo(
+    () => isDesktop() && (newSessionDesign() || (!desktopReviewOpen() && !desktopBrowserOpen())),
+  )
   const desktopV2PanelLayout = createMemo(() =>
     sessionPanelLayout({
       review: desktopV2ReviewOpen(),
+      browser: desktopV2BrowserOpen(),
       terminal: desktopTerminalOpen(),
       files: desktopFileTreeOpen(),
     }),
@@ -2462,53 +2483,67 @@ export default function Page() {
         </div>
 
         <Show when={!newSessionDesign() && desktopSidePanelOpen()}>
-          <Suspense>
-            <SessionSidePanel
-              canReview={canReview}
-              diffs={reviewDiffs}
-              diffsReady={reviewReady}
-              empty={reviewEmptyText}
-              hasReview={hasReview}
-              reviewHasFocusableContent={hasReview}
-              reviewCount={reviewCount}
-              reviewPanel={reviewPanel}
-              activeDiff={activeReviewFile()}
-              focusReviewDiff={focusReviewDiff}
-              reviewSnap={ui.reviewSnap}
-              size={size}
-            />
-          </Suspense>
+          <Show
+            when={desktopBrowserOpen()}
+            fallback={
+              <Suspense>
+                <SessionSidePanel
+                  canReview={canReview}
+                  diffs={reviewDiffs}
+                  diffsReady={reviewReady}
+                  empty={reviewEmptyText}
+                  hasReview={hasReview}
+                  reviewHasFocusableContent={hasReview}
+                  reviewCount={reviewCount}
+                  reviewPanel={reviewPanel}
+                  activeDiff={activeReviewFile()}
+                  focusReviewDiff={focusReviewDiff}
+                  reviewSnap={ui.reviewSnap}
+                  size={size}
+                />
+              </Suspense>
+            }
+          >
+            <SessionBrowserPanel />
+          </Show>
         </Show>
         <Show when={newSessionDesign()}>
           <Show when={isDesktop() ? desktopV2PanelLayout().visible : terminalOpen()}>
             <div class="min-w-0 h-full flex flex-1 flex-col">
-              <Show when={isDesktop() && (desktopV2ReviewOpen() || desktopFileTreeOpen())}>
-                <div class="min-h-0 flex-1">
-                  <Suspense>
-                    <SessionSidePanel
-                      canReview={canReview}
-                      diffs={reviewDiffs}
-                      diffsReady={reviewReady}
-                      empty={reviewEmptyText}
-                      hasReview={hasReview}
-                      reviewHasFocusableContent={() => hasReview() || reviewV2State.sidebarOpened()}
-                      reviewCount={reviewCount}
-                      reviewPanel={reviewPanelV2}
-                      reviewSidebarToggle={(disabled) => (
-                        <SessionReviewV2SidebarToggle
-                          opened={reviewV2State.sidebarOpened()}
-                          disabled={disabled}
-                          onToggle={reviewV2State.toggleSidebar}
+              <Show when={isDesktop() && (desktopV2ReviewOpen() || desktopV2BrowserOpen() || desktopFileTreeOpen())}>
+                <div class="min-h-0 flex-1 flex">
+                  <Show
+                    when={desktopV2BrowserOpen()}
+                    fallback={
+                      <Suspense>
+                        <SessionSidePanel
+                          canReview={canReview}
+                          diffs={reviewDiffs}
+                          diffsReady={reviewReady}
+                          empty={reviewEmptyText}
+                          hasReview={hasReview}
+                          reviewHasFocusableContent={() => hasReview() || reviewV2State.sidebarOpened()}
+                          reviewCount={reviewCount}
+                          reviewPanel={reviewPanelV2}
+                          reviewSidebarToggle={(disabled) => (
+                            <SessionReviewV2SidebarToggle
+                              opened={reviewV2State.sidebarOpened()}
+                              disabled={disabled}
+                              onToggle={reviewV2State.toggleSidebar}
+                            />
+                          )}
+                          fileBrowserState={reviewV2State}
+                          activeDiff={activeReviewFile()}
+                          focusReviewDiff={focusReviewDiff}
+                          reviewSnap={ui.reviewSnap}
+                          size={size}
+                          stacked={desktopV2PanelLayout().stacked}
                         />
-                      )}
-                      fileBrowserState={reviewV2State}
-                      activeDiff={activeReviewFile()}
-                      focusReviewDiff={focusReviewDiff}
-                      reviewSnap={ui.reviewSnap}
-                      size={size}
-                      stacked={desktopV2PanelLayout().stacked}
-                    />
-                  </Suspense>
+                      </Suspense>
+                    }
+                  >
+                    <SessionBrowserPanel stacked={desktopV2PanelLayout().stacked} />
+                  </Show>
                 </div>
               </Show>
               <Show when={desktopV2PanelLayout().stacked}>

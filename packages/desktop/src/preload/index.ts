@@ -145,6 +145,7 @@ const api: ElectronAPI = {
   setForceFocus: (enabled) => ipcRenderer.invoke("set-force-focus", enabled),
   recordFatalRendererError: (error) => ipcRenderer.invoke("record-fatal-renderer-error", error),
   setNativeTranslations: (bundle) => ipcRenderer.invoke("set-native-translations", bundle),
+  clearBrowserData: () => ipcRenderer.invoke("clear-browser-data"),
 }
 
 contextBridge.exposeInMainWorld("api", api)

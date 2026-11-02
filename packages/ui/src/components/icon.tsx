@@ -25,6 +25,9 @@ const icons = {
   terminal: `<path d="M6.5 8L8.64286 10L6.5 12M10.9286 12H13.5M2 18H18V2H2V18Z" stroke="currentColor" stroke-linecap="square"/>`,
   "terminal-active": `<path d="M2 18H18V2H2V18Z" fill="currentColor" fill-opacity="0.1"/>
 <path d="M6.5 8L8.64286 10L6.5 12M10.9286 12H13.5M2 18H18V2H2V18Z" stroke="currentColor" stroke-linecap="square"/>`,
+  browser: `<circle cx="10" cy="10" r="8" stroke="currentColor"/><ellipse cx="10" cy="10" rx="3.5" ry="8" stroke="currentColor"/><path d="M2 10H18" stroke="currentColor"/>`,
+  "browser-active": `<circle cx="10" cy="10" r="8" fill="currentColor" fill-opacity="0.1"/>
+<circle cx="10" cy="10" r="8" stroke="currentColor"/><ellipse cx="10" cy="10" rx="3.5" ry="8" stroke="currentColor"/><path d="M2 10H18" stroke="currentColor"/>`,
   review: `<path d="M7 14.5H13M7 7.99512H10.0049M10.0049 7.99512H13M10.0049 7.99512V5M10.0049 7.99512V11M18 18V2L2 2L2 18H18Z" stroke="currentColor"/>`,
   "review-active": `<path d="M18 18V2L2 2L2 18H18Z" fill="currentColor" fill-opacity="0.1"/>
 <path d="M7 14.5H13M7 7.99512H10.0049M10.0049 7.99512H13M10.0049 7.99512V5M10.0049 7.99512V11M18 18V2L2 2L2 18H18Z" stroke="currentColor"/>`,

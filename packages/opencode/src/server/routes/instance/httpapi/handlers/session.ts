@@ -16,6 +16,7 @@ import { SessionRunState } from "@/session/run-state"
 import { SessionStatus } from "@/session/status"
 import { SessionSummary } from "@/session/summary"
 import { Todo } from "@/session/todo"
+import { Browser } from "@/browser"
 import { MessageID, PartID, SessionID } from "@/session/schema"
 import { NamedError } from "@opencode-ai/core/util/error"
 import { FSUtil } from "@opencode-ai/core/fs-util"
@@ -40,7 +41,7 @@ import {
   SummarizePayload,
   UpdatePayload,
 } from "../groups/session"
-import { PermissionNotFoundError } from "../errors"
+import { PayloadTooLargeError, PermissionNotFoundError } from "../errors"
 import * as SessionError from "./session-errors"
 
 const tryParseJson = (text: string) =>
@@ -61,6 +62,7 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const permissionSvc = yield* Permission.Service
     const statusSvc = yield* SessionStatus.Service
     const todoSvc = yield* Todo.Service
+    const browserSvc = yield* Browser.Service
     const summary = yield* SessionSummary.Service
     const recovery = yield* SessionRecovery.Service
     const events = yield* EventV2Bridge.Service
@@ -100,6 +102,39 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
     const todo = Effect.fn("SessionHttpApi.todo")(function* (ctx: { params: { sessionID: SessionID } }) {
       yield* requireSession(ctx.params.sessionID)
       return yield* todoSvc.get(ctx.params.sessionID)
+    })
+
+    const browser = Effect.fn("SessionHttpApi.browser")(function* (ctx: { params: { sessionID: SessionID } }) {
+      yield* requireSession(ctx.params.sessionID)
+      return yield* browserSvc.get(ctx.params.sessionID)
+    })
+
+    const browserUpdate = Effect.fn("SessionHttpApi.browserUpdate")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: Browser.StateInput
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      return yield* browserSvc.setState(ctx.params.sessionID, ctx.payload)
+    })
+
+    const browserAttach = Effect.fn("SessionHttpApi.browserAttach")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: Browser.AttachInput
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      if (ctx.payload.attached) return yield* browserSvc.attach(ctx.params.sessionID, ctx.payload.clientID)
+      return yield* browserSvc.detach(ctx.params.sessionID, ctx.payload.clientID)
+    })
+
+    const browserResult = Effect.fn("SessionHttpApi.browserResult")(function* (ctx: {
+      params: { sessionID: SessionID }
+      payload: Browser.ResultInput
+    }) {
+      yield* requireSession(ctx.params.sessionID)
+      yield* browserSvc
+        .resolve(ctx.params.sessionID, ctx.payload)
+        .pipe(Effect.mapError((err) => new PayloadTooLargeError({ message: err.message })))
+      return yield* browserSvc.get(ctx.params.sessionID)
     })
 
     const diff = Effect.fn("SessionHttpApi.diff")(function* (ctx: {
@@ -546,6 +581,10 @@ export const sessionHandlers = HttpApiBuilder.group(InstanceHttpApi, "session", 
       .handle("get", get)
       .handle("children", children)
       .handle("todo", todo)
+      .handle("browser", browser)
+      .handle("browserUpdate", browserUpdate)
+      .handle("browserAttach", browserAttach)
+      .handle("browserResult", browserResult)
       .handle("diff", diff)
       .handle("plan", plan)
       .handle("planRecover", planRecover)

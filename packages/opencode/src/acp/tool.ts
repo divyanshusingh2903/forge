@@ -44,6 +44,8 @@ export function toToolKind(toolName: string): ToolKind {
       return "execute"
 
     case "webfetch":
+    case "browser_navigate":
+    case "browser_read":
       return "fetch"
 
     case "edit":

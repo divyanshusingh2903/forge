@@ -432,6 +432,30 @@ export function SessionHeader(props: { diffs?: Accessor<SessionHeaderReviewDiff[
 
                     <div class="hidden md:flex items-center gap-1 shrink-0">
                       <TooltipKeybind
+                        title={language.t("command.browser.toggle")}
+                        keybind={command.keybind("browser.toggle")}
+                      >
+                        <Button
+                          variant="ghost"
+                          class="titlebar-icon w-8 h-6 p-0 box-border"
+                          onClick={() => view().browserPanel.toggle()}
+                          aria-label={language.t("command.browser.toggle")}
+                          aria-expanded={view().browserPanel.opened()}
+                          aria-controls="browser-panel"
+                        >
+                          <div class="relative flex items-center justify-center size-4">
+                            <Icon size="small" name={view().browserPanel.opened() ? "browser-active" : "browser"} />
+                            <Show when={view().browser.activity() && !view().browserPanel.opened()}>
+                              <span
+                                data-slot="browser-activity-badge"
+                                class="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-icon-info-base"
+                              />
+                            </Show>
+                          </div>
+                        </Button>
+                      </TooltipKeybind>
+
+                      <TooltipKeybind
                         title={language.t("command.review.toggle")}
                         keybind={command.keybind("review.toggle")}
                       >
@@ -496,11 +520,13 @@ export function SessionHeaderQuickActions(props: {
   mcp?: boolean
   review?: boolean
   terminal?: boolean
+  browser?: boolean
 }) {
   const language = useLanguage()
   const settings = useSettings()
   const dialog = useDialog()
   const showTerminal = props.terminal ?? true
+  const showBrowser = props.browser ?? props.review ?? true
   // Only call useTerminal() when this instance actually renders the terminal button --
   // routes without TerminalProvider (the draft/new-session page) would otherwise throw.
   const terminal = showTerminal ? useTerminal() : undefined
@@ -519,6 +545,8 @@ export function SessionHeaderQuickActions(props: {
   const reviewDiffs = props.diffs ?? (() => [])
   const reviewOpened = createMemo(() => view().reviewPanel.opened())
   const terminalOpened = createMemo(() => view().terminal.opened())
+  const browserOpened = createMemo(() => view().browserPanel.opened())
+  const browserActivity = createMemo(() => view().browser.activity())
 
   const toggleTerminal = () => {
     const next = !terminalOpened()
@@ -571,6 +599,32 @@ export function SessionHeaderQuickActions(props: {
             aria-controls="terminal-panel"
             onClick={toggleTerminal}
             icon={<IconV2 name={terminalOpened() ? "terminal-active" : "terminal"} />}
+          />
+        </TooltipV2>
+      </Show>
+      <Show when={showBrowser}>
+        <TooltipV2 value={language.t("command.browser.toggle")} placement="bottom">
+          <IconButtonV2
+            type="button"
+            variant="ghost-muted"
+            size="large"
+            class="!w-9 shrink-0 relative"
+            state={browserOpened() ? "pressed" : undefined}
+            aria-label={language.t("command.browser.toggle")}
+            aria-expanded={browserOpened()}
+            aria-controls="browser-panel"
+            onClick={() => view().browserPanel.toggle()}
+            icon={
+              <span class="relative inline-flex items-center justify-center">
+                <IconV2 name={browserOpened() ? "browser-active" : "browser"} />
+                <Show when={browserActivity() && !browserOpened()}>
+                  <span
+                    data-slot="browser-activity-badge"
+                    class="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-icon-info-base"
+                  />
+                </Show>
+              </span>
+            }
           />
         </TooltipV2>
       </Show>

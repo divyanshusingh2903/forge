@@ -9,6 +9,7 @@ import type {
   QuestionRequest,
   ReferenceInfo,
   Session,
+  SessionBrowserCommand,
   SessionStatus,
   Todo,
   VcsInfo,
@@ -27,6 +28,17 @@ export type ProjectMeta = {
   }
   commands?: {
     start?: string
+  }
+}
+
+export type SessionBrowserState = {
+  /** Latest agent command for the session browser panel; the panel clears it once it starts running it. */
+  command?: {
+    requestID: string
+    tabID?: string
+    command: SessionBrowserCommand
+    /** Client clock time after which the server has stopped waiting for the result. */
+    expiresAt: number
   }
 }
 
@@ -53,6 +65,9 @@ export type State = {
   }
   todo: {
     [sessionID: string]: Todo[]
+  }
+  browser: {
+    [sessionID: string]: SessionBrowserState | undefined
   }
   permission: {
     [sessionID: string]: PermissionRequest[]

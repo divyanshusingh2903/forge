@@ -1,0 +1,13 @@
+- Navigates a tab in the session's Browser panel, the live browser the user sees in the Forge desktop app.
+- Actions: `goto` (requires `url`, http/https only), `back`, `forward`, `reload`.
+- Returns the tab ID, final URL, title and the list of open tabs. It does NOT return page content; call `browser_read` afterwards to read the page.
+- Use this tool ONLY for:
+  1. Frontend verification: loading a local dev server (`localhost`, `127.0.0.1`, or a preview URL) to check rendered output.
+  2. Pages unusable via `webfetch`: client-side rendered apps, pages that need the user's signed-in cookies, or bot-challenged pages.
+  3. User-directed browsing in the panel.
+- Do NOT use it for general web fetching or documentation lookups; use `webfetch` for normal URLs.
+
+Tab targeting:
+  - Pass `tabID` (from the open tabs list) to navigate a specific tab, or `newTab: true` to open a new one.
+  - Without either, `goto` reuses a tab already showing the same URL or origin, then an empty tab, and otherwise opens a new tab, so the user's unrelated tabs are left alone. `back`, `forward` and `reload` act on the active tab.
+- Fails when no Browser panel is available (web app, CLI, or the panel does not open in time).

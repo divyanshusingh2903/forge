@@ -12,6 +12,7 @@ import { ReadTool } from "./read"
 import { TaskTool } from "./task"
 import { Database } from "@opencode-ai/core/database/database"
 import { TodoWriteTool } from "./todo"
+import { BrowserNavigateTool, BrowserReadTool } from "./browser"
 import { WebFetchTool } from "./webfetch"
 import { WriteTool } from "./write"
 import { InvalidTool } from "./invalid"
@@ -29,6 +30,7 @@ import { WebSearchTool } from "./websearch"
 import { LspTool } from "./lsp"
 import * as Truncate from "./truncate"
 import { ApplyPatchTool } from "./apply_patch"
+import { Browser } from "@/browser"
 import { Glob } from "@opencode-ai/core/util/glob"
 import path from "path"
 import { pathToFileURL } from "url"
@@ -106,6 +108,8 @@ const layer = Layer.effect(
     const lsptool = yield* LspTool
     const plan = yield* PresentPlanTool
     const planEnter = yield* PlanEnterTool
+    const browserNavigate = yield* BrowserNavigateTool
+    const browserRead = yield* BrowserReadTool
     const webfetch = yield* WebFetchTool
     const websearch = yield* WebSearchTool
     const shell = yield* ShellTool
@@ -216,6 +220,8 @@ const layer = Layer.effect(
           edit: Tool.init(edit),
           write: Tool.init(writetool),
           task: Tool.init(task),
+          browserNavigate: Tool.init(browserNavigate),
+          browserRead: Tool.init(browserRead),
           fetch: Tool.init(webfetch),
           todo: Tool.init(todo),
           search: Tool.init(websearch),
@@ -240,6 +246,8 @@ const layer = Layer.effect(
             tool.edit,
             tool.write,
             tool.task,
+            tool.browserNavigate,
+            tool.browserRead,
             tool.fetch,
             tool.todo,
             tool.search,
@@ -438,6 +446,7 @@ export const node = LayerNode.make({
     Todo.node,
     Agent.node,
     Skill.node,
+    Browser.node,
     Session.node,
     BackgroundJob.node,
     Provider.node,

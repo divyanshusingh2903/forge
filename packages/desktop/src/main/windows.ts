@@ -3,7 +3,7 @@ import type { DesktopTheme } from "@opencode-ai/ui/theme/types"
 import oc2ThemeJson from "../../../ui/src/theme/themes/oc-2.json"
 import { randomUUID } from "node:crypto"
 import { rmSync } from "node:fs"
-import { app, BrowserWindow, dialog, net, nativeImage, nativeTheme, protocol, screen, shell } from "electron"
+import { app, BrowserWindow, dialog, net, nativeImage, nativeTheme, protocol, screen, session, shell } from "electron"
 import { dirname, isAbsolute, join, relative, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { TitlebarTheme } from "../preload/types"
@@ -24,6 +24,10 @@ const rendererHost = "renderer"
 const clipboardWritePermission = "clipboard-sanitized-write"
 const notificationPermission = "notifications"
 const rendererPermissions = new Set([clipboardWritePermission, notificationPermission])
+// The embedded session browser shares a single persistent partition across sessions
+// so cookies and logins stay signed in; users can clear it via the "Clear browser data" command.
+const browserPartition = "persist:forge-browser"
+let browserPartitionConfigured = false
 const oc2Theme = oc2ThemeJson as DesktopTheme
 const oc2Background = {
   light: resolveThemeVariant(oc2Theme.light, false)["background-base"],
@@ -207,9 +211,11 @@ export function createMainWindow(id: string = randomUUID()) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webviewTag: true,
     },
   })
 
+  configureBrowserPartition()
   allowRendererPermissions(win)
   wireWindowRecovery(win, id)
   wireNavigationPolicy(win)
@@ -260,6 +266,36 @@ export function openLocalFileURL(value: string) {
   })
 }
 
+export async function clearBrowserStorageData() {
+  await session.fromPartition(browserPartition).clearStorageData()
+}
+
+function configureBrowserPartition() {
+  if (browserPartitionConfigured) return
+  browserPartitionConfigured = true
+  const browserSession = session.fromPartition(browserPartition)
+  browserSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false)
+  })
+  browserSession.setPermissionCheckHandler(() => false)
+  browserSession.on("will-download", (_event, item) => {
+    writeLog(
+      "browser",
+      "cancelled download in session browser",
+      { url: item.getURL(), filename: item.getFilename() },
+      "warn",
+    )
+    item.cancel()
+  })
+}
+
+function isAllowedBrowserUrl(value?: string) {
+  if (!value) return false
+  if (value === "about:blank") return true
+  const parsed = URL.parse(value)
+  return parsed?.protocol === "http:" || parsed?.protocol === "https:"
+}
+
 function wireNavigationPolicy(win: BrowserWindow) {
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (!isRendererUrl(url)) openExternalURL(url)
@@ -271,6 +307,42 @@ function wireNavigationPolicy(win: BrowserWindow) {
     if (isRendererUrl(url)) return
     event.preventDefault()
     openExternalURL(url)
+  })
+  win.webContents.on("will-attach-webview", (event, webPreferences, params) => {
+    delete (webPreferences as Record<string, unknown>).preload
+    delete (webPreferences as Record<string, unknown>).preloadURL
+    webPreferences.nodeIntegration = false
+    webPreferences.contextIsolation = true
+    webPreferences.sandbox = true
+    webPreferences.webSecurity = true
+
+    const partition = params.partition ?? webPreferences.partition
+    if (partition !== browserPartition || !isAllowedBrowserUrl(params.src)) {
+      writeLog("browser", "rejected webview attach", { partition, src: params.src }, "warn")
+      event.preventDefault()
+      return
+    }
+    webPreferences.partition = browserPartition
+  })
+  win.webContents.on("did-attach-webview", (_event, guest) => {
+    guest.setWindowOpenHandler(({ url }) => {
+      if (url !== "about:blank" && isAllowedBrowserUrl(url)) {
+        void guest.loadURL(url)
+      }
+      return { action: "deny" }
+    })
+    guest.on("will-navigate", (event, url) => {
+      if (!isAllowedBrowserUrl(url)) event.preventDefault()
+    })
+    // Subframes may also use document-local schemes (srcdoc, blob and data iframes); the main frame stays http(s).
+    guest.on("will-frame-navigate", (event) => {
+      if (isAllowedBrowserUrl(event.url)) return
+      if (!event.isMainFrame && /^(about:srcdoc|blob:|data:)/.test(event.url)) return
+      event.preventDefault()
+    })
+    guest.on("will-redirect", (event, url) => {
+      if (!isAllowedBrowserUrl(url)) event.preventDefault()
+    })
   })
 }
 

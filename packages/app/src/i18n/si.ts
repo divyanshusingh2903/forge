@@ -1,7 +1,9 @@
+import { browserDict } from "./browser"
 import { gitDict } from "./git"
 import { MANUAL_UPDATE_ENGLISH } from "./updater"
 
 export const dict: Record<string, string> = {
+  ...browserDict("si"),
   ...gitDict("si"),
   ...MANUAL_UPDATE_ENGLISH,
   "desktop.menu.app": "OpenCode",

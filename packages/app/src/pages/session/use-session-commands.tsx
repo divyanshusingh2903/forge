@@ -6,6 +6,7 @@ import { useFile, selectionFromLines, type FileSelection, type SelectedLineRange
 import { useLanguage } from "@/context/language"
 import { useLayout } from "@/context/layout"
 import { usePermission } from "@/context/permission"
+import { usePlatform } from "@/context/platform"
 import { usePrompt } from "@/context/prompt"
 import { useSDK } from "@/context/sdk"
 import { useSettings } from "@/context/settings"
@@ -43,6 +44,7 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const file = useFile()
   const language = useLanguage()
   const permission = usePermission()
+  const platform = usePlatform()
   const prompt = usePrompt()
   const sdk = useSDK()
   const settings = useSettings()
@@ -550,6 +552,33 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
       keybind: "mod+shift+r",
       onSelect: () => view().reviewPanel.toggle(),
     }),
+    viewCommand({
+      id: "browser.toggle",
+      title: language.t("command.browser.toggle"),
+      description: language.t("command.browser.toggle.description"),
+      keybind: "mod+shift+b",
+      disabled: !params.id,
+      onSelect: () => view().browserPanel.toggle(),
+    }),
+    ...(platform.platform === "desktop" && platform.clearBrowserData
+      ? [
+          viewCommand({
+            id: "browser.clearData",
+            title: language.t("command.browser.clearData"),
+            description: language.t("command.browser.clearData.description"),
+            onSelect: () => {
+              void platform.clearBrowserData?.().then(() => {
+                showToast({
+                  variant: "success",
+                  icon: "circle-check",
+                  title: language.t("command.browser.clearData.toast.title"),
+                  description: language.t("command.browser.clearData.toast.description"),
+                })
+              })
+            },
+          }),
+        ]
+      : []),
     ...(shown()
       ? [
           viewCommand({

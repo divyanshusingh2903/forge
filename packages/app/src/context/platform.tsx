@@ -124,6 +124,9 @@ type PlatformBase = {
 
   /** Record a fatal renderer error in platform logs (desktop only) */
   recordFatalRendererError?(error: FatalRendererErrorLog): Promise<void>
+
+  /** Clear cookies and storage for the session browser partition (desktop only) */
+  clearBrowserData?(): Promise<void>
 }
 
 export type Platform = PlatformBase &

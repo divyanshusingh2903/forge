@@ -31,6 +31,14 @@ export class ConflictError extends Schema.TaggedErrorClass<ConflictError>()(
   { httpApiStatus: 409 },
 ) {}
 
+export class PayloadTooLargeError extends Schema.TaggedErrorClass<PayloadTooLargeError>()(
+  "PayloadTooLargeError",
+  {
+    message: Schema.String,
+  },
+  { httpApiStatus: 413 },
+) {}
+
 export class UpstreamError extends Schema.TaggedErrorClass<UpstreamError>()(
   "UpstreamError",
   {

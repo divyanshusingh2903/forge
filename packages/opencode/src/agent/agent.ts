@@ -140,6 +140,7 @@ const layer = Layer.effect(
           "*": "allow",
           bash: "ask",
           edit: "ask",
+          browser: "ask",
           doom_loop: "ask",
           external_directory: {
             "*": "ask",
@@ -229,6 +230,7 @@ const layer = Layer.effect(
                 bash: "allow",
                 webfetch: "allow",
                 websearch: "allow",
+                browser: "ask",
                 read: "allow",
                 external_directory: readonlyExternalDirectory,
               }),

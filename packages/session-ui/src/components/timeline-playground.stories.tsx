@@ -439,6 +439,48 @@ const TOOL_SAMPLES = {
     title: "Fetch https://example.com/image.png",
     metadata: {},
   },
+  browser_navigate: {
+    tool: "browser_navigate",
+    input: { action: "goto", url: "http://localhost:3000/dashboard" },
+    output: [
+      "URL: http://localhost:3000/dashboard",
+      "Title: Local Dev Dashboard",
+      "Tab: tab-1",
+      "Open tabs:",
+      "- [tab-1] Local Dev Dashboard — http://localhost:3000/dashboard (active)",
+    ].join("\n"),
+    title: "Local Dev Dashboard",
+    metadata: {
+      action: "goto",
+      url: "http://localhost:3000/dashboard",
+      title: "Local Dev Dashboard",
+      tabID: "tab-1",
+    },
+  },
+  browser_read: {
+    tool: "browser_read",
+    input: { format: "markdown" },
+    output: [
+      "URL: http://localhost:3000/dashboard",
+      "Title: Local Dev Dashboard",
+      "Tab: tab-1",
+      "source: live",
+      "",
+      "# Local Dev Dashboard",
+      "",
+      "Active workers: **4**",
+    ].join("\n"),
+    title: "Local Dev Dashboard",
+    metadata: {
+      url: "http://localhost:3000/dashboard",
+      title: "Local Dev Dashboard",
+      tabID: "tab-1",
+      format: "markdown",
+      source: "live",
+    },
+  },
+
+  },
   websearch: {
     tool: "websearch",
     input: { query: "SolidJS createStore performance" },
@@ -1850,7 +1892,7 @@ function Playground() {
                 Never completes, so the activity indicator keeps animating
               </div>
               <div style={{ display: "flex", "flex-wrap": "wrap", gap: "4px" }}>
-                <For each={["bash", "edit", "webfetch", "websearch"] as const}>
+                <For each={["bash", "edit", "browser_navigate", "browser_read", "webfetch", "websearch"] as const}>
                   {(key) => (
                     <button style={btnStyle} onClick={() => addTool(key, "running")}>
                       {key}

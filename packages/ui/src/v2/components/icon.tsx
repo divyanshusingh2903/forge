@@ -69,6 +69,14 @@ const icons = {
     viewBox: "0 0 20 20",
     body: `<path d="M2 18H18V2H2V18Z" fill="currentColor" fill-opacity="0.1"/><path d="M6.5 8L8.64286 10L6.5 12M10.9286 12H13.5M2 18H18V2H2V18Z" stroke="currentColor" stroke-linecap="square"/>`,
   },
+  browser: {
+    viewBox: "0 0 20 20",
+    body: `<circle cx="10" cy="10" r="8" stroke="currentColor"/><ellipse cx="10" cy="10" rx="3.5" ry="8" stroke="currentColor"/><path d="M2 10H18" stroke="currentColor"/>`,
+  },
+  "browser-active": {
+    viewBox: "0 0 20 20",
+    body: `<circle cx="10" cy="10" r="8" fill="currentColor" fill-opacity="0.1"/><circle cx="10" cy="10" r="8" stroke="currentColor"/><ellipse cx="10" cy="10" rx="3.5" ry="8" stroke="currentColor"/><path d="M2 10H18" stroke="currentColor"/>`,
+  },
   plan: {
     viewBox: "0 0 20 20",
     body: `<path d="M5 2H15V18H5V2Z" stroke="currentColor" stroke-miterlimit="10" stroke-linecap="square"/><path d="M7.5 6.5H12.5M7.5 10H12.5M7.5 13.5H10.5" stroke="currentColor" stroke-linecap="square"/>`,

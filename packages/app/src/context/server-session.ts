@@ -8,6 +8,7 @@ import type {
   PermissionRequest,
   QuestionRequest,
   Session,
+  SessionBrowserCommand,
   SessionStatus,
   Todo,
 } from "@opencode-ai/sdk/v2/client"
@@ -20,6 +21,7 @@ import { rootSession } from "@/utils/session-route"
 import { normalizeSessionInfo } from "@/utils/session"
 import { compareMessages, messageKey, normalizeSessionMessages } from "@/utils/session-message"
 import { dropSessionCaches, pickSessionCacheEvictions, SESSION_CACHE_LIMIT } from "./global-sync/session-cache"
+import type { SessionBrowserState } from "./global-sync/types"
 import { createV2SessionReducer, type V2SessionReduction } from "./server-session-v2-reducer"
 import type { ServerApi } from "@/utils/server"
 
@@ -198,6 +200,7 @@ export function createServerSession(
     session_status: {} as Record<string, SessionStatus>,
     session_diff: {} as Record<string, FileDiffInfo[]>,
     todo: {} as Record<string, Todo[]>,
+    browser: {} as Record<string, SessionBrowserState | undefined>,
     permission: {} as Record<string, PermissionRequest[]>,
     question: {} as Record<string, QuestionRequest[]>,
     message: {} as Record<string, Message[]>,
@@ -1022,7 +1025,25 @@ export function createServerSession(
         setData("todo", props.sessionID, reconcile(props.todos, { key: "id" }))
         return
       }
-      case "session.status": {
+      case "session.browser.command": {
+      const props = event.properties as {
+        sessionID: string
+        requestID: string
+        tabID?: string
+        timeoutMs: number
+        command: SessionBrowserCommand
+      }
+      setData("browser", props.sessionID, {
+        command: {
+          requestID: props.requestID,
+          tabID: props.tabID,
+          command: props.command,
+          expiresAt: Date.now() + props.timeoutMs,
+        },
+      })
+      return
+    }
+    case "session.status": {
         const props = event.properties as { sessionID: string; status: SessionStatus }
         setData("session_status", props.sessionID, reconcile(props.status))
         return

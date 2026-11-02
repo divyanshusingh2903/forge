@@ -143,6 +143,8 @@ function permissionTitle(toolName: string, input: ToolInput) {
       return stringValue(input.description) ?? stringValue(input.command) ?? stringValue(input.parentDir)
 
     case "webfetch":
+    case "browser_navigate":
+    case "browser_read":
       return stringValue(input.url)
 
     case "websearch":
