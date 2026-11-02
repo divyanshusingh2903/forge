@@ -2,6 +2,7 @@ import { createEffect, For, Show } from "solid-js"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import type { PermissionRequest } from "@opencode-ai/sdk/v2"
 import { Button } from "@opencode-ai/ui/button"
+import { browserActLabel } from "@opencode-ai/session-ui/browser-act-label"
 import { DockPrompt } from "@opencode-ai/session-ui/dock-prompt"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Keybind } from "@opencode-ai/ui/keybind"
@@ -42,6 +43,17 @@ export function SessionPermissionDock(props: {
     }
     makeEventListener(window, "keydown", onKeyDown)
   })
+
+  // browser_act asks with the element and input in its metadata, so say what will happen, not only where.
+  const browserAct = () => {
+    if (props.request.permission !== "browser_act") return
+    const label = browserActLabel(
+      { t: (key) => language.t(key as Parameters<typeof language.t>[0]) },
+      props.request.metadata,
+      undefined,
+    )
+    return [label.verb, label.target, label.input].filter(Boolean).join(" ")
+  }
 
   const toolDescription = () => {
     const key = `settings.permissions.tool.${props.request.permission}.description`
@@ -86,6 +98,17 @@ export function SessionPermissionDock(props: {
         </>
       }
     >
+      <Show when={browserAct()}>
+        {(summary) => (
+          <div data-slot="permission-row">
+            <span data-slot="permission-spacer" aria-hidden="true" />
+            <div data-slot="permission-hint" class="text-text-strong">
+              {summary()}
+            </div>
+          </div>
+        )}
+      </Show>
+
       <Show when={toolDescription()}>
         <div data-slot="permission-row">
           <span data-slot="permission-spacer" aria-hidden="true" />

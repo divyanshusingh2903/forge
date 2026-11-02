@@ -362,18 +362,31 @@ function runBrowserNavigate(p: ToolProps<typeof BrowserNavigateTool>): ToolInlin
 
 function runBrowserRead(p: ToolProps<typeof BrowserReadTool>): ToolInline {
   const url = p.metadata.url || ""
-  const source = p.metadata.source ? ` (${p.metadata.source})` : ""
+  // Source, then the format unless it is the default markdown, then the element count of an interactive read.
+  const detail = [
+    p.metadata.source,
+    p.metadata.format && p.metadata.format !== "markdown" ? p.metadata.format : undefined,
+    p.metadata.format === "interactive" && p.metadata.elements !== undefined
+      ? `${p.metadata.elements} ${p.metadata.elements === 1 ? "element" : "elements"}`
+      : undefined,
+  ].filter(Boolean)
   return {
     icon: "%",
-    title: `Browser read${url ? ` ${url}` : ""}${source}`,
+    title: `Browser read${url ? ` ${url}` : ""}${detail.length > 0 ? ` (${detail.join(", ")})` : ""}`,
   }
 }
 
 function runBrowserScreenshot(p: ToolProps<typeof BrowserScreenshotTool>): ToolInline {
   const url = p.metadata.url || ""
+  // What was captured: the whole page, or the element behind a ref (role and name when known).
+  const target = p.metadata.fullPage
+    ? "full page"
+    : p.metadata.role
+      ? `${p.metadata.role} "${p.metadata.name ?? ""}"`
+      : p.metadata.ref
   return {
     icon: "%",
-    title: `Browser screenshot${url ? ` ${url}` : ""}`,
+    title: `Browser screenshot${url ? ` ${url}` : ""}${target ? ` (${target})` : ""}`,
   }
 }
 
@@ -381,8 +394,17 @@ function runBrowserAct(p: ToolProps<typeof BrowserActTool>): ToolInline {
   const url = p.metadata.url || ""
   return {
     icon: "%",
-    title: `Browser ${p.input.action ?? "act"}${p.input.ref ? ` ${p.input.ref}` : ""}${url ? ` ${url}` : ""}`,
+    title: `Browser ${browserActSummary(p.input, p.metadata)}${url ? ` ${url}` : ""}`,
   }
+}
+
+// e.g. `fill textbox "Customer name:" "Test User"`; falls back to the ref when the element's label is unknown.
+function browserActSummary(
+  input: { action?: string; ref?: string },
+  metadata: { role?: string; name?: string; input?: string },
+): string {
+  const subject = metadata.role ? `${metadata.role} "${metadata.name ?? ""}"` : input.ref
+  return [input.action ?? "act", subject, metadata.input ? `"${metadata.input}"` : undefined].filter(Boolean).join(" ")
 }
 
 function runEdit(p: ToolProps<typeof EditTool>): ToolInline {
@@ -972,7 +994,7 @@ function scrollBrowserScreenshotStart(p: ToolProps<typeof BrowserScreenshotTool>
 
 function scrollBrowserActStart(p: ToolProps<typeof BrowserActTool>): string {
   const url = p.metadata.url || ""
-  return `% Browser ${p.input.action ?? "act"}${p.input.ref ? ` ${p.input.ref}` : ""}${url ? ` ${url}` : ""}`
+  return `% Browser ${browserActSummary(p.input, p.metadata)}${url ? ` ${url}` : ""}`
 }
 
 function scrollWebSearchStart(p: ToolProps<typeof WebSearchTool>): string {
@@ -1077,7 +1099,7 @@ function permBrowser(
 
 function permBrowserAct(p: ToolPermissionProps<typeof BrowserActTool>): ToolPermissionInfo {
   const url = p.patterns[0] || ""
-  const action = `${p.input.action ?? "act"}${p.input.ref ? ` ${p.input.ref}` : ""}`
+  const action = browserActSummary(p.input, p.metadata)
   return {
     icon: "%",
     title: `Browser ${action}${url ? ` ${url}` : ""}`,

@@ -389,6 +389,13 @@ function wireNavigationPolicy(win: BrowserWindow) {
     webPreferences.partition = browserPartition
   })
   win.webContents.on("did-attach-webview", (_event, guest) => {
+    // Pages without their own background are transparent; the CSS background on the <webview> element does
+    // not reach the guest surface, so a dark window shows through and unstyled pages render black on black.
+    guest.once("dom-ready", () => {
+      void sendBrowserCdpCommand(guest.debugger, "Emulation.setDefaultBackgroundColorOverride", {
+        color: { r: 255, g: 255, b: 255, a: 1 },
+      }).catch((error: unknown) => writeLog("browser", "background override failed", { error: String(error) }, "warn"))
+    })
     guest.setWindowOpenHandler(({ url }) => {
       if (url !== "about:blank" && isAllowedBrowserUrl(url)) {
         void guest.loadURL(url)

@@ -43,6 +43,14 @@ export interface Interface {
   readonly attach: (sessionID: SessionID, clientID: string) => Effect.Effect<Info>
   readonly detach: (sessionID: SessionID, clientID: string) => Effect.Effect<Info>
   readonly resolve: (sessionID: SessionID, input: ResultInput) => Effect.Effect<void, PayloadTooLargeError>
+  /** Remembers the role and name behind each ref of a tab's last interactive read, replacing any earlier set. */
+  readonly setElements: (
+    sessionID: SessionID,
+    tabID: string,
+    elements: ReadonlyArray<SessionBrowser.InteractiveElement>,
+  ) => Effect.Effect<void>
+  /** Looks up a ref's role and name so an action can be described before it reaches the page. */
+  readonly element: (sessionID: SessionID, tabID: string, ref: string) => Effect.Effect<ElementLabel | undefined>
   /**
    * Sends a command to the session's browser panel and waits for its result. When no panel is attached it
    * waits up to `ATTACH_GRACE_MS` for one to attach (the app opens the panel on the command event) before failing.
@@ -56,12 +64,16 @@ export interface Interface {
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Browser") {}
 
+export type ElementLabel = { readonly role: string; readonly name: string }
+
 type Entry = {
   tabs: ReadonlyArray<Tab>
   activeTabID?: string
   leases: Map<string, number>
   attachSignal: Deferred.Deferred<void>
   waiters: Map<string, Deferred.Deferred<ResultInput>>
+  // Per tab: ref → label from the last interactive read. Dropped when the tab's page changes, like the panel's refs.
+  elements: Map<string, Map<string, ElementLabel>>
 }
 
 const layer = Layer.effect(
@@ -79,6 +91,7 @@ const layer = Layer.effect(
         leases: new Map(),
         attachSignal: yield* Deferred.make<void>(),
         waiters: new Map(),
+        elements: new Map(),
       }
       sessions.set(sessionID, created)
       return created
@@ -98,9 +111,27 @@ const layer = Layer.effect(
 
     const setState = Effect.fn("Browser.setState")(function* (sessionID: SessionID, input: StateInput) {
       const current = yield* entry(sessionID)
+      // Labels belong to one document, so a tab that navigated or closed loses them.
+      for (const tabID of [...current.elements.keys()]) {
+        const next = input.tabs.find((tab) => tab.tabID === tabID)
+        if (next?.url !== current.tabs.find((tab) => tab.tabID === tabID)?.url) current.elements.delete(tabID)
+      }
       current.tabs = input.tabs
       current.activeTabID = input.activeTabID
       return toInfo(current)
+    })
+
+    const setElements = Effect.fn("Browser.setElements")(function* (
+      sessionID: SessionID,
+      tabID: string,
+      elements: ReadonlyArray<SessionBrowser.InteractiveElement>,
+    ) {
+      const current = yield* entry(sessionID)
+      current.elements.set(tabID, new Map(elements.map((item) => [item.ref, { role: item.role, name: item.name }])))
+    })
+
+    const element = Effect.fn("Browser.element")(function* (sessionID: SessionID, tabID: string, ref: string) {
+      return sessions.get(sessionID)?.elements.get(tabID)?.get(ref)
     })
 
     const attach = Effect.fn("Browser.attach")(function* (sessionID: SessionID, clientID: string) {
@@ -176,7 +207,7 @@ const layer = Layer.effect(
       }).pipe(Effect.ensuring(Effect.sync(() => current.waiters.delete(requestID))))
     })
 
-    return Service.of({ get, setState, attach, detach, resolve, command })
+    return Service.of({ get, setState, attach, detach, resolve, setElements, element, command })
   }),
 )
 

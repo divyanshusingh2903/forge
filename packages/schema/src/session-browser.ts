@@ -75,8 +75,16 @@ export const Command = Schema.Union([NavigateCommand, ReadCommand, ScreenshotCom
 })
 export type Command = Schema.Schema.Type<typeof Command>
 
+export const InteractiveElement = Schema.Struct({
+  ref: Schema.String,
+  role: Schema.String,
+  name: Schema.String,
+}).annotate({ identifier: "SessionBrowserInteractiveElement" })
+export type InteractiveElement = Schema.Schema.Type<typeof InteractiveElement>
+
 // One flat result shape for every command keeps the reply route simple; `html`/`text` are only set by reads
-// (and `text` by actions and screenshots that report a detail) and `image`/`mime` are only set by screenshots.
+// (and `text` by actions and screenshots that report a detail), `image`/`mime` are only set by screenshots,
+// and `elements` is only set by interactive reads.
 export const ResultInput = Schema.Struct({
   requestID: Schema.String,
   ok: Schema.Boolean,
@@ -88,6 +96,7 @@ export const ResultInput = Schema.Struct({
   text: Schema.optional(Schema.String),
   image: Schema.optional(Schema.String),
   mime: Schema.optional(Schema.String),
+  elements: Schema.optional(Schema.Array(InteractiveElement)),
 }).annotate({ identifier: "SessionBrowserResultInput" })
 export type ResultInput = Schema.Schema.Type<typeof ResultInput>
 

@@ -32,7 +32,8 @@ type AXNode = {
 }
 
 // Turns a CDP Accessibility.getFullAXTree result into one line per actionable element. `refs` maps each
-// printed ref (e1, e2, …) to the element's backend DOM node id so later actions can resolve it.
+// printed ref (e1, e2, …) to the element's backend DOM node id so later actions can resolve it, and `elements`
+// carries each ref's role and name so the server can label actions before they reach the page.
 export function formatInteractiveElements(tree: unknown) {
   if (!tree || typeof tree !== "object" || !("nodes" in tree) || !Array.isArray(tree.nodes)) {
     throw new Error("Invalid accessibility tree")
@@ -40,7 +41,7 @@ export function formatInteractiveElements(tree: unknown) {
   const elements = tree.nodes.filter(isInteractive)
   const shown = elements.slice(0, MAX_INTERACTIVE_ELEMENTS)
   const refs = new Map(shown.map((node, index) => [`e${index + 1}`, node.backendDOMNodeId] as const))
-  if (shown.length === 0) return { text: "No interactive elements found on this page.", refs }
+  if (shown.length === 0) return { text: "No interactive elements found on this page.", refs, elements: [] }
 
   const lines = shown.map((node, index) => {
     const name = label(node.name?.value)
@@ -55,6 +56,11 @@ export function formatInteractiveElements(tree: unknown) {
   return {
     text: [...lines, ...(hidden > 0 ? [`… ${hidden} more interactive elements not shown`] : [])].join("\n"),
     refs,
+    elements: shown.map((node, index) => ({
+      ref: `e${index + 1}`,
+      role: String(node.role?.value),
+      name: label(node.name?.value),
+    })),
   }
 }
 

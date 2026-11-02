@@ -55,6 +55,7 @@ type BrowserResult = {
   text?: string
   image?: string
   mime?: string
+  elements?: { ref: string; role: string; name: string }[]
 }
 
 export function normalizeBrowserUrl(raw: string): string | undefined {
@@ -249,6 +250,7 @@ export function SessionBrowserPanel(props: { stacked?: boolean; resizing?: boole
           url: el.getURL(),
           title: el.getTitle() || undefined,
           text: truncateToMaxBytes(elements.text),
+          elements: elements.elements,
         })
       }
       const page = await el.executeJavaScript<{ url: string; title: string; content: string }>(

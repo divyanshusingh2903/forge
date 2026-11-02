@@ -64,6 +64,7 @@ import { ToolStatusTitle } from "./tool-status-title"
 import { patchFiles } from "./apply-patch-file"
 import { parseWebSearchResults } from "./web-search-results"
 import { ToolResponse } from "./tool-response"
+import { browserActLabel } from "./browser-act-label"
 import { writeClipboard } from "./clipboard"
 import { partDefaultOpen } from "./part-default-open"
 import { animate } from "motion"
@@ -526,14 +527,16 @@ export function getToolInfo(
         title: i18n.t("ui.tool.browser.screenshot"),
         subtitle: (typeof metadata?.title === "string" && metadata.title) || (typeof metadata?.url === "string" ? metadata.url : undefined),
       }
-    case "browser_act":
+    case "browser_act": {
+      const label = browserActLabel(i18n, metadata, input)
       return {
         icon: "browser",
-        title: i18n.t("ui.tool.browser.act"),
+        title: label.verb,
         subtitle:
-          [input.action, input.ref].filter((item) => typeof item === "string" && item).join(" ") ||
+          [label.target, label.input].filter(Boolean).join(" · ") ||
           (typeof metadata?.url === "string" ? metadata.url : undefined),
       }
+    }
     case "webfetch":
       return {
         icon: "window-cursor",
@@ -1992,13 +1995,36 @@ ToolRegistry.register({
   },
 })
 
-function BrowserToolTrigger(props: { title: string; pending: boolean; url: string; label: string; tag?: string }) {
+function BrowserToolTrigger(props: {
+  title: string
+  pending: boolean
+  url: string
+  label: string
+  tag?: string
+  // Plain-text subject shown before the link, e.g. the element a browser_act call touches.
+  target?: string
+  // Short chip for what the call sends, e.g. the text typed into a field.
+  detail?: string
+}) {
   return (
     <div data-slot="basic-tool-tool-info-structured">
       <div data-slot="basic-tool-tool-info-main">
         <span data-slot="basic-tool-tool-title">
           <TextShimmer text={props.title} active={props.pending} />
         </span>
+        <Show when={props.target}>
+          {(target) => <span data-slot="basic-tool-tool-subtitle">{target()}</span>}
+        </Show>
+        <Show when={props.detail}>
+          {(detail) => (
+            <span
+              data-slot="basic-tool-browser-source"
+              class="text-11-regular text-text-weak px-1.5 py-0.5 rounded bg-surface-base shrink-0 truncate"
+            >
+              {detail()}
+            </span>
+          )}
+        </Show>
         <Show when={!props.pending && props.url}>
           <a
             data-slot="basic-tool-tool-subtitle"
@@ -2062,9 +2088,20 @@ ToolRegistry.register({
     const i18n = useI18n()
     const pending = createMemo(() => props.status === "pending" || props.status === "running")
     const url = createMemo(() => (typeof props.metadata.url === "string" ? props.metadata.url : ""))
+    // Source, then the format unless it is the default markdown, then how many elements an interactive read listed.
     const tag = createMemo(() => {
-      if (props.metadata.source === "live") return i18n.t("ui.tool.browser.source.live")
-      if (props.metadata.source === "fetched") return i18n.t("ui.tool.browser.source.fetched")
+      const format = props.metadata.format
+      const elements = props.metadata.elements
+      const parts = [
+        props.metadata.source === "live" && i18n.t("ui.tool.browser.source.live"),
+        props.metadata.source === "fetched" && i18n.t("ui.tool.browser.source.fetched"),
+        (format === "text" || format === "html" || format === "interactive") &&
+          i18n.t(`ui.tool.browser.format.${format}` as const),
+        format === "interactive" &&
+          typeof elements === "number" &&
+          i18n.plural("ui.tool.browser.read.elements", elements),
+      ].filter((part): part is string => typeof part === "string")
+      return parts.length > 0 ? parts.join(" · ") : undefined
     })
     return (
       <BasicTool
@@ -2091,6 +2128,41 @@ ToolRegistry.register({
 })
 
 ToolRegistry.register({
+  name: "browser_act",
+  render(props) {
+    const i18n = useI18n()
+    const pending = createMemo(() => props.status === "pending" || props.status === "running")
+    const label = createMemo(() => browserActLabel(i18n, props.metadata, props.input))
+    // The link only shows when the action moved the page, so a plain click doesn't repeat the URL.
+    const navigatedUrl = createMemo(() =>
+      props.metadata.navigated === true && typeof props.metadata.url === "string" ? props.metadata.url : "",
+    )
+    return (
+      <BasicTool
+        {...props}
+        hideDetails={props.hideDetails || !props.output?.trim()}
+        defaultOpen={props.defaultOpen ?? false}
+        icon="browser"
+        trigger={
+          <BrowserToolTrigger
+            title={label().verb}
+            pending={pending()}
+            target={label().target}
+            detail={label().input}
+            url={navigatedUrl()}
+            label={(typeof props.metadata.title === "string" && props.metadata.title) || navigatedUrl()}
+          />
+        }
+      >
+        <Show when={props.output?.trim()}>
+          <ToolResponse output={props.output} />
+        </Show>
+      </BasicTool>
+    )
+  },
+})
+
+ToolRegistry.register({
   name: "browser_screenshot",
   render(props) {
     const i18n = useI18n()
@@ -2098,6 +2170,13 @@ ToolRegistry.register({
     const pending = createMemo(() => props.status === "pending" || props.status === "running")
     const url = createMemo(() => (typeof props.metadata.url === "string" ? props.metadata.url : ""))
     const label = createMemo(() => (typeof props.metadata.title === "string" && props.metadata.title) || url())
+    // Says what was captured: the whole page, or the element behind a ref (by role and name when known).
+    const tag = createMemo(() => {
+      if (props.metadata.fullPage === true) return i18n.t("ui.tool.browser.screenshot.fullPage")
+      const { role, name, ref } = props.metadata
+      if (typeof role === "string" && typeof name === "string") return `${role} "${name}"`
+      return typeof ref === "string" ? ref : undefined
+    })
     const image = createMemo(() =>
       props.attachments?.find((attachment) => attachment.mime?.startsWith("image/")),
     )
@@ -2118,6 +2197,7 @@ ToolRegistry.register({
             pending={pending()}
             url={url()}
             label={label()}
+            tag={tag()}
           />
         }
       >
