@@ -30,7 +30,7 @@ export const dict = {
   "server.connect.scan": "Scannen Sie den QR-Code",
   "server.connect.scan.description": "Richten Sie Ihre Kamera auf den von opencode pair angezeigten Code QR.",
   "server.connect.scan.invalid":
-    "Dies ist kein OpenCode-Pairing-Code. Scannen Sie den von opencode pair angezeigten Code.",
+    "Dies ist kein Forge-Pairing-Code. Scannen Sie den von opencode pair angezeigten Code.",
   "server.connect.camera": "Kamera koppeln",
   "server.connect.camera.starting": "Kamera wird geöffnet…",
   "server.connect.mixedContent":
@@ -67,7 +67,7 @@ export const dict = {
     "Wählen Sie den Suchanbieter aus, den Agenten zum Durchsuchen des Webs verwenden",
   "settings.projects.search.placeholder": "Projekte suchen",
   "project.settings.name.title": "Projektname",
-  "project.settings.name.description": "Der für dieses Projekt durchgehend angezeigte Name OpenCode",
+  "project.settings.name.description": "Der für dieses Projekt durchgehend angezeigte Name Forge",
   "project.settings.icon.description": "Empfohlen: 128×128px. Klicken oder ziehen Sie, um ein Bild hochzuladen.",
   "project.settings.color.description":
     "Wird für das Projektsymbol verwendet, wenn kein benutzerdefiniertes Bild festgelegt ist",
@@ -76,12 +76,12 @@ export const dict = {
   "project.settings.worktree.startup.hint.base": "Verwenden Sie $OPENCODE_WORKTREE_BASE für den Basisarbeitsbaum.",
   "project.settings.worktree.startup.hint.new": "Verwenden Sie $OPENCODE_WORKTREE_PATH für den neuen Arbeitsbereich.",
   "project.settings.extensions.empty.mcps.title": "Noch kein MCPs",
-  "project.settings.extensions.empty.mcps.description": "MCPs verfügbar für OpenCode wird hier angezeigt",
+  "project.settings.extensions.empty.mcps.description": "MCPs verfügbar für Forge wird hier angezeigt",
   "project.settings.extensions.empty.plugins.title": "Noch keine Plugins",
-  "project.settings.extensions.empty.plugins.description": "Für OpenCode verfügbare Plugins werden hier angezeigt",
+  "project.settings.extensions.empty.plugins.description": "Für Forge verfügbare Plugins werden hier angezeigt",
   "project.settings.extensions.empty.skills.title": "Noch keine Fähigkeiten",
   "project.settings.extensions.empty.skills.description":
-    "Hier werden die für OpenCode verfügbaren Fähigkeiten angezeigt",
+    "Hier werden die für Forge verfügbaren Fähigkeiten angezeigt",
   "project.settings.extensions.lsp.configured": "Konfigurierte Sprachserver",
   "project.settings.extensions.lsp.status.enabled": "In der Konfiguration aktiviert",
   "project.settings.extensions.lsp.status.disabled": "In der Konfiguration deaktiviert",
@@ -102,7 +102,7 @@ export const dict = {
   "settings.timeline.collapsed.label": "{{activity}} ist zusammengebrochen",
   "session.new.workspace.search.empty": "Keine passenden Arbeitsbereiche",
   "settings.workspaces.description": "Überprüfen Sie Arbeitsbereiche und verwalten Sie die Festplattennutzung",
-  "settings.workspaces.empty.description": "In OpenCode erstellte Arbeitsbereiche werden hier angezeigt",
+  "settings.workspaces.empty.description": "In Forge erstellte Arbeitsbereiche werden hier angezeigt",
   "settings.workspaces.sessions.filtered.one": "{{count}}-Sitzung",
   "settings.workspaces.sessions.filtered.other": "{{count}}-Sitzungen",
   "settings.workspaces.deleteAll.confirm.one":
@@ -156,7 +156,7 @@ export const dict = {
   "settings.about.firstPublished": "Erstmals veröffentlicht in Missouri, USA",
   "settings.about.firstIllustrated": "Erstmals illustriert in London, England",
   "settings.about.website": "www.opencode.ai",
-  "settings.about.description": "OpenCode, der Open-Source-Coding-Agent",
+  "settings.about.description": "Forge, der Open-Source-Coding-Agent",
   "settings.about.trademark": "OpenCode ist eine eingetragene Marke von Anomaly Innovations, Inc.",
   "settings.about.typeset": "Gesetzt in Inter und IBM Plex Mono",
   "settings.about.tagline": "KI kann ohne Sie keine großartige Software entwickeln",
@@ -302,7 +302,7 @@ export const dict = {
   "provider.connect.status.waiting": "Warten auf Autorisierung…",
   "provider.connect.status.failed": "Autorisierung fehlgeschlagen: {{error}}",
   "provider.connect.apiKey.description":
-    "Geben Sie Ihren API-Schlüssel für {{provider}} ein, um Ihr Konto zu verbinden und {{provider}}-Modelle in OpenCode zu nutzen.",
+    "Geben Sie Ihren API-Schlüssel für {{provider}} ein, um Ihr Konto zu verbinden und {{provider}}-Modelle in Forge zu nutzen.",
   "provider.connect.apiKey.label": "API-Schlüssel für {{provider}}",
   "provider.connect.apiKey.placeholder": "API-Schlüssel",
   "provider.connect.apiKey.required": "API-Schlüssel ist erforderlich",
@@ -418,7 +418,7 @@ export const dict = {
   "error.page.action.checking": "Prüfen…",
   "error.page.action.checkUpdates": "Nach Updates suchen",
   "error.page.action.updateTo": "Auf {{version}} aktualisieren",
-  "error.page.report.prefix": "Bitte melden Sie diesen Fehler dem OpenCode-Team",
+  "error.page.report.prefix": "Bitte melden Sie diesen Fehler dem Forge-Team",
   "error.page.report.discord": "auf Discord",
   "error.page.version": "Version: {{version}}",
   "error.dev.rootNotFound":
@@ -434,7 +434,7 @@ export const dict = {
   "error.chain.modelNotFound": "Modell nicht gefunden: {{provider}}/{{model}}",
   "error.chain.checkConfig": "Überprüfen Sie die Anbieter- und Modellnamen in Ihrer Konfiguration (opencode.json)",
   "error.chain.mcpFailed":
-    'MCP-Server "{{name}}" fehlgeschlagen. Hinweis: OpenCode unterstützt noch keine MCP-Authentifizierung.',
+    'MCP-Server "{{name}}" fehlgeschlagen. Hinweis: Forge unterstützt noch keine MCP-Authentifizierung.',
   "error.chain.providerAuthFailed": "Anbieter-Authentifizierung fehlgeschlagen ({{provider}}): {{message}}",
   "error.chain.providerInitFailed":
     'Anbieter "{{provider}}" konnte nicht initialisiert werden. Überprüfen Sie Anmeldeinformationen und Konfiguration.',
@@ -514,7 +514,7 @@ export const dict = {
   "settings.general.section.notifications": "Systembenachrichtigungen",
   "settings.general.section.sounds": "Soundeffekte",
   "settings.general.row.language.title": "Sprache",
-  "settings.general.row.language.description": "Die Anzeigesprache für OpenCode ändern",
+  "settings.general.row.language.description": "Die Anzeigesprache für Forge ändern",
   "settings.general.row.shell.title": "Terminal-Shell",
   "settings.general.row.shell.description":
     "Wählen Sie die Shell für Ihr Terminal aus. Kompatible Shells werden auch für Tool-Aufrufe von Agenten verwendet.",
@@ -522,9 +522,9 @@ export const dict = {
   "settings.general.row.shell.terminalOnly": "nur Terminal",
   "settings.general.row.colorScheme.title": "Farbschema",
   "settings.general.row.colorScheme.description":
-    "Wählen Sie, ob OpenCode dem System-, hellen oder dunklen Thema folgt",
+    "Wählen Sie, ob Forge dem System-, hellen oder dunklen Thema folgt",
   "settings.general.row.theme.title": "Thema",
-  "settings.general.row.theme.description": "Das Thema von OpenCode anpassen.",
+  "settings.general.row.theme.description": "Das Thema von Forge anpassen.",
   "settings.general.row.font.title": "Code-Schriftart",
   "settings.general.row.font.description": "Die in Codeblöcken verwendete Schriftart anpassen",
   "settings.general.row.terminalFont.title": "Terminalschriftart",
@@ -833,7 +833,7 @@ export const dict = {
   "command.project.copyID": "Projekt-ID kopieren",
   "command.session.copyID": "Sitzungs-ID kopieren",
   "server.row.incompatible":
-    "Auf diesem Server wird OpenCode {{version}} ausgeführt, das mit dieser App nicht kompatibel ist. Aktualisieren Sie ihn auf OpenCode V2, um fortzufahren.",
+    "Auf diesem Server wird Forge {{version}} ausgeführt, das mit dieser App nicht kompatibel ist. Aktualisieren Sie ihn auf Forge V2, um fortzufahren.",
   "toast.session.copyID.failed.title": "Sitzungs-ID konnte nicht kopiert werden",
   "toast.session.copyID.failed.description": "Beim Kopieren der Sitzungs-ID ist ein Fehler aufgetreten",
   "toast.project.copyID.failed.title": "Projekt-ID konnte nicht kopiert werden",
@@ -843,7 +843,7 @@ export const dict = {
   "error.page.action.reload": "Neu laden",
   "session.error.incompatible": "Diese Serverversion wird nicht unterstützt",
   "session.error.incompatible.description":
-    "Auf {{server}} wird OpenCode {{version}} ausgeführt, das mit dieser App nicht kompatibel ist. Aktualisieren Sie den Server auf OpenCode V2, um fortzufahren.",
+    "Auf {{server}} wird Forge {{version}} ausgeführt, das mit dieser App nicht kompatibel ist. Aktualisieren Sie den Server auf Forge V2, um fortzufahren.",
   "session.background.moveInline": "Drücken Sie {{keybind}}, um laufende Arbeit in den Hintergrund zu verschieben",
   "command.session.location.cycle": "Sitzungsort wechseln",
   "dialog.provider.anthropic.note": "Direkter Zugriff auf Claude-Modelle per API-Schlüssel",
