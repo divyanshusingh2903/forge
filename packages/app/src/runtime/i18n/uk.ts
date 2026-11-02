@@ -25,7 +25,7 @@ export const dict = {
   "session.background.subagent.many": "{{count}} підагентів",
   "settings.about.otherContributor.few": "{{count}} інші",
   "settings.about.otherContributor.many": "{{count}} інших",
-  "desktop.menu.app": "OpenCode",
+  "desktop.menu.app": "Forge",
   "desktop.menu.file": "Файл",
   "desktop.menu.edit": "Редагування",
   "desktop.menu.view": "Вигляд",

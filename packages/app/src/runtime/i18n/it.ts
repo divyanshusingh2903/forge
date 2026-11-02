@@ -702,7 +702,7 @@ export const dict = {
   "workspace.status.dirty": "Modifiche non integrate rilevate in quest'area di lavoro.",
   "workspace.delete.confirm": 'Eliminare l\'area di lavoro "{{name}}"?',
   "workspace.delete.button": "Elimina l'area di lavoro",
-  "desktop.menu.app": "OpenCode",
+  "desktop.menu.app": "Forge",
   "desktop.menu.file": "File",
   "desktop.menu.edit": "Modifica",
   "desktop.menu.view": "Vista",

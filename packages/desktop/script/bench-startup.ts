@@ -126,7 +126,7 @@ const env = {
   OPENCODE_DB: paths.db,
   OPENCODE_CONFIG_DIR: paths.config,
   // Beta and prod builds check for updates on start; a closed proxy port fails that fast and offline.
-  ...(args.values.offline || appId !== "ai.opencode.desktop.dev" ? { HTTPS_PROXY: "http://127.0.0.1:9" } : {}),
+  ...(args.values.offline || appId !== "io.github.divyanshusingh2903.forge.dev" ? { HTTPS_PROXY: "http://127.0.0.1:9" } : {}),
 }
 
 const cdpPort = await freePort()
@@ -572,11 +572,11 @@ function defaultExe() {
 function appIdFor(executable: string) {
   const name = basename(executable, ".exe")
 
-  if (/beta/i.test(name)) return "ai.opencode.desktop.beta"
+  if (/beta/i.test(name)) return "io.github.divyanshusingh2903.forge.beta"
 
-  if (/dev/i.test(name)) return "ai.opencode.desktop.dev"
+  if (/dev/i.test(name)) return "io.github.divyanshusingh2903.forge.dev"
 
-  return "ai.opencode.desktop"
+  return "io.github.divyanshusingh2903.forge"
 }
 
 function prepareHome() {

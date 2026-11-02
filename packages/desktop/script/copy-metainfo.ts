@@ -4,7 +4,7 @@ const arg = process.argv[2]
 
 const channel = arg === "dev" || arg === "beta" || arg === "prod" ? arg : resolveChannel()
 
-const appId = channel === "prod" ? "ai.opencode.desktop" : `ai.opencode.desktop.${channel}`
+const appId = channel === "prod" ? "io.github.divyanshusingh2903.forge" : `io.github.divyanshusingh2903.forge.${channel}`
 
 const productName = channel === "prod" ? "OpenCode" : `OpenCode ${channel.charAt(0).toUpperCase() + channel.slice(1)}`
 
@@ -34,9 +34,9 @@ const xml = `<?xml version="1.0" encoding="UTF-8"?>
 
   <content_rating type="oars-1.1" />
 
-  <url type="bugtracker">https://github.com/anomalyco/opencode/issues</url>
-  <url type="homepage">https://opencode.ai</url>
-  <url type="vcs-browser">https://github.com/anomalyco/opencode</url>
+  <url type="bugtracker">https://github.com/divyanshusingh2903/forge/issues</url>
+  <url type="homepage">https://github.com/divyanshusingh2903/forge</url>
+  <url type="vcs-browser">https://github.com/divyanshusingh2903/forge</url>
 
   <screenshots>
     <screenshot type="default">

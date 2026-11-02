@@ -198,7 +198,7 @@ export const dict = {
     "Välj om uppföljningar ska köas eller styra den aktuella turen. Använd {{keybind}} för att växla.",
   "settings.general.row.followUpBehavior.queue": "Lägg i kö",
   "settings.general.row.followUpBehavior.steer": "Styr",
-  "desktop.menu.app": "OpenCode",
+  "desktop.menu.app": "Forge",
   "desktop.menu.file": "Arkiv",
   "desktop.menu.edit": "Redigera",
   "desktop.menu.view": "Visa",

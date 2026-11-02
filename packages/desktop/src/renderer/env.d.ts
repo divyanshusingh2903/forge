@@ -7,7 +7,7 @@ declare global {
 
   interface Window {
     electron: ElectronNative
-    __OPENCODE__?: {
+    __FORGE__?: {
       deepLinks?: string[]
     }
   }

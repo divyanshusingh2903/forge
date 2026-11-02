@@ -2,12 +2,13 @@
   "name": "@opencode/desktop",
   "private": true,
   "version": "2.2.5",
+  "description": "A personal, human-in-the-loop fork of OpenCode.",
   "type": "module",
   "license": "MIT",
-  "homepage": "https://opencode.ai",
+  "homepage": "https://github.com/divyanshusingh2903/forge",
   "author": {
-    "name": "OpenCode",
-    "email": "hello@opencode.ai"
+    "name": "Divyanshu Singh",
+    "email": "divyanshusingh2903@gmail.com"
   },
   "scripts": {
     "typecheck": "bun check --no-script -b",

@@ -214,7 +214,7 @@ export const dict = {
     "Elige si poner los seguimientos en cola u orientar el turno actual. Usa {{keybind}} para cambiar.",
   "settings.general.row.followUpBehavior.queue": "Poner en cola",
   "settings.general.row.followUpBehavior.steer": "Orientar",
-  "desktop.menu.app": "OpenCode",
+  "desktop.menu.app": "Forge",
   "desktop.menu.file": "Archivo",
   "desktop.menu.edit": "Editar",
   "desktop.menu.view": "Ver",

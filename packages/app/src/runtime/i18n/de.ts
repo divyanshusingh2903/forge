@@ -704,7 +704,7 @@ export const dict = {
   "error.childStore.persistedCacheCreateFailed": "Dauerhafter Cache konnte nicht erstellt werden",
   "error.childStore.persistedProjectMetadataCreateFailed": "Dauerhafte Projektmetadaten konnten nicht erstellt werden",
   "error.childStore.storeCreateFailed": "Speicher konnte nicht erstellt werden",
-  "desktop.menu.app": "OpenCode",
+  "desktop.menu.app": "Forge",
   "desktop.menu.file": "Datei",
   "desktop.menu.edit": "Bearbeiten",
   "desktop.menu.view": "Ansicht",

@@ -1,5 +1,5 @@
 export const dict = {
-  "desktop.menu.app": "OpenCode",
+  "desktop.menu.app": "Forge",
   "desktop.menu.file": "Skrá",
   "desktop.menu.edit": "Rætta",
   "desktop.menu.view": "Vís",

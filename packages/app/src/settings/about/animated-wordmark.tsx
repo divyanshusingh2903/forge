@@ -1,14 +1,14 @@
 import { createEffect, For, on, onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { prefersReducedMotion } from "@opencode/ui/motion"
+import { FORGE_HEIGHT, FORGE_LETTERS, FORGE_PITCH, FORGE_WIDTH } from "@opencode/ui/forge-letters"
 
-const target = ["o", "p", "e", "n", "c", "o", "d", "e"] as const
-
-const choices = ["o", "p", "e", "n", "c", "d"] as const
+const target = FORGE_LETTERS.map((letter) => letter.id)
 
 export function AnimatedWordmark(props: { active: boolean }) {
-  const [state, setState] = createStore({ letters: [...target] })
+  const [state, setState] = createStore({ letters: [...target] as string[] })
   const timers = new Set<ReturnType<typeof setTimeout>>()
+  const random = () => target[Math.floor(Math.random() * target.length)]
 
   createEffect(
     on(
@@ -23,18 +23,18 @@ export function AnimatedWordmark(props: { active: boolean }) {
           return
         }
 
-        const starts = target.map(() => choices[Math.floor(Math.random() * choices.length)])
         const settles = target.map(() => 6 + Math.floor(Math.random() * 8))
         const last = Math.max(...settles)
-        setState("letters", starts)
+        setState(
+          "letters",
+          target.map(() => random()),
+        )
 
         Array.from({ length: last }, (_, index) => index + 1).forEach((tick) => {
           const timer = setTimeout(() => {
             setState(
               "letters",
-              target.map((letter, index) =>
-                tick >= settles[index] ? letter : choices[Math.floor(Math.random() * choices.length)],
-              ),
+              target.map((letter, index) => (tick >= settles[index] ? letter : random())),
             )
             timers.delete(timer)
           }, tick * 75)
@@ -48,36 +48,20 @@ export function AnimatedWordmark(props: { active: boolean }) {
   onCleanup(() => timers.forEach(clearTimeout))
 
   return (
-    <svg class="settings-about-wordmark" viewBox="0 0 234 42" aria-hidden="true">
+    <svg class="settings-about-wordmark" viewBox={`0 0 ${FORGE_WIDTH} ${FORGE_HEIGHT}`} aria-hidden="true">
       <defs>
-        <symbol id="settings-about-letter-o" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M18 30H6V18H18V30Z" />
-          <path d="M18 12H6V30H18V12ZM24 36H0V6H24V36Z" />
-        </symbol>
-        <symbol id="settings-about-letter-p" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M18 30H6V18H18V30Z" />
-          <path d="M6 30H18V12H6V30ZM24 36H6V42H0V6H24V36Z" />
-        </symbol>
-        <symbol id="settings-about-letter-e" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M24 24V30H6V24H24Z" />
-          <path d="M24 24H6V30H24V36H0V6H24V24ZM6 18H18V12H6V18Z" />
-        </symbol>
-        <symbol id="settings-about-letter-n" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M18 36H6V18H18V36Z" />
-          <path d="M18 12H6V36H0V6H18V12ZM24 36H18V12H24V36Z" />
-        </symbol>
-        <symbol id="settings-about-letter-c" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M24 30H6V18H24V30Z" />
-          <path d="M24 12H6V30H24V36H0V6H24V12Z" />
-        </symbol>
-        <symbol id="settings-about-letter-d" viewBox="0 0 24 42">
-          <path class="settings-about-letter-shadow" d="M18 30H6V18H18V30Z" />
-          <path d="M18 12H6V30H18V12ZM24 36H0V6H18V0H24V36Z" />
-        </symbol>
+        <For each={FORGE_LETTERS}>
+          {(letter) => (
+            <symbol id={`settings-about-letter-${letter.id}`} viewBox={`0 0 24 ${FORGE_HEIGHT}`}>
+              {letter.shadow && <path class="settings-about-letter-shadow" d={letter.shadow} />}
+              <path d={letter.shape} />
+            </symbol>
+          )}
+        </For>
       </defs>
       <For each={state.letters}>
         {(letter, index) => (
-          <use href={`#settings-about-letter-${letter}`} x={index() * 30} width="24" height="42" />
+          <use href={`#settings-about-letter-${letter}`} x={index() * FORGE_PITCH} width="24" height={FORGE_HEIGHT} />
         )}
       </For>
     </svg>

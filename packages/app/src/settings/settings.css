@@ -333,7 +333,7 @@
 }
 
 .settings-about-wordmark {
-  width: 178px;
+  width: 110px;
   height: 32px;
   flex-shrink: 0;
   opacity: 0.2;
@@ -344,6 +344,7 @@
 .settings-about-letter-shadow {
   opacity: 0.3;
 }
+
 
 .settings-about-faint,
 .settings-about-credits {

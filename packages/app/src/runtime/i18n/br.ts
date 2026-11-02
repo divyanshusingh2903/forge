@@ -213,7 +213,7 @@ export const dict = {
     "Escolha entre colocar mensagens de acompanhamento na fila ou orientar a interação atual. Use {{keybind}} para alternar.",
   "settings.general.row.followUpBehavior.queue": "Colocar na fila",
   "settings.general.row.followUpBehavior.steer": "Orientar",
-  "desktop.menu.app": "OpenCode",
+  "desktop.menu.app": "Forge",
   "desktop.menu.file": "Arquivo",
   "desktop.menu.edit": "Editar",
   "desktop.menu.view": "Visualizar",

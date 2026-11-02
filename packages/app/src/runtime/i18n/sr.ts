@@ -12,7 +12,7 @@ export const dict = {
   "session.background.shell.few": "{{count}} љуске",
   "session.background.subagent.few": "{{count}} подагента",
   "settings.about.otherContributor.few": "{{count}} друга",
-  "desktop.menu.app": "OpenCode",
+  "desktop.menu.app": "Forge",
   "desktop.menu.file": "датотека",
   "desktop.menu.edit": "Уреди",
   "desktop.menu.view": "Приказ",
