@@ -141,8 +141,9 @@ const it = testEffect(
 )
 
 const expected = {
-  // Folder startup: project identity, VCS branch/remote reads and the Location's repository probe.
-  "boot: git spawns": 8,
+  // Folder startup: project identity, VCS branch/remote reads and the Location's repository probe, plus the one probe
+  // GitActions makes when the Location's service is built.
+  "boot: git spawns": 9,
   // The step's snapshot: repository probe, snapshot init, diff, untracked files, ignore check, index and tree.
   "turn: git spawns": 9,
   // Git is resolved once per process, before this test, and every spawn uses that resolution. On Windows the shell
