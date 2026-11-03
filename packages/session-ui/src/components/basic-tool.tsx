@@ -350,7 +350,13 @@ function args(input: GenericToolInput | undefined) {
     .slice(0, 3)
 }
 
-export function GenericTool(props: { tool: string; status?: string; hideDetails?: boolean; input?: GenericToolInput }) {
+export function GenericTool(props: {
+  tool: string
+  status?: string
+  hideDetails?: boolean
+  input?: GenericToolInput
+  children?: JSX.Element
+}) {
   const i18n = useI18n()
 
   return (
@@ -363,6 +369,8 @@ export function GenericTool(props: { tool: string; status?: string; hideDetails?
         args: args(props.input),
       }}
       hideDetails={props.hideDetails}
-    />
+    >
+      {props.children}
+    </BasicTool>
   )
 }

@@ -65,6 +65,7 @@ import {
 import { AssistantReasoningContent, writeClipboard } from "../message/message-content"
 import { stripAnsi } from "./ansi"
 import { followShellOutput } from "./shell-output"
+import { parseWebSearchResults, type WebSearchResult } from "./web-search-results"
 import { LinkedText } from "../components/linked-text"
 
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
@@ -340,6 +341,91 @@ function taskSession(
     .filter((session) => session.parentID === parentID && !session.time?.archived)
     .filter((session) => (description ? session.title?.startsWith(description) : true))
     .sort((a, b) => (b.time.created ?? 0) - (a.time.created ?? 0))[0]?.id
+}
+
+// Results with a title, site and date, each opening to its excerpt. Output in another format keeps the plain link list.
+function WebSearchOutput(props: { output?: string }) {
+  const i18n = useI18n()
+  const [showAll, setShowAll] = createSignal(false)
+  const results = createMemo(() => parseWebSearchResults(props.output))
+  const visible = createMemo(() => (showAll() ? results() : results().slice(0, 10)))
+
+  return (
+    <Show when={results().length > 0} fallback={<ExaOutput output={props.output} />}>
+      <div data-component="websearch-results">
+        <For each={visible()}>{(result) => <WebSearchResultRow result={result} />}</For>
+        <Show when={!showAll() && results().length > 10}>
+          <button
+            type="button"
+            data-slot="exa-tool-more"
+            onClick={(event) => {
+              event.stopPropagation()
+              setShowAll(true)
+            }}
+          >
+            {i18n.plural("ui.common.moreCount", results().length - 10)}
+          </button>
+        </Show>
+      </div>
+    </Show>
+  )
+}
+
+function WebSearchResultRow(props: { result: WebSearchResult }) {
+  const i18n = useI18n()
+  const [open, setOpen] = createSignal(false)
+
+  const meta = createMemo(() => {
+    const site = URL.parse(props.result.url)?.hostname.replace(/^www\./, "")
+    const published = props.result.published ? new Date(props.result.published) : undefined
+
+    const date =
+      published && !Number.isNaN(published.getTime())
+        ? new Intl.DateTimeFormat(i18n.locale(), { dateStyle: "medium" }).format(published)
+        : undefined
+
+    return [site, date].filter(Boolean).join(" · ")
+  })
+
+  return (
+    <div data-slot="websearch-result">
+      <div data-slot="websearch-result-header">
+        <Show when={props.result.excerpt} fallback={<span data-slot="websearch-result-toggle" aria-hidden="true" />}>
+          <button
+            type="button"
+            data-slot="websearch-result-toggle"
+            aria-expanded={open()}
+            aria-label={props.result.title}
+            onClick={(event) => {
+              event.stopPropagation()
+              setOpen((value) => !value)
+            }}
+          >
+            <Icon name="chevron-right" size="small" style={{ transform: open() ? "rotate(90deg)" : undefined }} />
+          </button>
+        </Show>
+        <a
+          data-slot="websearch-result-title"
+          class="webfetch-link"
+          href={props.result.url}
+          title={props.result.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <span data-slot="webfetch-link-text">{props.result.title}</span>
+        </a>
+        <Show when={meta()}>
+          <span data-slot="websearch-result-meta">{meta()}</span>
+        </Show>
+      </div>
+      <Show when={open()}>
+        <div data-slot="websearch-result-excerpt" data-scrollable>
+          {props.result.excerpt}
+        </div>
+      </Show>
+    </div>
+  )
 }
 
 function ExaOutput(props: { output?: string }) {
@@ -1369,7 +1455,7 @@ export function ToolDisplay(
 
   const errorSubtitle = createMemo(() => toolErrorSubtitle(props, i18n))
   const error = createMemo(() => toolDisplayError(props))
-  const render = createMemo(() => ToolRegistry.render(props.tool) ?? GenericTool)
+  const render = createMemo(() => ToolRegistry.render(props.tool) ?? ResponseTool)
 
   return (
     <Show when={!hideQuestion()}>
@@ -1730,7 +1816,7 @@ ToolRegistry.register({
           subtitleClass: "exa-tool-query",
         }}
       >
-        <ExaOutput output={props.output} />
+        <WebSearchOutput output={props.output} />
       </BasicTool>
     )
   },
@@ -1852,6 +1938,48 @@ ToolRegistry.register({
     )
   },
 })
+
+// Tools without their own renderer, such as MCP tools called directly, show their response under the arguments.
+function ResponseTool(props: ToolProps) {
+  return (
+    <GenericTool tool={props.tool} status={props.status} hideDetails={props.hideDetails} input={props.input}>
+      <Show when={props.output?.trim()}>{(output) => <ToolResponse output={output()} />}</Show>
+    </GenericTool>
+  )
+}
+
+// Rendering megabytes of output in one <pre> stalls the timeline, so a long response shows its start until asked.
+const RESPONSE_PREVIEW = 20_000
+
+function ToolResponse(props: { output: string }) {
+  const i18n = useI18n()
+  const [all, setAll] = createSignal(false)
+
+  const text = createMemo(() => {
+    const parsed = decodeJson(props.output)
+    const json = /^\s*[[{]/.test(props.output) && Option.isSome(parsed)
+
+    return json ? JSON.stringify(parsed.value, null, 2) : props.output
+  })
+
+  return (
+    <div data-component="tool-response">
+      <ConsoleOutput output={all() ? text() : text().slice(0, RESPONSE_PREVIEW)} />
+      <Show when={!all() && text().length > RESPONSE_PREVIEW}>
+        <button
+          type="button"
+          data-slot="exa-tool-more"
+          onClick={(event) => {
+            event.stopPropagation()
+            setAll(true)
+          }}
+        >
+          {i18n.t("ui.common.showMore")}
+        </button>
+      </Show>
+    </div>
+  )
+}
 
 function ConsoleOutput(props: { command?: string; output: string }) {
   const i18n = useI18n()
