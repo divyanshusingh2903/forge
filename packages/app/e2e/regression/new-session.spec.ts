@@ -1084,7 +1084,7 @@ test("the location dialog separates added projects from server projects and tags
   await expect(rows.nth(0)).toHaveAttribute("aria-selected", "true")
   await page.keyboard.press("ArrowUp")
   await expect(options.nth(3)).toHaveAttribute("aria-selected", "true")
-  await page.keyboard.press((await page.evaluate(() => navigator.platform.includes("Mac"))) ? "Meta+o" : "Control+o")
+  await page.keyboard.press((await page.evaluate(() => navigator.platform.includes("Mac"))) ? "Meta+o" : "ControlOrMeta+o")
   await expect(back).toHaveText("Servers")
   // The server the app runs beside shows its hostname and "This computer" instead of its address.
   await expect(options).toHaveText(["hailmaryThis computer", "apollo"])

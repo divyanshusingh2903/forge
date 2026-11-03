@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import type { ConfigEntry, OpenCodeEvent, SessionMessageInfo, WorktreeDirectory } from "@opencode/client/promise"
+import { onMac } from "../utils/platform"
 import { NO_PROVIDER, REMOTE_SERVER, SERVER, holdRoute, project, seed, session } from "../utils/app"
 import { mockMissingLocation, mockOpenCodeServer } from "../utils/mock-server"
 import { mockRemoteServer, mockWorkspace, openSession, openSettings, type WorkspaceInput } from "../utils/workspace"
@@ -64,7 +65,7 @@ test("settings has its own route and returns through app history", async ({ page
   await settings.getByRole("button", { name: "Back to app", exact: true }).click()
   await expect(page).toHaveURL("/")
   await expect(home).toHaveAttribute("aria-pressed", "true")
-  await page.keyboard.press("Control+]")
+  await page.keyboard.press("ControlOrMeta+]")
   await expect(page).toHaveURL("/settings")
   await expect(home).toHaveAttribute("aria-pressed", "false")
   await home.click()
@@ -81,7 +82,7 @@ test("Ctrl+, opens settings as soon as the app loads", async ({ page }) => {
     seed: { tabs: [] },
   })
   await page.goto("/")
-  await page.keyboard.press("Control+,")
+  await page.keyboard.press("ControlOrMeta+,")
   await expect(page.getByTestId("settings-screen")).toBeVisible()
   await expect(page).toHaveURL("/settings")
 })
@@ -312,7 +313,7 @@ for (const locale of ["en", "ar"]) {
     await expect(page.locator("html")).toHaveAttribute("dir", locale === "ar" ? "rtl" : "ltr")
 
     for (const value of ["Center", "Right", "Hidden", "Left", "Right"] as const) {
-      await page.keyboard.press("Control+,")
+      await page.keyboard.press("ControlOrMeta+,")
       const settings = page.getByTestId("settings-screen")
       const control = settings.getByLabel("Background activity", { exact: true })
       await expect(control).toBeVisible()
@@ -373,7 +374,7 @@ for (const locale of ["en", "ar"]) {
         page.evaluate(() => JSON.parse(localStorage.getItem("settings.v3") ?? "{}").general?.backgroundActivity),
       )
       .toBe("right")
-    await page.keyboard.press("Control+,")
+    await page.keyboard.press("ControlOrMeta+,")
     await page.reload()
     await expect(page.getByTestId("settings-screen").getByLabel("Background activity", { exact: true })).toHaveText(
       "Right",
@@ -759,7 +760,7 @@ test("shortcuts list Search sessions once and unbind a shortcut while recording 
 
   const binding = settings.locator('[data-keybind-id="settings.open"]')
   const unbind = settings.getByRole("button", { name: "Unbind", exact: true })
-  await expect(binding).toHaveText("Ctrl+,")
+  await expect(binding).toHaveText((await onMac(page)) ? "⌘," : "Ctrl+,")
   await expect(unbind).toHaveCount(0)
   await binding.click()
   await expect(binding).toHaveText("Press keys")
@@ -780,7 +781,8 @@ for (const own of [false, true]) {
 
     await settings.getByRole("tab", { name: "Shortcuts", exact: true }).click()
     await expect(settings.locator('[data-keybind-id="terminal.new"]')).toBeVisible()
-    await expect(settings.locator('[data-keybind-id="terminal.close"]')).toHaveText(own ? ["Ctrl+Alt+E"] : [])
+    const label = (await onMac(page)) ? "⌃⌥E" : "Ctrl+Alt+E"
+    await expect(settings.locator('[data-keybind-id="terminal.close"]')).toHaveText(own ? [label] : [])
   })
 }
 
@@ -790,12 +792,12 @@ test("the new session shortcut waits for a shortcut recording, then leaves setti
   const binding = settings.locator('[data-keybind-id="tab.new"]')
   await binding.click()
   await expect(binding).toHaveText("Press keys")
-  await page.keyboard.press("Control+t")
-  await expect(binding).toHaveText("Ctrl+T")
+  await page.keyboard.press("ControlOrMeta+t")
+  await expect(binding).toHaveText((await onMac(page)) ? "⌘T" : "Ctrl+T")
   await expect(page).toHaveURL("/settings?tab=shortcuts")
   await expect(page.locator("[data-titlebar-tab]")).toHaveCount(0)
 
-  await page.keyboard.press("Control+t")
+  await page.keyboard.press("ControlOrMeta+t")
   await expect(page).toHaveURL(/\/new-session\?draftId=.+$/)
   await expect(settings).toBeHidden()
   await expect(page.locator('[data-component="composer-editor"]')).toBeEditable()

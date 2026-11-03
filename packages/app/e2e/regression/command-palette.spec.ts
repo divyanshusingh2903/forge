@@ -48,7 +48,7 @@ test("home commands do not wait for session search", async ({ page }) => {
 
 test("finds a setting and opens Settings with its row in view and highlighted", async ({ page }) => {
   await openPaletteWorkspace(page)
-  await page.keyboard.press("Control+K")
+  await page.keyboard.press("ControlOrMeta+K")
   const dialog = page.getByRole("dialog")
   const input = dialog.getByRole("combobox")
   await expect(input).toBeFocused()
@@ -175,7 +175,7 @@ test("Search projects opens the full location picker from a session, draft, and 
   const editor = page.locator('[data-component="composer-editor"]')
   const picker = page.getByRole("combobox", { name: "Search projects", exact: true })
   await openPaletteWorkspace(page)
-  const shortcut = (await page.evaluate(() => navigator.platform.includes("Mac"))) ? "Meta+Shift+O" : "Control+Shift+O"
+  const shortcut = (await page.evaluate(() => navigator.platform.includes("Mac"))) ? "Meta+Shift+O" : "ControlOrMeta+Shift+O"
   await page.keyboard.press(shortcut)
   await expect(page).toHaveURL(/\/new-session\?draftId=.+$/)
   await expect(picker).toBeFocused()
@@ -483,7 +483,7 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
   await expect(page).toHaveURL(/\/new-session\?/)
   await expect(editor).toBeEditable()
   await editor.blur()
-  await page.keyboard.press("Control+l")
+  await page.keyboard.press("ControlOrMeta+l")
   await expect(editor).toBeFocused()
   await page.keyboard.press("ControlOrMeta+Shift+P")
   const dialog = page.getByRole("dialog")
@@ -532,7 +532,7 @@ test("keeps matching session and file results steady across keystrokes while sea
 }) => {
   await openPaletteWorkspace(page)
   const mac = await page.evaluate(() => /(Mac|iPod|iPhone|iPad)/.test(navigator.platform))
-  await page.keyboard.press(mac ? "Meta+Shift+P" : "Control+Shift+P")
+  await page.keyboard.press(mac ? "Meta+Shift+P" : "ControlOrMeta+Shift+P")
   const dialog = page.getByRole("dialog")
   const input = dialog.getByRole("combobox")
   await expect(input).toBeFocused()

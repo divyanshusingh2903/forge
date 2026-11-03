@@ -65,7 +65,7 @@ async function setup(page: Page, input: { tabs: TabSeed[]; a?: Partial<MockServe
 }
 
 async function enableAutoAccept(page: Page) {
-  await page.keyboard.press("Control+,")
+  await page.keyboard.press("ControlOrMeta+,")
   const autoAccept = page.getByTestId("settings-screen").locator('[data-action="settings-auto-accept-permissions"]')
   await autoAccept.locator('[data-slot="switch-control"]').click()
   await expect(autoAccept.getByRole("switch")).toBeChecked()
@@ -93,7 +93,7 @@ test("settings opened from a remote session keep the remote scope", async ({ pag
   await expect(settings).toBeHidden()
   await expectPath(page, sessionHref(sessionB.id, REMOTE_SERVER))
   await expect(page.locator('[data-titlebar-tab][data-active="true"]')).toContainText(sessionB.title)
-  await page.keyboard.press("Control+]")
+  await page.keyboard.press("ControlOrMeta+]")
   await expect(page).toHaveURL("/settings?tab=models")
   await expect(settings.getByRole("tab", { name: "Models", exact: true })).toHaveAttribute("aria-selected", "true")
   await page.keyboard.press("Escape")

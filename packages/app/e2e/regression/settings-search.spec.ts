@@ -52,7 +52,7 @@ async function open(page: Page, input: { count?: number; seed?: SeedInput } = {}
 
 async function findShortcut(page: Page) {
   // Browser emulation can report a different OS than the machine running Playwright.
-  const key = await page.evaluate(() => (/Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "Meta+f" : "Control+f"))
+  const key = await page.evaluate(() => (/Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "Meta+f" : "ControlOrMeta+f"))
   await page.keyboard.press(key)
 }
 

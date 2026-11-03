@@ -166,7 +166,7 @@ test("replies with predefined choices and the edited custom multiselect answer",
       new URL(request.url()).pathname === `/api/session/${sessionID}/form/frm_question_multiselect/reply`,
   )
 
-  await question.getByRole("button", { name: "Submit", exact: true }).press("Control+Enter")
+  await question.getByRole("button", { name: "Submit", exact: true }).press("ControlOrMeta+Enter")
   expect((await reply).postDataJSON()).toEqual({ answer: { q0: ["files", "terminal", "Updated custom answer"] } })
   expect(cancellations).toEqual([])
 })

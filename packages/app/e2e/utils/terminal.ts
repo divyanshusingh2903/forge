@@ -20,7 +20,7 @@ export async function terminalText(page: Page, screen: Locator) {
   await page.mouse.down()
   await page.mouse.move(box.x + box.width - 1, box.y + box.height - 1, { steps: 4 })
   await page.mouse.up()
-  await page.keyboard.press("Control+Shift+C")
+  await page.keyboard.press("ControlOrMeta+Shift+C")
   const text = await page.evaluate(() => navigator.clipboard.readText())
 
   return text

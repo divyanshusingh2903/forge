@@ -9,7 +9,7 @@ export async function openFileLauncher(panel: Locator) {
 
 /** Opens the file browser with its shortcut: it reuses the selected launcher, else opens another. */
 export async function browseFiles(page: Page) {
-  await page.keyboard.press("Control+Alt+P")
+  await page.keyboard.press("ControlOrMeta+Alt+P")
 }
 
 /** Opens the Review tab from the launcher an empty side panel lists. */

@@ -54,10 +54,10 @@ async function open(
   }[input.surface]
 
   const show = async () => {
-    if (input.surface === "dialog") return page.keyboard.press("Control+;")
+    if (input.surface === "dialog") return page.keyboard.press("ControlOrMeta+;")
 
     if (input.surface === "settings") {
-      await page.keyboard.press("Control+,")
+      await page.keyboard.press("ControlOrMeta+,")
 
       return panel.getByRole("tab", { name: "MCPs", exact: true }).click()
     }

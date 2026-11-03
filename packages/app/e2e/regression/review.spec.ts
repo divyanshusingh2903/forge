@@ -274,7 +274,7 @@ test("open file tab browses, searches, and tracks missing files", async ({ page 
   await panel.locator("#session-side-panel-review-tab").click()
   await expect(sidebarToggle).toBeEnabled()
   await tab("Open file").click()
-  await page.keyboard.press("Control+w")
+  await page.keyboard.press("ControlOrMeta+w")
   await expect(tab("Open file")).toHaveCount(0)
   await expect(tab("nested.ts")).toHaveAttribute("aria-selected", "true")
 
@@ -286,7 +286,7 @@ test("open file tab browses, searches, and tracks missing files", async ({ page 
   await expect(tab("README.md")).toHaveAttribute("aria-selected", "true")
   await expect(tab("Open file")).toHaveCount(1)
   await tab("Open file").click()
-  await page.keyboard.press("Control+w")
+  await page.keyboard.press("ControlOrMeta+w")
   await expect(tab("Open file")).toHaveCount(0)
   await expect(tab("nested.ts")).toHaveAttribute("aria-selected", "true")
 
@@ -1154,10 +1154,10 @@ test("image gestures anchor zoom, pan, and reset independently of the pane", asy
   const second = (await panel.getByRole("img", { name: "second.svg", exact: true }).boundingBox())!
   expect(second.width).toBeGreaterThan(0)
   expect(second.height).toBeGreaterThan(0)
-  await page.keyboard.down("Control")
+  await page.keyboard.down("ControlOrMeta")
   await page.mouse.wheel(0, -50)
   await expect(stage).toHaveAttribute("data-zoom", "actual")
-  await page.keyboard.up("Control")
+  await page.keyboard.up("ControlOrMeta")
   await fit.click()
   await page.setViewportSize({ width: 1200, height: 700 })
   await expect
@@ -1506,17 +1506,17 @@ test("restores review state and the side-panel tab per session", async ({ page }
   // A hidden side-panel tab does not claim Close Tab while the side region is collapsed.
   await toggle.click()
   await expect(panel).toBeHidden()
-  await page.keyboard.press("Control+w")
+  await page.keyboard.press("ControlOrMeta+w")
   await expect(page.locator("[data-titlebar-tab-slot]", { hasText: "Alpha review state" })).toHaveCount(0)
   await expectSessionTitle(page, "Beta review state")
-  await page.keyboard.press("Control+Shift+T")
+  await page.keyboard.press("ControlOrMeta+Shift+T")
   await expectSessionTitle(page, "Alpha review state")
   await toggle.click()
   await selectedTab("README.md")
 
   // Opening moves focus into the side panel once its motion lands; from there Close Tab closes the side tab.
   await expect(panel).toBeFocused()
-  await page.keyboard.press("Control+w")
+  await page.keyboard.press("ControlOrMeta+w")
   await expect(panel.getByRole("tab", { name: "README.md", exact: true })).toHaveCount(0)
   await expect(review).toHaveAttribute("aria-selected", "true")
   await expectSessionTitle(page, "Alpha review state")

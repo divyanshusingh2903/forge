@@ -14,6 +14,7 @@ import {
   session,
   sessionHref,
 } from "../utils/app"
+import { onMac } from "../utils/platform"
 import { openFileLauncher, reviewTabs } from "../utils/side-panel"
 import { mockServers } from "../utils/mock-server"
 import { fixture, mockStressTimeline } from "../utils/session-fixture"
@@ -321,7 +322,7 @@ test("keyboard navigation and numbered shortcuts follow the visible tab order an
   await expect(page.locator("[data-titlebar-tab-slot]:visible")).toHaveCount(2)
   await expect(page.locator(`[data-titlebar-tab-slot]:has(a[href="${sessionHref(c.id)}"])`)).toBeVisible()
 
-  await page.keyboard.press("Control+Alt+ArrowRight")
+  await page.keyboard.press("ControlOrMeta+Alt+ArrowRight")
 
   await expectPath(page, sessionHref(c.id))
 
@@ -378,14 +379,14 @@ for (const navigation of ["horizontal", "vertical", "keyboard"] as const) {
     const tabB = strip.locator(`[data-titlebar-tab-link][href="${sessionHref(b.id)}"]`)
     await editor.fill("Draft A")
 
-    await (navigation === "keyboard" ? page.keyboard.press("Control+Alt+ArrowRight") : tabB.click())
+    await (navigation === "keyboard" ? page.keyboard.press("ControlOrMeta+Alt+ArrowRight") : tabB.click())
     await expectPath(page, sessionHref(b.id))
     await expect(editor).toBeFocused()
     await page.evaluate(() => navigator.clipboard.writeText("Draft B"))
     await page.keyboard.press("ControlOrMeta+V")
     await expect(editor).toHaveText("Draft B")
 
-    await page.keyboard.press("Control+Alt+ArrowLeft")
+    await page.keyboard.press("ControlOrMeta+Alt+ArrowLeft")
     await expectPath(page, sessionHref(a.id))
     await expect(editor).toBeFocused()
     await expect(editor).toHaveText("Draft A")
@@ -597,8 +598,9 @@ test("vertical tabs resize, scroll, show shortcut hints, and navigate", async ({
   await page.locator("html").evaluate((element) => element.setAttribute("dir", "rtl"))
   const home = sidebar.locator('[data-action="vertical-tabs-home"]')
   const hint = home.locator('span[aria-hidden="true"]')
-  await expect(hint).toHaveText("Ctrl+Alt+H")
-  await expect(hint.getByText("Ctrl+Alt+H", { exact: true })).toHaveCSS("direction", "ltr")
+  const label = (await onMac(page)) ? "⌃⌥H" : "Ctrl+Alt+H"
+  await expect(hint).toHaveText(label)
+  await expect(hint.getByText(label, { exact: true })).toHaveCSS("direction", "ltr")
   await expect(hint).toBeHidden()
   await home.focus()
   await expect(hint).toBeVisible()
@@ -1188,7 +1190,7 @@ test("tab shortcuts cycle side-panel tabs when the side panel is focused with mu
 
   // Focus outside the side panel still cycles session tabs even when multiple side-panel tabs are open.
   await composer.click()
-  await page.keyboard.press("Control+Tab")
+  await page.keyboard.press("ControlOrMeta+Tab")
   await expectPath(page, sessionHref(beta.id))
   await page.keyboard.press("ControlOrMeta+Alt+ArrowLeft")
   await expectPath(page, sessionHref(alpha.id))
@@ -1196,15 +1198,15 @@ test("tab shortcuts cycle side-panel tabs when the side panel is focused with mu
 
   // Focus inside the side panel cycles the drawn side-panel tabs and keeps focus inside the side panel.
   await panel.getByText("contents:README.md", { exact: true }).click()
-  await page.keyboard.press("Control+Tab")
+  await page.keyboard.press("ControlOrMeta+Tab")
   await expect(reviewTab).toHaveAttribute("aria-selected", "true")
   await expectPath(page, sessionHref(alpha.id))
 
-  await page.keyboard.press("Control+Tab")
+  await page.keyboard.press("ControlOrMeta+Tab")
   await expect(fileTab).toHaveAttribute("aria-selected", "true")
   await expectPath(page, sessionHref(alpha.id))
 
-  await page.keyboard.press("Control+Shift+Tab")
+  await page.keyboard.press("ControlOrMeta+Shift+Tab")
   await expect(reviewTab).toHaveAttribute("aria-selected", "true")
   await expectPath(page, sessionHref(alpha.id))
 
@@ -1217,13 +1219,13 @@ test("tab shortcuts cycle side-panel tabs when the side panel is focused with mu
   await expectPath(page, sessionHref(alpha.id))
 
   // Once only one side-panel tab remains, the shortcut returns to cycling session tabs.
-  await page.keyboard.press("Control+Tab")
+  await page.keyboard.press("ControlOrMeta+Tab")
   await expect(fileTab).toHaveAttribute("aria-selected", "true")
   await page.keyboard.press("ControlOrMeta+w")
   await expect(fileTab).toHaveCount(0)
   await expect(reviewTab).toHaveAttribute("aria-selected", "true")
   await reviewTab.click()
-  await page.keyboard.press("Control+Tab")
+  await page.keyboard.press("ControlOrMeta+Tab")
   await expectPath(page, sessionHref(beta.id))
 })
 

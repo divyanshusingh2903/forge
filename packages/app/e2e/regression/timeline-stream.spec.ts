@@ -1754,7 +1754,7 @@ test("changes timeline presets and saves custom thinking details", async ({ page
   })
   const part = page.locator(`[data-timeline-part-id="${assistantID}:reasoning:0"]`)
   const settings = page.getByTestId("settings-screen")
-  await page.keyboard.press("Control+,")
+  await page.keyboard.press("ControlOrMeta+,")
   const slider = settings.getByRole("slider", { name: "Timeline detail", exact: true })
   await expect(slider).toBeEnabled()
   await slider.press("Home")
@@ -2075,7 +2075,7 @@ test("quotes plain timeline text into the composer, with or without a comment", 
   // The shell turns selection off, so select all in the timeline selects its conversation and offers to quote it.
   await page.locator(answer).getByText("bundle", { exact: true }).click()
   await page.keyboard.press(
-    await page.evaluate(() => (/(Mac|iPod|iPhone|iPad)/.test(navigator.platform) ? "Meta+a" : "Control+a")),
+    await page.evaluate(() => (/(Mac|iPod|iPhone|iPad)/.test(navigator.platform) ? "Meta+a" : "ControlOrMeta+a")),
   )
   await expect(toolbar).toBeVisible()
   await page.keyboard.press("Escape")
@@ -3373,7 +3373,7 @@ async function expectBackgroundRequest(page: Page) {
       request.method() === "POST" && new URL(request.url()).pathname === `/api/session/${sessionID}/background`,
   )
 
-  await page.keyboard.press("Control+b")
+  await page.keyboard.press("ControlOrMeta+b")
   await request
 }
 
