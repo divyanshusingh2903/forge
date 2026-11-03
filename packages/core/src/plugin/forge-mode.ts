@@ -7,14 +7,36 @@ import { Effect } from "effect"
 
 const editActions = new Set(["edit"])
 
+// Upstream agents allow every action. Forge asks before shell commands and file edits, as v1 did, so Manual has
+// something to ask about and the other modes relax it.
+const askActions = ["shell", "edit"]
+
 /**
  * Settles permission requests by the session's Forge mode. It runs after configured denies have been applied, so it
- * only turns an `ask` into an `allow`. Subagents follow the mode of the session at the top of their lineage, which
+ * only turns an `ask` into an `allow`. It also makes shell commands and file edits ask by default. Subagents follow the mode of the session at the top of their lineage, which
  * the user sets, rather than the copy of its metadata they inherited when they started.
  */
 export const Plugin = define({
   id: "forge.mode",
   effect: Effect.fn(function* (ctx) {
+    // The asks follow each agent's base allow-all rule, so the agent's own rules and config, which come later, still
+    // override them. An agent without that rule chose its permissions outright and is left alone.
+    yield* ctx.agent.transform((editor) =>
+      editor.list().forEach((agent) => {
+        const base = agent.permissions.findIndex(
+          (rule) => rule.action === "*" && rule.resource === "*" && rule.effect === "allow",
+        )
+
+        if (base === -1) return
+
+        agent.permissions.splice(
+          base + 1,
+          0,
+          ...askActions.map((action) => ({ action, resource: "*", effect: "ask" as const })),
+        )
+      }),
+    )
+
     const rootMode = Effect.fn("ForgeModePlugin.rootMode")(function* (sessionID: Session.ID) {
       let session = yield* ctx.session.get({ sessionID })
       while (session.parentID !== undefined) session = yield* ctx.session.get({ sessionID: session.parentID })
