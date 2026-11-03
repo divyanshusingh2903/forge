@@ -93,25 +93,41 @@ jobs:
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
 
-      # The unit tests block network access, so ripgrep must already be on PATH. This is the version and hash the app
-      # pins in packages/core/src/ripgrep/binary.ts; Windows runners ship it already.
+      # The unit tests block network access, so ripgrep must already be on PATH. These are the version and hashes the
+      # app pins in packages/core/src/ripgrep/binary.ts.
       - name: Install ripgrep
-        if: runner.os != 'Windows'
         run: |
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            asset=ripgrep-15.1.0-x86_64-unknown-linux-musl.tar.gz
-            sha=1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599
+          version=15.1.0
+          case "$RUNNER_OS" in
+            Linux)
+              asset=ripgrep-$version-x86_64-unknown-linux-musl.tar.gz
+              sha=1c9297be4a084eea7ecaedf93eb03d058d6faae29bbc57ecdaf5063921491599
+              ;;
+            macOS)
+              asset=ripgrep-$version-aarch64-apple-darwin.tar.gz
+              sha=378e973289176ca0c6054054ee7f631a065874a352bf43f0fa60ef079b6ba715
+              ;;
+            Windows)
+              asset=ripgrep-$version-x86_64-pc-windows-msvc.zip
+              sha=124510b94b6baa3380d051fdf4650eaa80a302c876d611e9dba0b2e18d87493a
+              ;;
+          esac
+          download="$RUNNER_TEMP/$asset"
+          extract="$RUNNER_TEMP/rg-extract"
+          bin="$RUNNER_TEMP/rg-bin"
+          curl -fsSL -o "$download" "https://github.com/BurntSushi/ripgrep/releases/download/$version/$asset"
+          echo "$sha  $download" | (sha256sum -c - 2>/dev/null || shasum -a 256 -c -)
+          mkdir -p "$extract" "$bin"
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            powershell -NoProfile -Command "Expand-Archive -Force -LiteralPath '$(cygpath -w "$download")' -DestinationPath '$(cygpath -w "$extract")'"
+            cp "$extract"/*/rg.exe "$bin/rg.exe"
+            cygpath -w "$bin" >> "$GITHUB_PATH"
           else
-            asset=ripgrep-15.1.0-aarch64-apple-darwin.tar.gz
-            sha=378e973289176ca0c6054054ee7f631a065874a352bf43f0fa60ef079b6ba715
+            tar -xzf "$download" -C "$extract" --strip-components=1
+            install -m 755 "$extract/rg" "$bin/rg"
+            echo "$bin" >> "$GITHUB_PATH"
           fi
-          curl -fsSL -o "$RUNNER_TEMP/$asset" "https://github.com/BurntSushi/ripgrep/releases/download/15.1.0/$asset"
-          echo "$sha  $RUNNER_TEMP/$asset" | (sha256sum -c - 2>/dev/null || shasum -a 256 -c -)
-          mkdir -p "$HOME/.local/bin" "$RUNNER_TEMP/rg-extract"
-          tar -xzf "$RUNNER_TEMP/$asset" -C "$RUNNER_TEMP/rg-extract" --strip-components=1
-          install -m 755 "$RUNNER_TEMP/rg-extract/rg" "$HOME/.local/bin/rg"
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-          "$HOME/.local/bin/rg" --version
+          "$bin/rg" --version
 
       - name: Test Effect simplification rules
         if: runner.os == 'Linux'
