@@ -36,6 +36,7 @@ import { createPaneDrag } from "@/runtime/plugin/pane-drag"
 import { useLanguage } from "@/runtime/i18n/language"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Icon } from "@opencode/ui/icon"
+import { Splash } from "@opencode/ui/logo"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { createSessionTimelineInteraction } from "./timeline/interaction"
 import { createTimelineSearchController } from "./timeline/search-controller"
@@ -137,11 +138,17 @@ function SessionScreenContent(props: {
     timelineScrollbarHidden: boolean
     sideMounted: boolean
     mobileCached: string[]
+    /** Sessions whose mounted timeline has shown its rows. */
+    painted: Record<string, boolean>
   }>({
     timelineScrollbarHidden: false,
     sideMounted: false,
     mobileCached: [],
+    painted: {},
   })
+
+  // The mark stays until the chat shows: history loads, then a fresh timeline measures its rows before revealing them.
+  const historyLoading = () => !messagesReady() || !store.painted[session.identity.sessionID() ?? ""]
 
   const sideVisible = createMemo(() => isDesktop() && screen.side.open())
 
@@ -288,6 +295,9 @@ function SessionScreenContent(props: {
         return view.id === source.identity.sessionID() ? view : previous
       }, untrack(props.view))
 
+      const id = untrack(source.identity.sessionID)
+      onCleanup(() => id && setStore("painted", id, false))
+
       const actions = composer.actions.timeline({
         sessionID: source.identity.sessionID,
         isChild: () => !!source.data.parentID(),
@@ -317,6 +327,7 @@ function SessionScreenContent(props: {
             centered={screen.centered()}
             reserveReviewToggle={!sideVisible()}
             onContentResize={timeline.view.contentResized}
+            onVisible={() => id && setStore("painted", id, true)}
             bottomInset={timeline.inset()}
             setVisibleRef={timeline.view.setVisibleRef}
             anchor={timeline.view.anchor}
@@ -430,6 +441,21 @@ function SessionScreenContent(props: {
             <Show when={isDesktop() && !messagesReady()}>
               <SessionIdentityHeader sessionID={session.identity.params.id ?? ""} session={session.data.info()} />
             </Show>
+            {/* The startup splash's mark, shown at once while the session loads and faded out over the chat. */}
+            <div
+              data-slot="session-history-loading"
+              data-loading={historyLoading() || undefined}
+              role={historyLoading() ? "status" : undefined}
+              aria-label={historyLoading() ? language.t("common.loading") : undefined}
+              aria-hidden={historyLoading() ? undefined : true}
+              class="pointer-events-none absolute inset-0 z-10 flex items-center justify-center"
+              classList={{
+                "opacity-0 scale-90 motion-reduce:scale-100 transition-[opacity,scale] duration-300 ease-out":
+                  !historyLoading(),
+              }}
+            >
+              <Splash class={historyLoading() ? "w-16 h-20 opacity-50 animate-pulse" : "w-16 h-20 opacity-50"} />
+            </div>
             <Show when={messagesReady() && session.identity.params.id}>{timelineView()}</Show>
           </Match>
         </Switch>

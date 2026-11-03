@@ -77,6 +77,8 @@ type Input = {
   setScrollRef: (element: HTMLDivElement | undefined) => void
   /** The rows' content changed height. */
   onContentResize: () => void
+  /** The rows first show; a cold mount stays hidden until its rows and markdown are measured. */
+  onVisible?: () => void
   /** Height of the composer region floating over the timeline's bottom edge, where the timeline fades out. */
   bottomInset?: Accessor<number>
   setVisibleRef?: (element: HTMLDivElement | undefined) => void
@@ -740,11 +742,14 @@ export function createTimelineVirtualizer(input: Input) {
       contentObserver?.disconnect()
       viewportObserver?.disconnect()
       virtualContent.style.removeProperty("visibility")
+      input.onVisible?.()
     })
   }
 
   onMount(() => {
-    if (!coldPending || !virtualContent) return
+    if (!coldPending) return input.onVisible?.()
+
+    if (!virtualContent) return
     contentObserver = new MutationObserver(settleColdBottom)
     contentObserver.observe(virtualContent, {
       childList: true,

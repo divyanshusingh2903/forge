@@ -97,6 +97,8 @@ type MessageTimelineProps = {
   centered: boolean
   reserveReviewToggle: boolean
   onContentResize: () => void
+  /** The rows first show, after a cold mount measures them. */
+  onVisible?: () => void
   bottomInset?: number
   setVisibleRef?: (el: HTMLDivElement | undefined) => void
   anchor: (id: string) => string
@@ -199,6 +201,7 @@ function MessageTimelineView(
     onResumeScroll: props.onResumeScroll,
     setScrollRef: props.setScrollRef,
     onContentResize: props.onContentResize,
+    onVisible: props.onVisible,
     bottomInset: () => props.bottomInset ?? 0,
     setVisibleRef: props.setVisibleRef,
     onScheduleScrollState: props.onScheduleScrollState,
