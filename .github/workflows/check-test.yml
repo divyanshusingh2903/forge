@@ -226,8 +226,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Beta PRs gate on Linux; Windows runs on pushes and manual runs (nightly-beta.yml dispatches beta).
-        settings: ${{ fromJSON(github.base_ref == 'beta' && '[{"name":"linux","host":"ubuntu-24.04"}]' || '[{"name":"linux","host":"ubuntu-24.04"},{"name":"windows","host":"windows-2025"}]') }}
+        # Beta PRs gate on Linux; other runs cover Linux, Windows and macOS.
+        settings: ${{ fromJSON(github.base_ref == 'beta' && '[{"name":"linux","host":"ubuntu-24.04"}]' || '[{"name":"linux","host":"ubuntu-24.04"},{"name":"windows","host":"windows-2025"},{"name":"macos","host":"macos-15"}]') }}
         quarantine: ${{ fromJSON(inputs.quarantine && '[true]' || '[false]') }}
         # Playwright splits whole spec files across shards by test count, not duration. Every app-N
         # entry must use the same total, and the entries must cover 1..total. The service worker suite
