@@ -13,7 +13,8 @@ describe("upgrade command", () => {
     expect(help.stdout).toContain("[<target>]")
     expect(help.stdout).toContain("--method")
     expect(help.stdout).toContain("-m")
-  })
+    // Two cold CLI starts can exceed the default timeout on a loaded Windows runner.
+  }, 90_000)
 
   test("detects the installation method and resolves the latest version", async () => {
     const result = await cli([])
