@@ -2,21 +2,21 @@ name: check
 
 on:
   push:
-    branches: [dev]
+    branches: [main]
   pull_request:
-    branches: [dev, beta]
+    branches: [main]
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 concurrency:
-  group: ${{ case(github.ref == 'refs/heads/dev', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
+  group: ${{ case(github.ref == 'refs/heads/main', format('{0}-{1}', github.workflow, github.run_id), format('{0}-{1}', github.workflow, github.event.pull_request.number || github.ref)) }}
   cancel-in-progress: true
 
 jobs:
   check:
     name: typecheck
     if: ${{ !github.event.pull_request.draft }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
