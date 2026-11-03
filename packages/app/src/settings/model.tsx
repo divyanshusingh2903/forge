@@ -541,17 +541,8 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
           else projects[project] = value
           setStore("permissions", "autoApproveProjects", reconcile(projects))
         },
-        // Whether a project's requests are approved without asking.
+        // Whether a project's new sessions start in Auto mode. Approval itself is the server's, by session mode.
         autoApproves: (project: ScopedKey | undefined) => autoApproveOverride(project) ?? autoApproveDefault(),
-        // Whether any request on the server may be approved without asking.
-        autoApprovesOnServer(scope: ServerScope) {
-          if (autoApproveDefault()) return true
-          const prefix = ScopedKey.prefix(scope)
-
-          return Object.entries(store.permissions?.autoApproveProjects ?? {}).some(
-            ([key, value]) => value && key.startsWith(prefix),
-          )
-        },
       },
       workspaces: {
         defaultDestination: withFallback(

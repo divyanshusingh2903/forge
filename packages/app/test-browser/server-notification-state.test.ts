@@ -229,9 +229,8 @@ test.each(
     if (options.scenario === "disposed") dispose()
     await Promise.all(deliveries.map((run) => run()))
 
-    const suppressed =
-      ["resolved", "disposed", "no tab"].includes(options.scenario) ||
-      (options.scenario === "auto approve" && options.kind === "permission")
+    // The auto-approve setting only picks a new session's mode, so a request the server still asked alerts.
+    const suppressed = ["resolved", "disposed", "no tab"].includes(options.scenario)
 
     expect(alerts).toEqual(!suppressed && options.scenario !== "notifications disabled" ? [options.title] : [])
     expect(sounds).toEqual(

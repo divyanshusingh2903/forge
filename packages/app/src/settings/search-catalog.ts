@@ -38,9 +38,9 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
   },
   {
     tab: "general",
-    label: "command.permissions.autoaccept.enable",
+    label: "settings.permissions.autoAccept.title",
     target: "settings-auto-accept-permissions",
-    description: "settings.permissions.autoAccept.default.description",
+    description: "settings.permissions.autoAccept.start.description",
     keywords: "permissions approve allow auto accept default",
   },
   {
@@ -271,7 +271,7 @@ export const projectSettings: Entry<SettingsProjectTab>[] = [
   { tab: "general", label: "dialog.project.edit.color", target: "settings-project-color" },
   {
     tab: "general",
-    label: "command.permissions.autoaccept.enable",
+    label: "settings.permissions.autoAccept.title",
     target: "settings-project-auto-accept-permissions",
     keywords: "permissions approve allow auto accept",
   },

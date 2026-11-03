@@ -218,8 +218,8 @@ const AutoAcceptPermissionsSetting: Component<{ project: LocalProject; server: S
     <Show when={key()}>
       {(project) => (
         <SettingsRow
-          title={language.t("command.permissions.autoaccept.enable")}
-          description={language.t("project.settings.autoAccept.description")}
+          title={language.t("settings.permissions.autoAccept.title")}
+          description={language.t("project.settings.autoAccept.startDescription")}
         >
           <Select
             data-action="settings-project-auto-accept-permissions"

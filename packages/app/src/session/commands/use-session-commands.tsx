@@ -10,7 +10,8 @@ import { useComposerState } from "@/composer/persistence"
 import { useServerSDK } from "@/runtime/server/client"
 import { useData } from "@/runtime/server/current"
 import { formatServerError } from "@/runtime/server/errors"
-import { projectSettingsKey, useSettings } from "@/settings/model"
+import { ForgeMode } from "@opencode/schema/forge-mode"
+import { useSettings } from "@/settings/model"
 import { showToast } from "@/shell/notifications/toast"
 import { fetchSessionExport, saveSessionExport, sessionExportFilename } from "@/session/commands/export"
 import { usePlatform } from "@/runtime/platform/platform"
@@ -314,39 +315,28 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
     )
   }
 
-  const sessionProject = () => projectSettingsKey(serverSDK.scope, actions.session.data.info()?.projectID)
+  const autoMode = () => ForgeMode.read(actions.session.data.info()?.metadata) === "auto"
 
-  const autoAccepting = () => settings.permissions.autoApproves(sessionProject())
+  // Switches this session between Auto and Manual on the server, which settles permission requests by the mode.
+  // Metadata is replaced as a whole, so the mode is merged into what the session already holds.
+  const toggleAutoMode = () => {
+    const info = actions.session.data.info()
 
-  // From a session the toggle sets this project's choice, falling back to the default when they match.
-  const toggleAutoAccept = () => {
-    const project = sessionProject()
-    const active = !autoAccepting()
+    if (!info) return
 
-    if (!project) settings.permissions.setAutoApproveDefault(active)
-    else
-      settings.permissions.setAutoApproveOverride(
-        project,
-        active === settings.permissions.autoApproveDefault() ? undefined : active,
+    const mode = autoMode() ? "manual" : "auto"
+
+    void serverSDK.api.session
+      .update({ sessionID: info.id, metadata: { ...info.metadata, [ForgeMode.key]: mode } })
+      .then(() =>
+        showToast({
+          title: language.t(`toast.permissions.mode.${mode}.title`),
+          description: language.t(`toast.permissions.mode.${mode}.description`),
+        }),
       )
-
-    if (!active) {
-      showToast({
-        title: language.t("toast.permissions.autoaccept.off.title"),
-        description: language.t("toast.permissions.autoaccept.off.description"),
-      })
-
-      return
-    }
-
-    showToast({
-      title: project
-        ? language.t("toast.permissions.autoaccept.project.title")
-        : language.t("toast.permissions.autoaccept.on.title"),
-      description: project
-        ? language.t("toast.permissions.autoaccept.project.description")
-        : language.t("toast.permissions.autoaccept.on.description"),
-    })
+      .catch((cause: unknown) =>
+        showToast({ title: formatServerError(cause, language.t, language.t("common.requestFailed")) }),
+      )
   }
 
   const undo = actions.revert.undo
@@ -596,14 +586,10 @@ export const useSessionCommands = (actions: SessionCommandContext) => {
   const permissionsCmds = () => [
     permissionsCommand({
       id: "permissions.autoaccept",
-      title: autoAccepting()
-        ? language.t("command.permissions.autoaccept.disable")
-        : sessionProject()
-          ? language.t("command.permissions.autoaccept.project")
-          : language.t("command.permissions.autoaccept.enable"),
+      title: language.t(autoMode() ? "command.permissions.mode.manual" : "command.permissions.mode.auto"),
       keybind: "mod+shift+a",
-      disabled: false,
-      onSelect: toggleAutoAccept,
+      disabled: !actions.session.data.info(),
+      onSelect: toggleAutoMode,
     }),
   ]
 

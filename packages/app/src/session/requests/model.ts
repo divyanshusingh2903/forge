@@ -5,7 +5,6 @@ import { useParams } from "@solidjs/router"
 import { showToast } from "@/shell/notifications/toast"
 import { useServerSDK } from "@/runtime/server/client"
 import { useLanguage } from "@/runtime/i18n/language"
-import { projectSettingsKey, useSettings } from "@/settings/model"
 import { useWorkspaceLocation } from "@/workspaces/location"
 import { sessionPermissionRequest, sessionFormRequest, sessionTreeIDs } from "@/session/requests/session-request-tree"
 import { createWebSearchRequest } from "./websearch"
@@ -20,7 +19,6 @@ export function createSessionRequestModel() {
   const serverSDK = useServerSDK()
   const data = useData()
   const language = useLanguage()
-  const settings = useSettings()
   createEffect(() => {
     const id = params.id
 
@@ -115,10 +113,6 @@ export function createSessionRequestModel() {
 
   const permissionRequest = createMemo((): PermissionRequest | undefined => {
     const id = params.id
-
-    const project = projectSettingsKey(serverSDK.scope, id ? data.session.get(id)?.projectID : undefined)
-
-    if (settings.permissions.autoApproves(project)) return
 
     return sessionPermissionRequest(data.session.list(), data.session.permission.list, id)
   })

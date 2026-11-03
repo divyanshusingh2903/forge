@@ -5,7 +5,6 @@ import { createEffect, createMemo, createSignal, onCleanup, startTransition } fr
 import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { useLanguage } from "@/runtime/i18n/language"
-import { projectSettingsKey, useSettings } from "@/settings/model"
 import { useLayout } from "@/shell/state/layout"
 import { useTabs } from "@/shell/tabs/tabs"
 import { sessionBusy, sessionRequests } from "@/shell/layout/project-avatar-state"
@@ -47,7 +46,6 @@ export type InboxEntry = {
 export function createSessionInbox(options: { archived?: boolean } = {}) {
   const global = useGlobal()
   const servers = useServers()
-  const settings = useSettings()
   const layout = useLayout()
   const tabs = useTabs()
   const language = useLanguage()
@@ -125,8 +123,7 @@ export function createSessionInbox(options: { archived?: boolean } = {}) {
         )
 
         const status = (session: SessionInfo): InboxStatus => {
-          const project = projectSettingsKey(item.ctx.sdk.scope, session.projectID)
-          const requests = sessionRequests(data, session.id, true, settings.permissions.autoApproves(project))
+          const requests = sessionRequests(data, session.id, true)
 
           if (requests.permission) return "approval"
 

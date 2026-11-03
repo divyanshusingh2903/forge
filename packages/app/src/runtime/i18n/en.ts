@@ -105,6 +105,8 @@ export const dict = {
   "command.prompt.mode.normal": "Prompt",
   "command.prompt.mode.toggle": "Toggle shell mode",
   "command.permissions.autoaccept.enable": "Auto-accept permissions",
+  "command.permissions.mode.auto": "Switch this session to Auto mode",
+  "command.permissions.mode.manual": "Switch this session to Manual mode",
   "command.permissions.autoaccept.disable": "Stop auto-accepting permissions",
   "command.permissions.autoaccept.project": "Auto-accept permissions for this project",
   "command.session.undo": "Undo",
@@ -393,7 +395,8 @@ export const dict = {
   "mcp.configure.title": "Sign in to {{name}}",
   "mcp.configure.description": "Use an access token, or the client of an OAuth app you registered.",
   "mcp.configure.mode.cli": "GitHub CLI",
-  "mcp.configure.cli.description": "Uses your GitHub CLI (gh) sign-in. If gh isn't signed in, it signs in through your browser first.",
+  "mcp.configure.cli.description":
+    "Uses your GitHub CLI (gh) sign-in. If gh isn't signed in, it signs in through your browser first.",
   "mcp.configure.cli.waiting": "Checking your GitHub CLI sign-in…",
   "mcp.configure.cli.code": "Enter this code on GitHub to finish signing in",
   "mcp.configure.cli.open": "Copy code and open GitHub",
@@ -518,6 +521,10 @@ export const dict = {
 
   "dialog.usageExceeded.dontShowAgain": "Don't show again",
 
+  "toast.permissions.mode.auto.title": "Auto mode",
+  "toast.permissions.mode.auto.description": "This session approves permission requests without asking",
+  "toast.permissions.mode.manual.title": "Manual mode",
+  "toast.permissions.mode.manual.description": "This session asks before each permission request",
   "toast.permissions.autoaccept.on.title": "Auto-accepting permissions",
   "toast.permissions.autoaccept.on.description": "Permission requests will be automatically approved",
   "toast.permissions.autoaccept.project.title": "Auto-accepting permissions for this project",
@@ -964,6 +971,7 @@ export const dict = {
   "settings.extensions.addSkills": "How to add skills",
   "project.settings.title": "Edit project",
   "project.settings.autoAccept.description": "Approve this project's permission requests without asking",
+  "project.settings.autoAccept.startDescription": "Start this project's new sessions in Auto mode",
   "project.settings.autoAccept.default.on": "Use default (On)",
   "project.settings.autoAccept.default.off": "Use default (Off)",
   "project.settings.autoAccept.on": "On",
@@ -1270,6 +1278,9 @@ export const dict = {
   "settings.workspaces.delete.blocked.active": "The active worktree cannot be deleted.",
   "settings.workspaces.delete.blocked.linked":
     "Linked sessions will remain, but their working directory will no longer exist.",
+  "settings.permissions.autoAccept.title": "Start new sessions in Auto mode",
+  "settings.permissions.autoAccept.start.description":
+    "Auto mode approves permission requests without asking. You can change a session's mode at any time, and projects can override this in their settings.",
   "settings.permissions.autoAccept.default.description":
     "Approve permission requests without asking. Projects can override this in their settings.",
   "settings.workspaces.default.title": "Default environment",

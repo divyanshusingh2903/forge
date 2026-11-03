@@ -8,7 +8,7 @@ import { useComposerState } from "@/composer/persistence"
 import { createComposerControls, createComposerModelSelection } from "@/composer/selection"
 import { createComposerProjectControls } from "./project/controller"
 import { useLanguage } from "@/runtime/i18n/language"
-import { useSettings } from "@/settings/model"
+import { projectSettingsKey, useSettings } from "@/settings/model"
 import { useLocal } from "@/providers/models/selection"
 import { useData, useServer } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
@@ -37,11 +37,19 @@ export function createNewSessionComposerAdapter(props: {
   const location = useWorkspaceLocation()
   const language = useLanguage()
   const model = createComposerModelSelection({ agent: () => local.agent.current() })
-  // The session doesn't exist yet, so the draft holds the mode until it is created with it. The auto-approve setting
-  // picks the starting mode, so new sessions under it start in Auto.
-  const [mode, setMode] = createSignal<ForgeMode.Mode>(
-    useSettings().permissions.autoApproveDefault() ? "auto" : "manual",
-  )
+  const settings = useSettings()
+  // The session doesn't exist yet, so the draft holds the mode until it is created with it. Until the user picks one,
+  // the project's auto-approve setting picks it, so new sessions under it start in Auto.
+  const [chosen, setMode] = createSignal<ForgeMode.Mode>()
+
+  const mode = () =>
+    chosen() ??
+    (settings.permissions.autoApproves(
+      projectSettingsKey(serverSDK.scope, data.location.info({ directory: location().directory })?.project.id),
+    )
+      ? "auto"
+      : "manual")
+
   const controls = createComposerControls({ model, mode: { current: mode, select: setMode } })
 
   const adapter: NewSessionComposerAdapter = {

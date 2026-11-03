@@ -6,7 +6,7 @@ import type { ServerSDK } from "@/runtime/server/client"
 import type { Data } from "@opencode/client/solid"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useLanguage } from "@/runtime/i18n/language"
-import { projectSettingsKey, useSettings } from "@/settings/model"
+import { useSettings } from "@/settings/model"
 import { Persist, persisted, removePersisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { playSoundById } from "@/shell/notifications/sound"
@@ -311,8 +311,6 @@ export function createServerNotificationState(input: {
       if (disposed.value) return false
 
       if (kind !== "permission") return input.data.session.form.list(sessionID)?.some((form) => form.id === requestID)
-
-      if (settings.permissions.autoApproves(projectSettingsKey(input.sdk.scope, session.projectID))) return false
 
       return input.data.session.permission.list(sessionID)?.some((request) => request.id === requestID)
     }

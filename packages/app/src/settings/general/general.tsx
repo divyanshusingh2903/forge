@@ -27,8 +27,8 @@ const AutoApprovePermissionsSetting: Component = () => {
 
   return (
     <SettingsRow
-      title={language.t("command.permissions.autoaccept.enable")}
-      description={language.t("settings.permissions.autoAccept.default.description")}
+      title={language.t("settings.permissions.autoAccept.title")}
+      description={language.t("settings.permissions.autoAccept.start.description")}
     >
       <div data-action="settings-auto-accept-permissions">
         <Switch
