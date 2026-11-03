@@ -41,7 +41,7 @@ for (const custom of [false, true]) {
       ).toBeInViewport()
       await page.keyboard.press(shortcut)
       await expect(trigger).toHaveAttribute("aria-expanded", "true")
-      await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+      await expect(summary.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
       await expect.poll(() => summary.evaluate((element) => element.contains(document.activeElement))).toBe(true)
       await expect(tooltip).toBeHidden()
       await page.keyboard.press(shortcut)
@@ -77,13 +77,13 @@ test("the summary always shows services under a static, icon-free heading", asyn
   await expect(server.locator("svg")).toHaveCount(0)
   await expect(summary.getByRole("button", { name: "Extensions", exact: true })).toHaveCount(0)
   await expect(summary).not.toContainText("SummaryDisclosure")
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+  await expect(summary.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
   await page.keyboard.press("Escape")
   await expect(summary).toBeHidden()
   await page.reload()
   await trigger.click()
   await expect(server).toBeVisible()
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+  await expect(summary.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
   await page.screenshot({ path: test.info().outputPath("summary-static-heading.png"), animations: "disabled" })
 })
 
@@ -98,7 +98,7 @@ test("the project menu loads changes on demand and opens review", async ({ page 
   })
   await page.getByRole("button", { name: "Session details", exact: true }).click()
   const summary = page.getByRole("dialog", { name: "Session details", exact: true })
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+  await expect(summary.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
   expect(requests).toEqual([])
   await page.keyboard.press("Escape")
   const changes = await holdRoute(page, (url) => url.pathname === "/api/vcs/diff", { method: "GET" })
@@ -206,7 +206,7 @@ test("a subagent shows its details but cannot move to another worktree", async (
   const summary = page.getByRole("dialog", { name: "Session details", exact: true })
 
   await page.getByRole("button", { name: "Session details", exact: true }).click()
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+  await expect(summary.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
   await expect(summary).not.toContainText("feature")
   await page.keyboard.press("Escape")
   await expect(page.getByRole("button", { name: "More options", exact: true })).toHaveCount(0)
@@ -303,16 +303,16 @@ for (const direction of ["ltr", "rtl"] as const) {
       .toBeGreaterThan(0)
     await expectAlignedWithHeader(page, direction)
 
-    const mcp = summary.getByRole("button", { name: "MCP", exact: true })
-    const submenu = page.getByRole("group", { name: "MCP", exact: true })
-    await mcp.click()
-    await expect(submenu.getByText("No MCP servers configured", { exact: true })).toBeVisible()
-    await expect(submenu.getByText("Configuration file")).toBeVisible()
+    // Forge lists MCPs from the header's MCP button, so the first submenu here is Plugins.
+    const plugins = summary.getByRole("button", { name: "Plugins", exact: true })
+    const submenu = page.getByRole("group", { name: "Plugins", exact: true })
+    await plugins.click()
+    await expect(submenu.getByText("No plugins configured", { exact: true })).toBeVisible()
     await expect(summary).toBeVisible()
     // The submenu opens beside its row, never over it.
     await expect
       .poll(async () => {
-        const item = (await mcp.boundingBox())!
+        const item = (await plugins.boundingBox())!
         const menu = (await submenu.boundingBox())!
 
         return menu.x + menu.width <= item.x + 1 || menu.x >= item.x + item.width - 1
@@ -320,7 +320,6 @@ for (const direction of ["ltr", "rtl"] as const) {
       .toBe(true)
 
     for (const [name, empty] of [
-      ["Plugins", "No plugins configured"],
       ["Skills", "No skills configured"],
       ["LSP", "No LSP servers configured"],
     ]) {
@@ -423,7 +422,7 @@ test("summary catalogs load, refresh while cached, and tell errors from empty", 
 
   await prefetch.arrived
   await expect(summary.getByText("Local repository", { exact: true })).toHaveCount(0)
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+  await expect(summary.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
   await open("Plugins")
   await expect(menu("Plugins").getByRole("status")).toContainText("Loading")
   await expect(menu("Plugins").getByText("No plugins configured", { exact: true })).toHaveCount(0)
@@ -453,13 +452,8 @@ test("summary catalogs load, refresh while cached, and tell errors from empty", 
   await expect(menu("LSP").getByText("typescript", { exact: true })).toBeVisible()
   await expect(menu("LSP").getByText("rust", { exact: true })).toHaveCount(0)
   await expect(menu("LSP").locator(".session-service-dot")).toHaveCount(0)
-  await open("MCP")
-  await expect(
-    menu("MCP").locator('[data-slot="truncated-text-label"]').filter({ hasText: "summary-mcp" }),
-  ).toBeVisible()
 
   for (const service of [
-    { name: "MCP", path: "/api/mcp", item: "summary-mcp" },
     { name: "Plugins", path: "/api/plugin", item: "supermemory" },
     { name: "Skills", path: "/api/skill", item: "find-skills" },
     { name: "LSP", path: "/api/config", item: "typescript" },
@@ -475,10 +469,10 @@ test("summary catalogs load, refresh while cached, and tell errors from empty", 
   lsp.length = 0
 
   for (const service of [
-    { name: "MCP", path: "/api/mcp", empty: "No MCP servers configured" },
-    { name: "Plugins", path: "/api/plugin", empty: "No plugins configured" },
+    // Plugins is still open from the refresh above, so it goes last, once another list has replaced it.
     { name: "Skills", path: "/api/skill", empty: "No skills configured" },
     { name: "LSP", path: "/api/config", empty: "No LSP servers configured" },
+    { name: "Plugins", path: "/api/plugin", empty: "No plugins configured" },
   ]) {
     await open(service.name)
     await expectRefreshKeeps(page, service.name, service.path, service.empty)
@@ -487,7 +481,7 @@ test("summary catalogs load, refresh while cached, and tell errors from empty", 
   expect(warnings).toEqual([])
 })
 
-test("MCP rows toggle once per action and keep sign-in, errors, and management available", async ({ page }) => {
+test("MCP rows in the header popover toggle once per action and keep sign-in, errors, and management available", async ({ page }) => {
   await mockStressTimeline(page, {
     mcp: [
       { name: "figma", status: { status: "connected" } },
@@ -504,10 +498,8 @@ test("MCP rows toggle once per action and keep sign-in, errors, and management a
     if (request.method() === "POST" && url.pathname.startsWith("/api/experimental/mcp/")) writes.push(url.pathname)
   })
   await page.goto(sessionHref(fixture.targetID))
-  await page.getByRole("button", { name: "Session details", exact: true }).click()
-  const item = page.getByRole("button", { name: "MCP", exact: true })
-  await item.click()
-  const submenu = page.getByRole("group", { name: "MCP", exact: true })
+  await page.getByRole("button", { name: "MCP", exact: true }).click()
+  const submenu = page.getByRole("dialog", { name: "MCP", exact: true })
   await expect(submenu).toBeVisible()
 
   const row = (name: string) =>
@@ -614,7 +606,7 @@ test("MCP rows toggle once per action and keep sign-in, errors, and management a
 
 test("Extensions lists open on hover, hold course into the open list, and follow the keyboard", async ({ page }) => {
   await mockStressTimeline(page, {
-    mcp: [{ name: "figma", status: { status: "connected" } }],
+    skills: [{ id: "find-skills", name: "find-skills", path: "/skills/find/SKILL.md", content: "Find skills" }],
     plugins: [
       {
         id: "supermemory",
@@ -631,45 +623,45 @@ test("Extensions lists open on hover, hold course into the open list, and follow
   const list = (name: string) => page.getByRole("group", { name, exact: true })
 
   // Hovering opens a list without a click, and moving down the rows switches lists.
-  await row("MCP").hover()
-  await expect(row("MCP")).toHaveAttribute("aria-expanded", "true")
-  await expect(list("MCP").getByRole("switch", { name: "figma", exact: true })).toBeVisible()
   await row("Plugins").hover()
+  await expect(row("Plugins")).toHaveAttribute("aria-expanded", "true")
   await expect(list("Plugins").getByText("supermemory", { exact: true })).toBeVisible()
-  await expect(list("MCP")).toBeHidden()
-  await row("MCP").hover()
-  await expect(list("MCP")).toBeVisible()
-
-  // A diagonal move from MCP into its list crosses the Plugins row without switching to it.
-  const from = (await row("MCP").boundingBox())!
-  const into = (await list("MCP").boundingBox())!
-  await page.mouse.move(into.x + into.width - 24, from.y + from.height * 3, { steps: 12 })
-  await expect(row("MCP")).toHaveAttribute("aria-expanded", "true")
-  await expect(row("Plugins")).toHaveAttribute("aria-expanded", "false")
-  await expect(list("MCP")).toBeVisible()
-
-  // A pointer that comes to rest on Plugins while still heading for the list switches to Plugins.
-  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
-  const plugins = (await row("Plugins").boundingBox())!
-  await page.mouse.move(plugins.x + 12, plugins.y + plugins.height / 2, { steps: 6 })
+  await row("Skills").hover()
+  await expect(list("Skills").getByText("find-skills", { exact: true })).toBeVisible()
+  await expect(list("Plugins")).toBeHidden()
+  await row("Plugins").hover()
   await expect(list("Plugins")).toBeVisible()
+
+  // A diagonal move from Plugins into its list crosses the Skills row without switching to it.
+  const from = (await row("Plugins").boundingBox())!
+  const into = (await list("Plugins").boundingBox())!
+  await page.mouse.move(into.x + into.width - 24, from.y + from.height * 3, { steps: 12 })
+  await expect(row("Plugins")).toHaveAttribute("aria-expanded", "true")
+  await expect(row("Skills")).toHaveAttribute("aria-expanded", "false")
+  await expect(list("Plugins")).toBeVisible()
+
+  // A pointer that comes to rest on Skills while still heading for the list switches to Skills.
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
+  const skills = (await row("Skills").boundingBox())!
+  await page.mouse.move(skills.x + 12, skills.y + skills.height / 2, { steps: 6 })
+  await expect(list("Skills")).toBeVisible()
 
   // The keyboard opens a list into its first control and closes it back to its row; Escape closes only the list.
   await page.mouse.move(0, 0)
   await page.keyboard.press("Escape")
-  await expect(list("Plugins")).toBeHidden()
+  await expect(list("Skills")).toBeHidden()
   await expect(summary).toBeVisible()
-  await row("MCP").focus()
+  await row("Skills").focus()
   await page.keyboard.press("ArrowRight")
-  await expect(list("MCP").getByRole("switch", { name: "figma", exact: true })).toBeFocused()
+  await expect(list("Skills").getByRole("button", { name: "find-skills", exact: true })).toBeFocused()
   await page.keyboard.press("ArrowLeft")
-  await expect(list("MCP")).toBeHidden()
-  await expect(row("MCP")).toBeFocused()
+  await expect(list("Skills")).toBeHidden()
+  await expect(row("Skills")).toBeFocused()
   await page.keyboard.press("Enter")
-  await expect(list("MCP").getByRole("switch", { name: "figma", exact: true })).toBeFocused()
+  await expect(list("Skills").getByRole("button", { name: "find-skills", exact: true })).toBeFocused()
   await page.keyboard.press("Escape")
-  await expect(list("MCP")).toBeHidden()
-  await expect(row("MCP")).toBeFocused()
+  await expect(list("Skills")).toBeHidden()
+  await expect(row("Skills")).toBeFocused()
   await expect(summary).toBeVisible()
   await page.keyboard.press("Escape")
   await expect(summary).toBeHidden()
@@ -714,13 +706,14 @@ test("Extensions lists open config files and skills in a side tab and start setu
   const row = (name: string) => summary.getByRole("button", { name, exact: true })
   const list = (name: string) => page.getByRole("group", { name, exact: true })
 
-  await trigger.click()
-  await row("MCP").hover()
+  // The MCP servers' configuration file opens from the header's MCP button.
+  const mcp = page.getByRole("dialog", { name: "MCP", exact: true })
+  await page.getByRole("button", { name: "MCP", exact: true }).click()
   // A file outside the workspace is read by name from its own directory.
   const read = page.waitForRequest((request) => new URL(request.url()).pathname.endsWith("/api/fs/read/opencode.jsonc"))
-  await list("MCP").getByRole("button", { name: "Configuration file", exact: true }).click()
+  await mcp.getByRole("button", { name: "Configuration file", exact: true }).click()
   expect(new URL((await read).url()).searchParams.get("location[directory]")).toBe("C:/Users/kit/.config/opencode/")
-  await expect(summary).toBeHidden()
+  await expect(mcp).toBeHidden()
   await expect(page.getByRole("tab", { name: "opencode.jsonc", exact: true })).toHaveAttribute("aria-selected", "true")
   await expect(page.getByText("contents:opencode.jsonc", { exact: true })).toBeVisible()
 
@@ -766,7 +759,7 @@ test("multiple desktop connections show the session's server name", async ({ pag
   await page.getByRole("button", { name: "Session details", exact: true }).click()
   const summary = page.getByRole("dialog", { name: "Session details", exact: true })
   await expect(summary.getByText("Design server", { exact: true })).toBeVisible()
-  await expect(summary.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+  await expect(summary.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
 })
 
 test.describe("remote configuration", () => {
@@ -802,7 +795,6 @@ test.describe("remote configuration", () => {
 
     // Each service opens from a fresh summary: after a copy, the next submenu closes itself (reported defect).
     for (const [index, service] of [
-      { name: "MCP", path: `${home}/mcp.jsonc` },
       { name: "Plugins", path: `${home}/plugins.json` },
       { name: "Skills", path: `${home}/skills.jsonc` },
       { name: "LSP", path: `${home}/lsp.json` },
@@ -854,7 +846,7 @@ test.describe("remote configuration", () => {
   })
 })
 
-test("long MCP lists stay in the viewport in a real RTL locale", async ({ page }) => {
+test("long MCP lists in the header popover stay in the viewport in a real RTL locale", async ({ page }) => {
   await page.setViewportSize({ width: 800, height: 600 })
   await mockStressTimeline(page, {
     mcp: Array.from({ length: 30 }, (_, index) => ({
@@ -864,19 +856,13 @@ test("long MCP lists stay in the viewport in a real RTL locale", async ({ page }
   })
   await seed(page, { locale: "he", theme: { id: "oc-2", scheme: "dark" } })
   await page.goto(sessionHref(fixture.targetID))
-  await page.getByRole("button", { name: "פרטי ההפעלה", exact: true }).click()
-  const summary = page.getByRole("dialog", { name: "פרטי ההפעלה", exact: true })
-  await summary.getByRole("button", { name: "MCP", exact: true }).click()
-  const menu = page.getByRole("group", { name: "MCP", exact: true })
+  await page.getByRole("button", { name: "MCP", exact: true }).click()
+  const menu = page.getByRole("dialog", { name: "MCP", exact: true })
   await expect(menu.locator(".session-mcp-row")).toHaveCount(30)
   const list = menu.locator("[data-scrollable]")
   await expect.poll(() => list.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true)
   // Long names truncate; the list only scrolls vertically.
   expect(await list.evaluate((element) => element.scrollWidth - element.clientWidth)).toBe(0)
-  // The submenu shows and moves without motion unless its Knobs toggle is on.
-  expect(
-    await page.locator(".session-service-flyout").evaluate((element) => getComputedStyle(element).transitionDuration),
-  ).toBe("0s")
   await expect
     .poll(async () => {
       const bounds = (await menu.boundingBox())!
