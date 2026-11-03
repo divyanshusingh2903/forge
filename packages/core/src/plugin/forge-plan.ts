@@ -100,7 +100,8 @@ export const Plugin = {
       const existing = ForgePlan.read(session.metadata)
       if (ForgePlan.open(existing)) return existing
       const next: ForgePlan.Info = {
-        path: path.join(ForgePlan.directory, `${Date.now()}-${Slug.create()}.md`),
+        // Slash-separated on every platform, since the edit rule above and the app both match it that way.
+        path: path.posix.join(ForgePlan.directory, `${Date.now()}-${Slug.create()}.md`),
         status: "drafting",
       }
       yield* setPlan(sessionID, next)
