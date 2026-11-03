@@ -36,6 +36,7 @@ export function GitRemoteDialog(props: { git: ReviewGit; mode: "push" | "pull"; 
 
   const pullBranch = () => form.branch || (form.remote ? "" : (git.store.state?.remote.target?.branch ?? branch() ?? ""))
   const strategy = () => form.strategy || configured()
+  const chosen = () => (strategy() === "rebase" ? "rebase" : "merge")
   const valid = () => !!remote() && (props.mode === "push" ? !!branch() : !!pullBranch().trim())
 
   const submit = async () => {
@@ -48,7 +49,7 @@ export function GitRemoteDialog(props: { git: ReviewGit; mode: "push" | "pull"; 
             remote: remote(),
             branch: pullBranch().trim(),
             // Leave the configured strategy to Git, so options such as rebase=merges still apply.
-            ...(strategy() === configured() ? {} : { strategy: strategy() === "rebase" ? "rebase" : "merge" }),
+            strategy: strategy() === configured() ? undefined : chosen(),
           })
 
     if (done) return props.dialog.close()
@@ -132,6 +133,7 @@ export function GitStashDialog(props: { git: ReviewGit; dialog: DialogHandle }) 
   const [form, setForm] = createStore({
     message: "",
     includeUntracked: false,
+    // SAFETY: only widens the initial value to the stash the user picks to drop.
     drop: undefined as GitStash | undefined,
   })
 
@@ -169,7 +171,7 @@ export function GitStashDialog(props: { git: ReviewGit; dialog: DialogHandle }) 
               disabled={git.store.busy || !git.store.state?.changes.length}
               onClick={async () => {
                 const done = await git.stashCreate({
-                  ...(form.message.trim() ? { message: form.message.trim() } : {}),
+                  message: form.message.trim() || undefined,
                   includeUntracked: form.includeUntracked,
                 })
 

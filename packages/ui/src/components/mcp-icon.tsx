@@ -36,6 +36,7 @@ export function mcpDisplayName(id: string) {
   return isMcpIconName(name) ? names[name] : id
 }
 
+// SAFETY: `paths` is keyed by McpIconName, and Object.keys only widens its keys to string.
 export const iconNames = Object.keys(paths) as McpIconName[]
 
 export function isMcpIconName(id: string): id is McpIconName {

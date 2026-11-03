@@ -821,6 +821,7 @@ test("single extension rows stay aligned when switching tabs", async ({ page }) 
   await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
 
   let bounds: typeof mcp
+
   for (const item of [
     { tab: "Plugins", name: "demo-plugin" },
     { tab: "Skills", name: "demo-skill" },

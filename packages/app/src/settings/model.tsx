@@ -254,6 +254,7 @@ function legacyTimelineActivity(value: boolean | "hidden" | "compact" | "full" |
   } as const
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- the value is persisted settings JSON of any shape
 function isCompact(detail: unknown) {
   if (!Predicate.isObject(detail) || !timelineCategories.every((category) => Predicate.isObject(detail[category])))
     return false

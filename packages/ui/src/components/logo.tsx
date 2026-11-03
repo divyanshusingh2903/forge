@@ -48,7 +48,7 @@ export const Logo = (props: { class?: string }) => {
         {(letter, index) => (
           <g transform={`translate(${index() * FORGE_PITCH} 0)`}>
             {letter.shadow && <path d={letter.shadow} fill="var(--icon-weak-base)" />}
-            <path d={letter.shape} fill={index() < 3 ? "var(--icon-base)" : "var(--icon-strong-base)"} />
+            <path d={letter.outline} fill={index() < 3 ? "var(--icon-base)" : "var(--icon-strong-base)"} />
           </g>
         )}
       </For>

@@ -1058,6 +1058,7 @@ const translations = {
 } satisfies Record<string, readonly string[]>
 
 export function gitDict(locale: keyof typeof translations) {
+  // SAFETY: every entry is built from `keys`, so the result has exactly the `git.<key>` entries.
   return Object.fromEntries(
     keys.map((key, index) => [
       `git.${key}`,

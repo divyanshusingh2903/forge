@@ -6,6 +6,7 @@ import { FORGE_HEIGHT, FORGE_LETTERS, FORGE_PITCH, FORGE_WIDTH } from "@opencode
 const target = FORGE_LETTERS.map((letter) => letter.id)
 
 export function AnimatedWordmark(props: { active: boolean }) {
+  // SAFETY: the letter IDs are literal strings; this only widens them so the letters can be shuffled.
   const [state, setState] = createStore({ letters: [...target] as string[] })
   const timers = new Set<ReturnType<typeof setTimeout>>()
   const random = () => target[Math.floor(Math.random() * target.length)]
@@ -54,7 +55,7 @@ export function AnimatedWordmark(props: { active: boolean }) {
           {(letter) => (
             <symbol id={`settings-about-letter-${letter.id}`} viewBox={`0 0 24 ${FORGE_HEIGHT}`}>
               {letter.shadow && <path class="settings-about-letter-shadow" d={letter.shadow} />}
-              <path d={letter.shape} />
+              <path d={letter.outline} />
             </symbol>
           )}
         </For>

@@ -97,7 +97,7 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
         i18n.plural("ui.reference.downloads", props.result.downloads, {
           count: compactNumber(props.result.downloads, i18n.locale()),
         }),
-    ].filter((item): item is string => typeof item === "string")
+    ].filter((item): item is string => item !== false)
 
   return (
     <div data-component="reference-card" data-kind={kind()}>

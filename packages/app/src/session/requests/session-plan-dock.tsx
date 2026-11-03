@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createSignal, For, on, Show } from "solid-js"
+import { Predicate } from "effect"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import type { FormAnswer, FormInfo } from "@opencode/client/promise"
 import { Button } from "@opencode/ui/button"
@@ -42,7 +43,7 @@ export function SessionPlanDock(props: { request: FormInfo; onSubmit: () => void
   const plan = () => {
     const value = props.request.metadata?.plan
 
-    return typeof value === "string" ? value : undefined
+    return Predicate.isString(value) ? value : undefined
   }
 
   const prompt = useComposerState()
@@ -77,6 +78,7 @@ export function SessionPlanDock(props: { request: FormInfo; onSubmit: () => void
     props.onSubmit()
     serverSDK.api.session.form
       .reply({ sessionID: props.request.sessionID, formID: props.request.id, answer })
+      // oxlint-disable-next-line anti-slop/no-unknown-parameters -- a rejected promise carries any value
       .catch((error: unknown) =>
         showToast({
           title: language.t("common.requestFailed"),

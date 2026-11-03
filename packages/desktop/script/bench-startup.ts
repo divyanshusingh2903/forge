@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+/* oxlint-disable anti-slop/no-array-filter-map, anti-slop/no-conditional-empty-object-spread, anti-slop/no-known-value-widening, anti-slop/no-runtime-typeof, anti-slop/no-unsafe-dictionary-type, anti-slop-effect/prefer-effect-match, anti-slop/require-safety-comment-for-type-assertion -- a developer benchmark that reads untyped process, trace and profile JSON */
 // Cold-start benchmark for a packaged desktop build.
 //
 //   bun run bench:startup -- [--exe <path>] [--compare <path>] [--runs 5] [--warmup 1] [--service warm|cold]

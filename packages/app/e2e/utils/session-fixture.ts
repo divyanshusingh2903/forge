@@ -1,3 +1,4 @@
+/* oxlint-disable anti-slop/no-conditional-empty-object-spread, anti-slop/no-known-value-widening, anti-slop/no-unsafe-dictionary-type, anti-slop-effect/prefer-effect-match, anti-slop/require-safety-comment-for-type-assertion -- test fixtures that build untyped wire payloads for the mock server */
 import type { Page } from "@playwright/test"
 import type { JsonValue, SessionMessageAssistant, SessionMessageInfo } from "@opencode/client/promise"
 import { base64Encode } from "@opencode/util/encode"

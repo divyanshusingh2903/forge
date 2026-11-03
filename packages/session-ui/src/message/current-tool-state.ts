@@ -1,3 +1,4 @@
+/* oxlint-disable anti-slop/no-known-value-widening, anti-slop/no-runtime-typeof, anti-slop/no-unsafe-dictionary-type -- tool inputs, metadata and outputs are provider-defined JSON that this file decodes into the few fields it reads */
 import type { SessionMessageAssistant, SessionMessageAssistantTool } from "@opencode/client/promise"
 import { Option, Schema } from "effect"
 

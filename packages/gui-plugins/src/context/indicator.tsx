@@ -159,8 +159,7 @@ export function SessionContextUsage(props: {
           {menuRow(
             ctx.t("usage.tokens"),
             [context()?.total ?? 0, limit()]
-              .filter((value) => value !== undefined)
-              .map((value) => value.toLocaleString(i18n.locale()))
+              .flatMap((value) => (value === undefined ? [] : [value.toLocaleString(i18n.locale())]))
               .join(" / "),
           )}
           <Show when={showCost()}>{menuRow(ctx.t("usage.cost"), cost())}</Show>

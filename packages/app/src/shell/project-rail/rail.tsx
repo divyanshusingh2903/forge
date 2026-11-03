@@ -213,6 +213,7 @@ function RailSession(props: {
   const label = () => sessionLabel(props.record.session)
   const active = () => props.active(props.server, props.record.session.id)
   const server = () => ServerConnection.Key.make(props.server)
+  // SAFETY: only widens the initial value to the optional draft title the store later holds.
   const [ui, setUI] = createStore({ menu: false, pendingRename: false, draft: undefined as string | undefined })
   let input: HTMLInputElement | undefined
 

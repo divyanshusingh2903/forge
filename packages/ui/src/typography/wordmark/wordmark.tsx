@@ -30,7 +30,7 @@ export function Wordmark(
                 <path
                   pathLength={props.outline ? 1 : undefined}
                   transform={`translate(50.400 -25.800) scale(4.3000) translate(${index() * FORGE_PITCH} 0)`}
-                  d={letter.shape}
+                  d={letter.outline}
                 />
               )}
             </For>

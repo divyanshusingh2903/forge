@@ -36,7 +36,9 @@ function parse(content: string): LatestYml {
   let current: Partial<FileEntry> | undefined
 
   const flush = () => {
-    if (current?.url && current.sha512 && current.size) files.push(current as FileEntry)
+    if (current?.url && current.sha512 && current.size)
+      // SAFETY: the condition has just checked every FileEntry field that the entry needs.
+      files.push(current as FileEntry)
     current = undefined
   }
 

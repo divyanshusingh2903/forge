@@ -65,6 +65,7 @@ function github(segments: string[]): Reference | undefined {
   // A stray "%" would make decodeURIComponent throw, so such tags are simply not references.
   if (owner && repo && type === "releases" && id === "tag" && tag && !/%(?![0-9a-f]{2})/i.test(tag))
     return { kind: "github-release", repository: `${owner}/${repo}`, tag: decodeURIComponent(tag) }
+  // SAFETY: an unknown segment indexes nothing and reads as undefined, which the check below rejects.
   const kind = githubPaths[type as keyof typeof githubPaths]
 
   if (!owner || !repo || !kind || !id || !/^\d+$/.test(id)) return
@@ -76,6 +77,7 @@ function github(segments: string[]): Reference | undefined {
 function gitlab(segments: string[]): Reference | undefined {
   const dash = segments.indexOf("-")
   const [type, id] = segments.slice(dash + 1)
+  // SAFETY: an unknown segment indexes nothing and reads as undefined, which the check below rejects.
   const kind = gitlabPaths[type as keyof typeof gitlabPaths]
 
   if (dash < 2 || !kind || !id || !/^\d+$/.test(id)) return
@@ -85,6 +87,7 @@ function gitlab(segments: string[]): Reference | undefined {
 
 function linear(segments: string[]): Reference | undefined {
   const [workspace, type, id] = segments
+  // SAFETY: an unknown segment indexes nothing and reads as undefined, which the check below rejects.
   const kind = linearPaths[type as keyof typeof linearPaths]
 
   if (!workspace || !kind || !id) return

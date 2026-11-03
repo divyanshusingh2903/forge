@@ -25,6 +25,7 @@ export function createReviewGit(input: { view: Accessor<MountedSession>; enabled
   const client = () => view().server.client.git
 
   const [store, setStore] = createStore({
+    // SAFETY: only widens the initial value; the state is assigned from the server's typed answer.
     state: undefined as GitState | undefined,
     message: "",
     busy: false,
@@ -137,7 +138,7 @@ export function createReviewGit(input: { view: Accessor<MountedSession>; enabled
         client().message({
           ...location(),
           all,
-          ...(model ? { model: { providerID: model.providerID, id: model.modelID, variant: model.variant } } : {}),
+          model: model && { providerID: model.providerID, id: model.modelID, variant: model.variant },
         }),
       )
 
@@ -158,6 +159,7 @@ export function createReviewGit(input: { view: Accessor<MountedSession>; enabled
 
 export type ReviewGit = ReturnType<typeof createReviewGit>
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- a caught value has no declared type
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 const checked = (change: GitChange) => change.staged && !change.unstaged
@@ -277,7 +279,9 @@ export function GitChanges(props: {
       if (props.working && current) return current.conflicted ? "!" : current.untracked ? "U" : "M"
       const kind = props.kinds.get(input.file)
 
-      return kind === "add" ? "A" : kind === "del" ? "D" : "M"
+      if (kind === "add") return "A"
+
+      return kind === "del" ? "D" : "M"
     }
 
     return (
@@ -386,7 +390,7 @@ function buildTree(files: readonly string[]): TreeNode[] {
       const existing = parent.children.find((child) => child.path === path)
 
       if (existing) return existing
-      const node: TreeNode = { name, path, files: [], children: [], ...(index === parts.length - 1 ? { file } : {}) }
+      const node: TreeNode = { name, path, files: [], children: [], file: index === parts.length - 1 ? file : undefined }
       parent.children.push(node)
 
       return node

@@ -8,8 +8,11 @@ export type Tone = "success" | "warning" | "danger" | "done" | "accent" | "muted
 export function stateTone(reference: Reference, result: LinkPreviewResult): Tone {
   const state = result.state
 
-  if (reference.kind === "github-issue" || reference.kind === "gitlab-issue")
-    return state === "open" ? "success" : state === "not-planned" ? "muted" : "done"
+  if (reference.kind === "github-issue" || reference.kind === "gitlab-issue") {
+    if (state === "open") return "success"
+
+    return state === "not-planned" ? "muted" : "done"
+  }
 
   if (reference.kind === "github-pr" || reference.kind === "gitlab-mr") {
     if (state === "open") return "success"
@@ -19,8 +22,11 @@ export function stateTone(reference: Reference, result: LinkPreviewResult): Tone
     return state === "draft" ? "muted" : "danger"
   }
 
-  if (reference.kind === "github-release")
-    return state === "prerelease" ? "warning" : state === "draft" ? "muted" : "accent"
+  if (reference.kind === "github-release") {
+    if (state === "prerelease") return "warning"
+
+    return state === "draft" ? "muted" : "accent"
+  }
 
   if (result.stateType === "started") return "warning"
 

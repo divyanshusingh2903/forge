@@ -948,7 +948,7 @@ function mockHandlers(
             data: {
               branch: "main",
               changes: (Predicate.isFunction(config.vcsDiff) ? config.vcsDiff({ mode: "git" }) : (config.vcsDiff ?? []))
-                .flatMap((diff) => (typeof (diff as { file?: unknown }).file === "string" ? [(diff as { file: string }).file] : []))
+                .flatMap((diff) => (Predicate.hasProperty(diff, "file") && Predicate.isString(diff.file) ? [diff.file] : []))
                 .map((file) => ({ file, staged: false, unstaged: true, untracked: false })),
               remote: { upstream: false, ahead: 0, behind: 0, remotes: false },
             },

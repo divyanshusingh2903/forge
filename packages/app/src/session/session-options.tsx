@@ -17,7 +17,12 @@ export function SessionOptionsContent(
   } & Pick<ComponentProps<typeof Menu.Content>, "class" | "style" | "onCloseAutoFocus">,
 ) {
   const language = useLanguage()
-  const keys: Record<string, () => void> = { r: props.rename, e: props.export, d: props.delete }
+
+  const keys = new Map([
+    ["r", props.rename],
+    ["e", props.export],
+    ["d", props.delete],
+  ])
 
   return (
     <Menu.Content
@@ -26,7 +31,7 @@ export function SessionOptionsContent(
       onCloseAutoFocus={props.onCloseAutoFocus}
       onKeyDown={(event: KeyboardEvent) => {
         if (event.altKey || event.ctrlKey || event.metaKey) return
-        const run = keys[event.key.toLowerCase()]
+        const run = keys.get(event.key.toLowerCase())
 
         if (!run) return
         event.preventDefault()

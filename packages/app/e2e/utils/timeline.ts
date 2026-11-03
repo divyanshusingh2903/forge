@@ -261,6 +261,7 @@ export async function setupTimeline(
   })
 
   if (input.tabs) await seed(page, { tabs: input.tabs })
+
   const general = {
     editToolPartsExpanded: false,
     shellToolPartsExpanded: false,

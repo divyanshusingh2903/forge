@@ -18,6 +18,12 @@ import { showToast } from "@/shell/notifications/toast"
  * token sent as a Bearer header, or the client of a pre-registered OAuth app. All are stored as credentials, never in
  * config.
  */
+const toastKey = {
+  cli: "mcp.configure.toast.cli",
+  token: "mcp.configure.toast.saved",
+  oauth: "mcp.configure.toast.signingIn",
+} as const
+
 export function DialogMcpConfigure(props: { name: string; integrationID: string; directory: string }) {
   const dialog = useDialog()
   const data = useData()
@@ -26,13 +32,16 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
   const language = useLanguage()
 
   const [form, setForm] = createStore({
+    // SAFETY: this only widens the initial value to the modes the form can take; nothing is read from outside.
     mode: "cli" as "cli" | "token" | "oauth",
     token: "",
     clientID: "",
     clientSecret: "",
+    // SAFETY: only widens the initial value to the optional message the store later holds.
     error: undefined as string | undefined,
     // stderr of the running `gh auth login`, which carries the one-time code and URL.
     output: "",
+    // SAFETY: only widens the initial value to the optional attempt ID the store later holds.
     attemptID: undefined as string | undefined,
   })
 
@@ -135,14 +144,15 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
       // Connecting first leaves the server waiting for sign-in, so the finished login brings it online.
       await sdk.api.experimental.mcp.connect({ server: props.name, location: location() })
 
+      const clientSecret = form.clientSecret.trim()
+
       const attempt = await sdk.api.integration.oauth.connect({
         integrationID: props.integrationID,
         methodID: method.id,
         location: location(),
-        answer: {
-          client_id: form.clientID.trim(),
-          ...(form.clientSecret.trim() ? { client_secret: form.clientSecret.trim() } : {}),
-        },
+        answer: clientSecret
+          ? { client_id: form.clientID.trim(), client_secret: clientSecret }
+          : { client_id: form.clientID.trim() },
       })
 
       platform.openExternal(attempt.data.url)
@@ -154,14 +164,7 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
       showToast({
         variant: "success",
         icon: "circle-check",
-        title: language.t(
-          mode() === "cli"
-            ? "mcp.configure.toast.cli"
-            : mode() === "token"
-              ? "mcp.configure.toast.saved"
-              : "mcp.configure.toast.signingIn",
-          { name: mcpDisplayName(props.name) },
-        ),
+        title: language.t(toastKey[mode()], { name: mcpDisplayName(props.name) }),
       })
     },
     onError: (error) => {
