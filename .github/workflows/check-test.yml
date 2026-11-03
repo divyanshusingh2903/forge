@@ -93,6 +93,15 @@ jobs:
       - name: Setup Bun
         uses: ./.github/actions/setup-bun
 
+      # macOS ships bash 3.2, which lacks syntax the shell tool and its tests exercise (compound commands in
+      # substitutions, process substitution with wait), so the tests need a current bash first on PATH and as $SHELL.
+      - name: Install bash
+        if: runner.os == 'macOS'
+        run: |
+          brew install bash
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
+          echo "SHELL=$(brew --prefix)/bin/bash" >> "$GITHUB_ENV"
+
       # The unit tests block network access, so ripgrep must already be on PATH. These are the version and hashes the
       # app pins in packages/core/src/ripgrep/binary.ts.
       - name: Install ripgrep
@@ -328,7 +337,9 @@ jobs:
         run: bun --cwd packages/app test:e2e:built --shard=${{ matrix.suite.shard }} ${{ env.PLAYWRIGHT_ARGS }}
         env:
           CI: true
-        timeout-minutes: ${{ (matrix.quarantine || github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && 10 || 15 }}
+          # macOS runners have 3 vCPUs; five workers starve the pages and time out load-sensitive specs.
+          PLAYWRIGHT_WORKERS: ${{ runner.os == 'macOS' && '3' || '5' }}
+        timeout-minutes: ${{ runner.os == 'macOS' && 30 || (matrix.quarantine || github.base_ref == 'beta' || github.ref == 'refs/heads/beta') && 10 || 15 }}
 
       - name: Verify service worker precaching and upgrades
         if: matrix.suite.shard == '2/2' && !matrix.quarantine
