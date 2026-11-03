@@ -1,4 +1,4 @@
-import { createMemo, on, onCleanup, onMount, For, Show } from "solid-js"
+import { createMemo, createResource, on, onCleanup, onMount, For } from "solid-js"
 import type { JSX } from "solid-js"
 import { checksum } from "@opencode/util/encode"
 import { Icon } from "@opencode/ui/icon"
@@ -8,10 +8,10 @@ import { StickyAccordionHeader } from "@opencode/ui/sticky-accordion-header"
 import { showToast } from "@opencode/ui/toast"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { File } from "@opencode/session-ui/file"
-import { Markdown } from "@opencode/session-ui/markdown"
 import type { SessionMessageInfo } from "@opencode/client/promise"
 import { lastAssistantWithUsage } from "@opencode/client/solid"
 import { createKeyed, usePlugin, type MountedSession } from "@opencode/plugin/gui"
+import { ContextBreakdown, ContextPrompt } from "./breakdown"
 import { catalogModel, syncCatalog } from "./catalog"
 import { fetchSessionExport, sessionExportFilename } from "./export"
 import { createSessionContextFormatter } from "./format"
@@ -151,16 +151,11 @@ export default function SessionContextTab(props: { session: MountedSession }) {
     }
   })
 
-  const systemPrompt = createMemo(() => {
-    const system = messages().findLast((message) => message.type === "system")?.text
-
-    if (!system) return
-    const trimmed = system.trim()
-
-    if (!trimmed) return
-
-    return trimmed
-  })
+  // Reloads as the conversation moves on: a new message, or a response that reported usage.
+  const [usage] = createResource(
+    () => props.session.id && `${props.session.id}:${counts().all}:${context()?.message.id ?? ""}`,
+    () => props.session.server.client.session.usage({ sessionID: props.session.id! }),
+  )
 
   const providerLabel = createMemo(() => {
     const c = context()
@@ -292,20 +287,13 @@ export default function SessionContextTab(props: { session: MountedSession }) {
       onScroll={handleScroll}
     >
       <div data-slot="session-usage-content" class="px-4 pt-4 pb-6 flex flex-col gap-6 md:px-6 md:pb-10 md:gap-10">
+        <ContextBreakdown usage={() => usage.latest} />
+
         <div class="grid grid-cols-1 @[32rem]:grid-cols-2 gap-4">
           <For each={stats}>{(stat) => <Stat label={ctx.t(stat.label)} value={stat.value()} />}</For>
         </div>
 
-        <Show when={systemPrompt()}>
-          {(prompt) => (
-            <div class="flex flex-col gap-2">
-              <div class="text-12-regular text-text-weak">{ctx.t("systemPrompt.title")}</div>
-              <div class="border border-v2-border-border-base rounded-md bg-surface-base px-3 py-2">
-                <Markdown text={prompt()} class="text-12-regular" />
-              </div>
-            </div>
-          )}
-        </Show>
+        <ContextPrompt usage={() => usage.latest} />
 
         <div class="flex flex-col gap-2">
           <div class="flex items-center justify-between">

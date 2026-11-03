@@ -289,6 +289,48 @@ export type SessionContextInput = { readonly sessionID: Session.ID }
 export type SessionContextOutput = ReadonlyArray<SessionMessage.Info>
 export type SessionContextOperation<E = never> = (input: SessionContextInput) => Effect.Effect<SessionContextOutput, E>
 
+export type SessionUsageInput = { readonly sessionID: Session.ID }
+export type SessionUsageOutput = {
+  readonly model: { readonly providerID: string; readonly id: string }
+  readonly limit?: number | undefined
+  readonly threshold?: number | undefined
+  readonly total: number
+  readonly measured: boolean
+  readonly categories: ReadonlyArray<{
+    readonly id:
+      | "system"
+      | "tools"
+      | "mcpTools"
+      | "codeMode"
+      | "mcpInstructions"
+      | "skills"
+      | "instructions"
+      | "memory"
+      | "references"
+      | "other"
+      | "messages"
+    readonly tokens: number
+    readonly items: ReadonlyArray<{ readonly name: string; readonly tokens: number }>
+  }>
+  readonly prompt: ReadonlyArray<{
+    readonly id:
+      | "system"
+      | "tools"
+      | "mcpTools"
+      | "codeMode"
+      | "mcpInstructions"
+      | "skills"
+      | "instructions"
+      | "memory"
+      | "references"
+      | "other"
+      | "messages"
+    readonly name: string
+    readonly text: string
+  }>
+}
+export type SessionUsageOperation<E = never> = (input: SessionUsageInput) => Effect.Effect<SessionUsageOutput, E>
+
 export type SessionDiffInput = {
   readonly sessionID: Session.ID
   readonly from?: SessionMessage.ID | undefined
@@ -421,6 +463,7 @@ export interface SessionApi<E = never> {
     readonly commit: SessionRevertCommitOperation<E>
   }
   readonly context: SessionContextOperation<E>
+  readonly usage: SessionUsageOperation<E>
   readonly diff: SessionDiffOperation<E>
   readonly inbox: {
     readonly list: SessionInboxListOperation<E>

@@ -47,6 +47,50 @@ const PublicSessionInfo = Schema.Struct({
   location: Location.PublicRef,
 }).annotate({ identifier: "Session.Info" })
 
+const ContextUsageItem = Schema.Struct({ name: Schema.String, tokens: Schema.Number })
+
+const ContextUsageCategory = Schema.Literals([
+  "system",
+  "tools",
+  "mcpTools",
+  "codeMode",
+  "mcpInstructions",
+  "skills",
+  "instructions",
+  "memory",
+  "references",
+  "other",
+  "messages",
+])
+
+const ContextUsage = Schema.Struct({
+  model: Schema.Struct({ providerID: Schema.String, id: Schema.String }),
+  limit: Schema.optional(Schema.Number).annotate({ description: "The model's input window, when known." }),
+  threshold: Schema.optional(Schema.Number).annotate({
+    description: "The prompt size at which automatic compaction starts, when it is on and the window is known.",
+  }),
+  total: Schema.Number.annotate({ description: "Tokens the next request is expected to send." }),
+  measured: Schema.Boolean.annotate({
+    description: "False when no response in the current window reported usage, so every part is estimated.",
+  }),
+  categories: Schema.Array(
+    Schema.Struct({
+      id: ContextUsageCategory,
+      tokens: Schema.Number,
+      items: Schema.Array(ContextUsageItem),
+    }),
+  ),
+  prompt: Schema.Array(
+    Schema.Struct({
+      id: ContextUsageCategory,
+      name: Schema.String.annotate({
+        description: 'The Instruction Source key, or "base" for the agent\'s own prompt.',
+      }),
+      text: Schema.String,
+    }),
+  ).annotate({ description: "The system prompt the next request sends, part by part in order." }),
+}).annotate({ identifier: "SessionContextUsage" })
+
 const PublicSessionTransfer = Schema.Struct({
   info: PublicSessionInfo,
   messages: Schema.Array(PublicSessionMessage),
@@ -512,6 +556,20 @@ export const makeSessionGroup = <I extends HttpApiMiddleware.AnyId, S, FormI ext
           identifier: "session.context",
           summary: "Get session context",
           description: "Retrieve the active context messages for a session (all messages after the last compaction).",
+        }),
+      ),
+    )
+    .add(
+      HttpApiEndpoint.get("session.usage", "/api/session/:sessionID/usage", {
+        params: { sessionID: Session.ID },
+        success: ContextUsage,
+        error: [SessionNotFoundError, UnknownError],
+      }).annotateMerge(
+        OpenApi.annotations({
+          identifier: "session.usage",
+          summary: "Get session context usage",
+          description:
+            "Describe what the session's next model request is made of. Each part is estimated from its text, then scaled so the parts add up to the provider's latest count plus an estimate of what came after. Also returns the system prompt text by part.",
         }),
       ),
     )

@@ -25,6 +25,7 @@ import {
   ServiceUnavailableError,
   SessionBusyError,
   SkillNotFoundError,
+  UnknownError,
 } from "@opencode/protocol/errors"
 import { AbsolutePath } from "@opencode/core/schema"
 import { locationErrors } from "../location"
@@ -501,6 +502,19 @@ export const SessionHandler = HttpApiBuilder.group(Api, "server.session", (handl
                 Effect.catchTag("Session.MessageDecodeError", failedMessageDecode),
               ),
           }
+        }),
+      )
+      .handle(
+        "session.usage",
+        Effect.fn(function* (ctx) {
+          return yield* session.contextUsage(ctx.params.sessionID).pipe(
+            Effect.catchTag("Session.NotFoundError", missingSession),
+            // A missing model or agent is the user's to fix, so its reason reaches the client.
+            Effect.catchTag(
+              "SessionContextUsage.UnavailableError",
+              (error) => new UnknownError({ message: error.message, ref: `err_${crypto.randomUUID().slice(0, 8)}` }),
+            ),
+          )
         }),
       )
       .handle(

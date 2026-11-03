@@ -119,6 +119,46 @@ export type SessionStructuredError = {
   retryAfterMs?: number
 }
 
+export type SessionContextUsage = {
+  model: { providerID: string; id: string }
+  limit?: number | undefined
+  threshold?: number | undefined
+  total: number
+  measured: boolean
+  categories: Array<{
+    id:
+      | "system"
+      | "tools"
+      | "mcpTools"
+      | "codeMode"
+      | "mcpInstructions"
+      | "skills"
+      | "instructions"
+      | "memory"
+      | "references"
+      | "other"
+      | "messages"
+    tokens: number
+    items: Array<{ name: string; tokens: number }>
+  }>
+  prompt: Array<{
+    id:
+      | "system"
+      | "tools"
+      | "mcpTools"
+      | "codeMode"
+      | "mcpInstructions"
+      | "skills"
+      | "instructions"
+      | "memory"
+      | "references"
+      | "other"
+      | "messages"
+    name: string
+    text: string
+  }>
+}
+
 export type SessionGenerateResponse = { data: { text: string } }
 
 export type SessionInterruptResponse = { interrupted: boolean }
@@ -3530,6 +3570,10 @@ export type SessionRevertCommitOutput = void
 export type SessionContextInput = { readonly sessionID: string }
 
 export type SessionContextOutput = { data: Array<SessionMessageInfo> }["data"]
+
+export type SessionUsageInput = { readonly sessionID: string }
+
+export type SessionUsageOutput = SessionContextUsage
 
 export type SessionDiffInput = {
   readonly sessionID: string

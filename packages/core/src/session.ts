@@ -58,6 +58,7 @@ import { SessionModelTransport } from "./session/model-transport.js"
 import { llmClient } from "./effect/app-node-platform.js"
 import { Snapshot } from "./snapshot.js"
 import { Session } from "./session/session.js"
+import { SessionContextUsage } from "./session/context-usage.js"
 import { SessionDiff, TurnRangeError } from "./session/diff.js"
 import { LocationServiceMap } from "./location-service-map.js"
 import { FSUtil } from "@opencode/util/fs-util"
@@ -160,6 +161,10 @@ export interface Interface {
   readonly context: (
     sessionID: SessionSchema.ID,
   ) => Effect.Effect<SessionMessage.Info[], NotFoundError | MessageDecodeError>
+  /** What the next model request is made of, by part; see `SessionContextUsage.get`. */
+  readonly contextUsage: (
+    sessionID: SessionSchema.ID,
+  ) => Effect.Effect<SessionContextUsage.Usage, NotFoundError | SessionContextUsage.UnavailableError>
   /** Structured diffs of the files changed by a turn or range of turns; see `SessionDiff.turn`. */
   readonly diff: (input: {
     readonly sessionID: SessionSchema.ID
@@ -446,6 +451,9 @@ const layer = Layer.effect(
       context: Effect.fn("Session.context")(function* (sessionID) {
         yield* result.get(sessionID)
         return yield* store.context(sessionID)
+      }),
+      contextUsage: Effect.fn("Session.contextUsage")(function* (sessionID) {
+        return yield* SessionContextUsage.get(locations, yield* result.get(sessionID))
       }),
       diff: Effect.fn("Session.diff")(function* (input) {
         const session = yield* result.get(input.sessionID)

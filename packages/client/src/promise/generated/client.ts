@@ -55,6 +55,8 @@ import type {
   SessionRevertCommitOutput,
   SessionContextInput,
   SessionContextOutput,
+  SessionUsageInput,
+  SessionUsageOutput,
   SessionDiffInput,
   SessionDiffOutput,
   SessionInboxListInput,
@@ -901,6 +903,17 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ).then((value) => value.data),
+      usage: (input: SessionUsageInput, requestOptions?: RequestOptions) =>
+        request<SessionUsageOutput>(
+          {
+            method: "GET",
+            path: `/api/session/${encodeURIComponent(input.sessionID)}/usage`,
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 500],
+            empty: false,
+          },
+          requestOptions,
+        ),
       diff: (input: SessionDiffInput, requestOptions?: RequestOptions) =>
         request<{ readonly data: SessionDiffOutput }>(
           {

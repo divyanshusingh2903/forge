@@ -79,6 +79,8 @@ export interface Interface extends State.Transformable<Editor> {
     context: Effect.Effect<SessionContext.Loaded, E>,
     estimate?: Estimate,
   ) => Effect.Effect<void, E>
+  /** The prompt size at which automatic compaction starts for `limit`, or undefined when it never will. */
+  readonly threshold: (limit: SessionContext.Loaded["model"]["limit"]) => number | undefined
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SessionCompaction") {}
@@ -925,6 +927,11 @@ export const layer = Layer.effect(
     return Service.of({
       transform: state.transform,
       reload: state.reload,
+      threshold: (limit) => {
+        const settings = state.get()
+        const ceiling = calculateCeiling(limit, settings.buffer)
+        return settings.auto && Number.isFinite(ceiling) ? ceiling : undefined
+      },
       // A manual compaction settles through its `/compact` inbox item, which the runner owns.
       compact: (trigger) =>
         compact(trigger).pipe(
@@ -1211,7 +1218,7 @@ const estimateRequest = (request: Pick<LLMRequest, "system" | "tools" | "message
   request.messages.reduce((sum, message) => sum + estimateMessage(message), 0)
 
 /** Only what providers receive; `metadata` and `native` stay local. */
-const estimateTool = (tool: ToolEntry): number => {
+export const estimateTool = (tool: ToolEntry): number => {
   if (tool.type === "tool") return Token.estimate(tool.name + tool.description + JSON.stringify(tool.inputSchema))
   return (
     Token.estimate(tool.name + (tool.description ?? "")) +
@@ -1219,7 +1226,7 @@ const estimateTool = (tool: ToolEntry): number => {
   )
 }
 
-const estimateMessage = (message: Message) => message.content.reduce((sum, part) => sum + estimatePart(part), 0)
+export const estimateMessage = (message: Message) => message.content.reduce((sum, part) => sum + estimatePart(part), 0)
 
 const estimatePart = (part: ContentPart): number => {
   // An encrypted native compaction has no locally measurable size.
