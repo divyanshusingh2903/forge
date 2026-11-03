@@ -378,7 +378,7 @@ test("deleting a failed service registration stops its owner", async () => {
   } finally {
     await stopManagedService(service)
   }
-}, 30_000)
+}, 60_000)
 
 test("clean managed service shutdown removes its registration", async () => {
   const service = await startManagedService("opencode-service-clean-")
@@ -786,7 +786,8 @@ test("a failed service stays registered and owns the selected port until stopped
 }, 30_000)
 
 async function waitForInfo(file: string, accept: (info: Info) => boolean = () => true) {
-  for (let attempt = 0; attempt < 400; attempt++) {
+  // Booting a managed service can take over 20s on a loaded Windows runner.
+  for (let attempt = 0; attempt < 1000; attempt++) {
     const value = await Bun.file(file)
       .json()
       .catch(() => undefined)
