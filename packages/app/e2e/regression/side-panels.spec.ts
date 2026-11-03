@@ -4,6 +4,8 @@ import { openReviewLauncher, reviewFile } from "../utils/side-panel"
 import { base64Encode } from "@opencode/util/encode"
 
 test("review content stays aligned with the side region in both directions", async ({ page }) => {
+  // Rendering the whole 2,740-file change list twice, around a reload, takes most of the default minute on a slow runner.
+  test.setTimeout(150_000)
   await page.setViewportSize({ width: 1400, height: 900 })
 
   // A large nested branch diff; its first file is the sentinel that proves the virtualized tree stays mounted.
@@ -168,7 +170,8 @@ test("tabs in a narrow side strip shrink to keep their close buttons, and a tab'
 
 async function expectTreeSentinel(page: Page) {
   const panel = page.locator("#review-panel")
-  await expect(reviewFile(panel, "action.yml")).toBeVisible()
+  // Forge's change list mounts every one of the 2,740 rows, so a slow runner needs longer than the default to show one.
+  await expect(reviewFile(panel, "action.yml")).toBeVisible({ timeout: 45_000 })
   // Upstream's tree mounted at most 60 rows. Forge's change list renders every row, so only the sentinel is checked.
   expect(await panel.locator("bdi").count()).toBeGreaterThan(0)
 }
