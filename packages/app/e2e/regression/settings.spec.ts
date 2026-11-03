@@ -809,23 +809,28 @@ test("single extension rows stay aligned when switching tabs", async ({ page }) 
     skills: [{ name: "demo-skill", description: "Demo skill", path: "/skills/demo/SKILL.md" }],
   })
 
-  await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
-  await expect(settings.getByRole("switch", { name: "demo-mcp", exact: true })).toBeChecked()
-  const mcp = settings.getByRole("tabpanel", { name: "MCPs", exact: true }).locator(".settings-extension-row")
-  await expect(mcp).toHaveCount(1)
-  const bounds = await mcp.boundingBox()
-  expect(bounds).not.toBeNull()
+  const rows = settings.locator(".settings-extension-row")
 
+  // Forge lists MCPs on a page of their own, without the inner tab bar, so only the row's size and inline position
+  // can match the Extensions rows.
+  await settings.getByRole("tab", { name: "MCPs", exact: true }).click()
+  await expect(settings.getByRole("switch", { name: "demo-mcp", exact: true })).toBeChecked()
+  await expect(rows).toHaveCount(1)
+  const mcp = await rows.boundingBox()
+  expect(mcp).not.toBeNull()
+  await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
+
+  let bounds: typeof mcp
   for (const item of [
     { tab: "Plugins", name: "demo-plugin" },
     { tab: "Skills", name: "demo-skill" },
   ]) {
     await settings.getByRole("tab", { name: item.tab, exact: true }).click()
-    const panel = settings.getByRole("tabpanel", { name: item.tab, exact: true })
-    await expect(panel.getByText(item.name, { exact: true })).toBeVisible()
-    const row = panel.locator(".settings-extension-row")
-    await expect(row).toHaveCount(1)
-    await expect.poll(() => row.boundingBox()).toEqual(bounds)
+    await expect(settings.getByText(item.name, { exact: true })).toBeVisible()
+    await expect(rows).toHaveCount(1)
+    bounds ??= await rows.boundingBox()
+    await expect.poll(() => rows.boundingBox()).toEqual(bounds)
+    expect(bounds).toMatchObject({ x: mcp!.x, width: mcp!.width, height: mcp!.height })
   }
 })
 
@@ -863,12 +868,11 @@ test.describe("pages open before slow data", () => {
   test("extensions", async ({ page }) => {
     const { settings } = await open(page, { mcp: [{ name: "demo-mcp", status: { status: "connected" } }] })
     const mcp = await holdRoute(page, (url) => url.pathname === "/api/mcp")
-    await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
+    await settings.getByRole("tab", { name: "MCPs", exact: true }).click()
     await mcp.arrived
-    await expect(settings.getByRole("heading", { name: "Extensions", exact: true })).toBeVisible()
+    await expect(settings.getByRole("heading", { name: "MCPs", exact: true })).toBeVisible()
     await expect(settings.getByRole("button", { name: "Back to app" })).toBeVisible()
     mcp.release()
-    await settings.getByRole("tab", { name: "MCPs", exact: true }).click()
     await expect(settings.getByRole("switch", { name: "demo-mcp" })).toBeChecked()
   })
 
@@ -900,7 +904,6 @@ test.describe("pages open before slow data", () => {
       },
     })
 
-    await settings.getByRole("tab", { name: "Extensions", exact: true }).click()
     await settings.getByRole("tab", { name: "MCPs", exact: true }).click()
     // As in the MCPs dialog, a dot shows each status and the words stay for assistive technology.
     await expect(settings.getByRole("switch", { name: "demo-mcp" })).toBeChecked()
@@ -1893,8 +1896,9 @@ for (const viewport of [
       await expect(toggle.getByRole("switch")).toBeChecked()
     }
 
-    // Wheel over the outer gutter must not move the entire settings screen.
-    await main.hover({ position: { x: 1, y: 200 } })
+    // Wheel over the outer gutter must not move the entire settings screen. The Projects rail's resize handle covers
+    // the first few pixels of the main area, so the pointer starts just past it.
+    await main.hover({ position: { x: viewport.name === "desktop" ? 8 : 1, y: 200 } })
     await page.mouse.wheel(0, 10000)
     await expect(main).toHaveJSProperty("scrollTop", 0)
 
