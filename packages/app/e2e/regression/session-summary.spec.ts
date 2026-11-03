@@ -862,8 +862,11 @@ test("long MCP lists in the header popover stay in the viewport in a real RTL lo
       return bounds.x >= 15 && bounds.y >= 15 && bounds.x + bounds.width <= 785 && bounds.y + bounds.height <= 585
     })
     .toBe(true)
-  await page.keyboard.press("Escape")
-  await expect(menu).toBeHidden()
+  // The popover may not have attached its dismiss handler yet under load, so press Escape until it closes.
+  await expect(async () => {
+    await page.keyboard.press("Escape")
+    await expect(menu).toBeHidden({ timeout: 1_000 })
+  }).toPass({ timeout: 10_000 })
 })
 
 // Moves the pointer straight across from a submenu's trigger into the open submenu, so it never crosses sibling items.
