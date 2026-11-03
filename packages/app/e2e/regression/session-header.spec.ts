@@ -109,17 +109,17 @@ for (const direction of ["ltr", "rtl"] as const) {
     await expect(review).toHaveAttribute("aria-expanded", "false")
 
     await options.click()
-    const actions = page.getByRole("menu").filter({ has: page.getByRole("menuitem", { name: "Rename", exact: true }) })
-    await expect(actions.getByRole("menuitem")).toHaveText(["Rename", "Export…", "Delete…"])
+    // Forge's session menu hints each action's key after its label.
+    const actions = page.getByRole("menu").filter({ has: page.getByRole("menuitem", { name: /^Rename/ }) })
+    await expect(actions.getByRole("menuitem")).toHaveText([/^Rename\s*R$/, /^Export\s*E$/, /^Delete\s*D$/])
     await expect(actions.locator("svg")).toHaveCount(0)
-    await actions.getByRole("menuitem", { name: "Rename", exact: true }).click()
+    await actions.getByRole("menuitem", { name: /^Rename/ }).click()
     await expect(header.getByRole("textbox")).toBeFocused()
     await header.getByRole("textbox").press("Escape")
 
     await details.click()
     const menu = page.getByRole("dialog", { name: "Session details", exact: true })
     await expect(menu.getByRole("heading", { name: "Extensions", exact: true })).toBeVisible()
-    await expect(menu.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
     await expect(menu.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
     await expect(menu).not.toContainText(fixture.project.name)
     await expect(menu.getByText("No changes", { exact: true })).toHaveCount(0)
@@ -238,12 +238,13 @@ test.describe("location", () => {
 
     // Keep the viewport fixed: a pane can narrow a session independently of the window.
     for (const state of [
+      // Forge's header also holds Review, Terminal and MCP buttons, so every step collapses at a wider window.
       { width: 1000, project: true, worktree: true, usage: true, truncated: false },
-      { width: 680, project: true, worktree: false, usage: true, truncated: false },
-      { width: 600, project: false, worktree: false, usage: true, truncated: false },
-      { width: 550, project: false, worktree: false, usage: false, truncated: false },
+      { width: 770, project: true, worktree: false, usage: true, truncated: false },
+      { width: 680, project: false, worktree: false, usage: true, truncated: false },
+      { width: 590, project: false, worktree: false, usage: false, truncated: false },
       { width: 490, project: false, worktree: false, usage: false, truncated: true },
-      { width: 680, project: true, worktree: false, usage: true, truncated: false },
+      { width: 770, project: true, worktree: false, usage: true, truncated: false },
       { width: 1000, project: true, worktree: true, usage: true, truncated: false },
     ]) {
       await row.evaluate((element, width) => (element.style.inlineSize = `${width}px`), state.width)
@@ -413,7 +414,7 @@ test.describe("location", () => {
       persistentPty: {},
     })
 
-    await expect(page.getByRole("button", { name: "More options", exact: true })).toBeVisible()
+    await expect(page.locator("[data-session-title]").getByRole("button", { name: "More options", exact: true })).toBeVisible()
     await trigger(page).click()
     const card = page.locator('[data-slot="session-location-card"]')
     const branch = card.getByRole("menuitem", { name: "feature/branch-menu", exact: true })
