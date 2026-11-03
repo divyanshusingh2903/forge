@@ -280,7 +280,7 @@ test("summary drawer dismisses by backdrop, Escape, and drag", async ({ page }) 
       .getByRole("dialog", { name: "More options", exact: true })
       .getByRole("button", { name: "Session details", exact: true })
       .click()
-    await expect(drawer.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+    await expect(drawer.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
     // Corvu starts opening after paint; the transition flag is also absent
     // before that callback. Wait for the open position before dismissing.
     await expect

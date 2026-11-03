@@ -26,11 +26,11 @@ for (const scheme of ["light", "dark"] as const) {
         .getByRole("button", { name: "Session details", exact: true })
         .click()
       const details = page.getByRole("dialog", { name: "Session details", exact: true })
-      await expect(details.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+      // Forge lists MCPs from the desktop header's MCP button, so the drawer offers only the rest.
+      await expect(details.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
       await details.evaluate((element) => element.setAttribute("data-drawer-probe", "single"))
 
       for (const [name, empty] of [
-        ["MCP", "No MCP servers configured"],
         ["Plugins", "No plugins configured"],
         ["Skills", "No skills configured"],
         ["LSP", "No LSP servers configured"],
@@ -46,7 +46,7 @@ for (const scheme of ["light", "dark"] as const) {
         await expect(plugin.locator(".session-service-flyout")).toHaveCount(0)
         await expect(plugin).toBeInViewport({ ratio: 1 })
         await plugin.getByRole("button", { name: "Navigate back", exact: true }).click()
-        await expect(details.getByRole("button", { name: "MCP", exact: true })).toBeVisible()
+        await expect(details.getByRole("button", { name: "Plugins", exact: true })).toBeVisible()
         await expect(trigger).toBeFocused()
       }
 
@@ -70,10 +70,10 @@ for (const scheme of ["light", "dark"] as const) {
   }
 }
 
-test("mobile plugin drawers keep configured lists, retry, refresh, and MCP status working", async ({ page }) => {
+test("mobile plugin drawers keep configured lists, retry, and refresh working", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 })
   await mockStressTimeline(page)
-  const state = { fail: true, extra: false, enabled: true }
+  const state = { fail: true, extra: false }
   await page.route(
     (url) => url.pathname === "/api/plugin",
     (route) => {
@@ -123,32 +123,6 @@ test("mobile plugin drawers keep configured lists, retry, refresh, and MCP statu
     (route) =>
       route.fulfill({ json: [{ type: "document", info: { lsp: { "drawer-lsp": { command: ["drawer-lsp"] } } } }] }),
   )
-  await page.route(
-    (url) => url.pathname.startsWith("/api/mcp") || url.pathname.startsWith("/api/experimental/mcp"),
-    (route) => {
-      if (route.request().method() === "OPTIONS") return route.fallback()
-      const path = new URL(route.request().url()).pathname
-
-      if (path.endsWith("/disconnect")) {
-        state.enabled = false
-
-        return route.fulfill({ status: 204 })
-      }
-
-      return route.fulfill({
-        json: {
-          location: { directory: fixture.directory },
-          data:
-            path === "/api/mcp/resource"
-              ? { resources: [], templates: [] }
-              : Array.from({ length: 30 }, (_, index) => ({
-                  name: `mcp-${String(index).padStart(2, "0")}`,
-                  status: { status: index === 0 && !state.enabled ? "disabled" : "connected" },
-                })),
-        },
-      })
-    },
-  )
   await openWithDirection(page, sessionHref(fixture.targetID), "ltr")
   const tabs = page.getByRole("tablist", { name: "Session view", exact: true })
   await expect(tabs.getByRole("tab", { selected: true })).toHaveText("Session")
@@ -179,27 +153,4 @@ test("mobile plugin drawers keep configured lists, retry, refresh, and MCP statu
     await expect(plugin.getByText(item, { exact: true })).toBeVisible()
     await plugin.getByRole("button", { name: "Navigate back", exact: true }).click()
   }
-
-  await details.getByRole("button", { name: "MCP", exact: true }).click()
-  const mcp = page.getByRole("dialog", { name: "MCP", exact: true })
-  await expect(mcp.locator(".session-mcp-row")).toHaveCount(30)
-  await expect(mcp.getByRole("switch")).toHaveCount(30)
-  const toggle = mcp.getByRole("switch", { name: "mcp-00", exact: true })
-  await expect(toggle).toBeChecked()
-  await toggle.press("Space")
-  await expect(toggle).not.toBeChecked()
-  await expect(toggle).toBeEnabled()
-  await expect
-    .poll(() =>
-      mcp
-        .locator('[data-slot="mobile-panel-content"]')
-        .evaluate((element) => element.scrollHeight > element.clientHeight),
-    )
-    .toBe(true)
-  await expect(mcp).toBeInViewport({ ratio: 1 })
-
-  const last = mcp.locator(".session-mcp-row").filter({ hasText: "mcp-29" })
-  await last.scrollIntoViewIfNeeded()
-  await expect(last).toBeInViewport()
-  await expect(mcp.getByRole("button", { name: "Manage MCP servers", exact: true })).toBeVisible()
 })
