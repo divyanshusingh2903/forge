@@ -4,7 +4,7 @@ import { Home } from "@/home/route"
 import { ServerProvider } from "@/runtime/server/current"
 import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
-import { SessionPanelFrame, SessionRouteFrame } from "@/session/session-frame"
+import { SessionLoadingMark, SessionPanelFrame, SessionRouteFrame } from "@/session/session-frame"
 import { LayoutProvider } from "@/shell/state/layout"
 import { SettingsSurfaceProvider } from "@/settings/surface"
 import Shell from "@/shell/shell"
@@ -59,7 +59,9 @@ export function AppRoutes() {
             <Suspense
               fallback={
                 <div class="flex min-h-0 flex-1 px-[var(--shell-inline-inset,8px)] pb-[var(--shell-bottom-inset,8px)] pt-[var(--shell-top-inset,8px)]">
-                  <SessionPanelFrame raised />
+                  <SessionPanelFrame raised>
+                    <SessionLoadingMark />
+                  </SessionPanelFrame>
                 </div>
               }
             >

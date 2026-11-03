@@ -1,4 +1,6 @@
 import type { ParentProps } from "solid-js"
+import { Splash } from "@opencode/ui/logo"
+import { useLanguage } from "@/runtime/i18n/language"
 
 export function SessionRouteFrame(props: ParentProps<{ padded?: boolean }>) {
   return (
@@ -23,6 +25,24 @@ export function SessionPanelFrame(props: ParentProps<{ raised?: boolean }>) {
       }}
     >
       {props.children}
+    </div>
+  )
+}
+
+/**
+ * The startup splash's mark, pulsing in the middle of a session panel that has nothing to show yet. The session screen
+ * shows the same mark while its history loads, so it stays in place from the first frame until the chat appears.
+ */
+export function SessionLoadingMark() {
+  const language = useLanguage()
+
+  return (
+    <div
+      role="status"
+      aria-label={language.t("common.loading")}
+      class="pointer-events-none absolute inset-0 flex items-center justify-center"
+    >
+      <Splash class="w-16 h-20 opacity-50 animate-pulse" />
     </div>
   )
 }

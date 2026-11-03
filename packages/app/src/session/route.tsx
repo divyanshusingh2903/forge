@@ -24,7 +24,7 @@ import { SessionUIProvider } from "@/shell/routes/session-ui-provider"
 import { useTabs, type PendingSession } from "@/shell/tabs/tabs"
 import { requireServerKey } from "@/shell/routes/session"
 import { useSessionModel } from "./model"
-import { SessionPanelFrame } from "./session-frame"
+import { SessionLoadingMark, SessionPanelFrame } from "./session-frame"
 import { SessionIdentityHeader } from "./session-identity-header"
 import { ServerUnavailablePanel } from "./server-unavailable-panel"
 import { SessionErrorFallback } from "./route-error"
@@ -183,6 +183,7 @@ function PendingSessionState(props: { sessionID: string }) {
   return (
     <SessionStatePanel>
       <SessionIdentityHeader sessionID={props.sessionID} />
+      <SessionLoadingMark />
     </SessionStatePanel>
   )
 }
