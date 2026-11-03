@@ -16,8 +16,8 @@ type Surface = "popover" | "dialog" | "settings"
 
 // A session in a worktree of the project. The harness answers the MCP list for each location directory and stores
 // connect/disconnect results per directory; `requests` records every MCP request and the directory it targeted.
-// The popover is the session details' MCP list; the dialog (Ctrl+;) is the app's own MCP manager; settings is the
-// Extensions page opened (Ctrl+,) from the session.
+// The popover is the header's MCP button; the dialog (Ctrl+;) is the app's own MCP manager; settings is the
+// MCPs page opened (Ctrl+,) from the session.
 async function open(
   page: Page,
   input: { surface: Surface } & Pick<MockServerConfig, "mcp" | "onMcpAction" | "integrations" | "onIntegrationOAuth">,
@@ -49,7 +49,7 @@ async function open(
 
   const panel = {
     settings: page.getByTestId("settings-screen"),
-    popover: page.getByRole("group", { name: "MCP", exact: true }),
+    popover: page.getByRole("dialog", { name: "MCP", exact: true }),
     dialog: page.getByRole("dialog", { name: "MCPs", exact: true }),
   }[input.surface]
 
@@ -59,12 +59,10 @@ async function open(
     if (input.surface === "settings") {
       await page.keyboard.press("Control+,")
 
-      return panel.getByRole("tab", { name: "Extensions", exact: true }).click()
+      return panel.getByRole("tab", { name: "MCPs", exact: true }).click()
     }
 
-    await page.getByRole("button", { name: "Session details", exact: true }).click()
-    const item = page.getByRole("button", { name: "MCP", exact: true })
-    await item.click()
+    await page.getByRole("button", { name: "MCP", exact: true }).click()
     await expect(panel).toBeVisible()
   }
 
