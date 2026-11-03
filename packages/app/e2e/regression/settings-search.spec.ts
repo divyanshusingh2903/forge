@@ -94,7 +94,8 @@ test("pointer selection, keyboard navigation, the empty state, and the local fin
 
   await view.search.fill("zzzzzzzzzz")
   await expect(view.results.getByRole("option")).toHaveCount(0)
-  await expect(view.settings.getByRole("status")).toHaveText('No results for "zzzzzzzzzz"')
+  // The visible label ellipsizes to the room beside Forge's Projects rail; the accessible name keeps the whole query.
+  await expect(view.settings.getByRole("status")).toHaveAccessibleName('No results for "zzzzzzzzzz"')
   await view.search.press("Escape")
   await expect(view.search).toHaveValue("")
 
@@ -255,7 +256,7 @@ test("a search result reveal highlights once and cleans up after it finishes", a
   )
   await expect(view.settings.locator("[data-search-target]")).toHaveCount(0)
 
-  for (const tab of ["MCPs", "Skills"]) {
+  for (const tab of ["Plugins", "Skills"]) {
     await view.settings.getByRole("tab", { name: tab, exact: true }).click()
     await expect(view.settings.getByRole("tab", { name: tab, exact: true })).toHaveAttribute("aria-selected", "true")
   }
@@ -429,9 +430,10 @@ test("multi-server results follow the selected server and keep the query on retu
   await page.getByRole("menuitemradio", { name: "Build server", exact: true }).click()
 
   await view.search.fill("MCPs")
-  await view.results.getByRole("option", { name: "MCPs, Build server, Extensions", exact: true }).click()
+  await view.results.getByRole("option", { name: "MCPs, Build server", exact: true }).click()
   await expect(view.settings.getByRole("button", { name: "Server Build server", exact: true })).toBeVisible()
-  await expect(view.settings.getByRole("tab", { name: "MCPs", exact: true })).toHaveAttribute("aria-selected", "true")
+  // MCPs is a page of its own in Forge, so the result opens that page, whose title replaces the tab list under search.
+  await expect(view.settings.getByRole("heading", { name: "MCPs", exact: true })).toBeVisible()
   await view.search.fill("Remote app name")
   await expect(view.results.getByRole("option")).toHaveCount(1)
   await view.results.getByRole("option").click()
