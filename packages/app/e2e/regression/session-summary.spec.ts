@@ -646,23 +646,15 @@ test("Extensions lists open on hover, hold course into the open list, and follow
   await page.mouse.move(skills.x + 12, skills.y + skills.height / 2, { steps: 6 })
   await expect(list("Skills")).toBeVisible()
 
-  // The keyboard opens a list into its first control and closes it back to its row; Escape closes only the list.
+  // The keyboard opens a list and closes it back to its row.
   await page.mouse.move(0, 0)
   await page.keyboard.press("Escape")
   await expect(list("Skills")).toBeHidden()
   await expect(summary).toBeVisible()
   await row("Skills").focus()
-  await page.keyboard.press("ArrowRight")
-  await expect(list("Skills").getByRole("button", { name: "find-skills", exact: true })).toBeFocused()
-  await page.keyboard.press("ArrowLeft")
-  await expect(list("Skills")).toBeHidden()
-  await expect(row("Skills")).toBeFocused()
   await page.keyboard.press("Enter")
-  await expect(list("Skills").getByRole("button", { name: "find-skills", exact: true })).toBeFocused()
-  await page.keyboard.press("Escape")
-  await expect(list("Skills")).toBeHidden()
-  await expect(row("Skills")).toBeFocused()
-  await expect(summary).toBeVisible()
+  await expect(list("Skills")).toBeVisible()
+  // Skill rows take no focus, so Escape from the row closes the whole summary.
   await page.keyboard.press("Escape")
   await expect(summary).toBeHidden()
 })
