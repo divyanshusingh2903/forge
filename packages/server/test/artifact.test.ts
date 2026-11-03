@@ -215,4 +215,6 @@ export default {
       })
     })
   }),
+  // It builds three servers and takes just over the default five seconds on a loaded Windows runner.
+  30_000,
 )
