@@ -46,7 +46,11 @@ it.live("manages schedules through the experimental API when enabled and honors 
       )
 
     yield* Effect.promise(async () => {
-      const session = await api.session.create({ location: { directory: enabled } })
+      // Forge asks before shell commands, and scheduling a prompt is checked like one; Auto settles that ask.
+      const session = await api.session.create({
+        location: { directory: enabled },
+        metadata: { "forge.mode": "auto" },
+      })
       const created = await api.experimental.schedule.create({
         sessionID: session.id,
         name: "build",
