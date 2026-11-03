@@ -154,7 +154,7 @@ test("a failed changelog request leaves What's New for the next start", async ({
   const failed = Promise.withResolvers<void>()
   const requests: string[] = []
 
-  await page.route("https://opencode.ai/changelog.json", async (route) => {
+  await page.route("https://api.github.com/repos/divyanshusingh2903/forge/releases", async (route) => {
     requests.push(route.request().url())
 
     if (requests.length > 1) return route.fulfill({ headers: cors, json: changelog })
@@ -203,7 +203,7 @@ for (const row of [
 async function serveChangelog(page: Page, body: typeof changelog | typeof cliOnly = changelog, held?: Promise<void>) {
   const requests: string[] = []
 
-  await page.route("https://opencode.ai/changelog.json", async (route) => {
+  await page.route("https://api.github.com/repos/divyanshusingh2903/forge/releases", async (route) => {
     requests.push(route.request().url())
     await held
 
