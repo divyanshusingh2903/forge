@@ -441,7 +441,6 @@ export function ComposerEditor(props: ComposerEditorProps) {
                         title={i18n.t("ui.promptInput.chooseVariant")}
                         keybind={["Shift", "Mod", "D"]}
                         control={control}
-                        class={control.current() === "default" ? "composer-variant-default" : undefined}
                       />
                     </Show>
                   )}
