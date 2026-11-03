@@ -279,10 +279,12 @@ windows(
         expect(await Bun.file(path.join(installer.dir, "instdir.txt")).text(), item.name).toBe(
           path.join(root, item.expected),
         )
+
         const left = (await readdir(from, { recursive: true, withFileTypes: true }).catch(() => undefined))
           ?.filter((entry) => entry.isFile())
           .map((entry) => path.relative(from, path.join(entry.parentPath, entry.name)).replaceAll("\\", "/"))
           .toSorted()
+
         expect(left, item.name).toEqual(item.left)
         const query = await installer.run(["reg.exe", "query", `HKCU\\${uninstallKey}`, "/v", "UninstallString"])
         expect(query.code === 0, item.name).toBe(item.uninstallKept)

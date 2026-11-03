@@ -14,43 +14,62 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
 
   const state = () => {
     const value = props.result.state
+
     if (!value) return
+
     if (value === "open") return i18n.t("ui.reference.state.open")
+
     if (value === "closed") return i18n.t("ui.reference.state.closed")
+
     if (value === "merged") return i18n.t("ui.reference.state.merged")
+
     if (value === "draft") return i18n.t("ui.reference.state.draft")
+
     if (value === "not-planned") return i18n.t("ui.reference.state.notPlanned")
+
     if (value === "release") return i18n.t("ui.reference.state.release")
+
     if (value === "prerelease") return i18n.t("ui.reference.state.prerelease")
+
     // Linear workflow status names are shown as the workspace spells them.
     return value
   }
 
   const eyebrow = () => {
     const reference = props.reference
+
     // A Notion page is placed by where it sits in the workspace, after its emoji.
     if (reference.kind === "notion-page")
       return [props.result.icon, props.result.path ?? referenceLabel(reference)].filter(Boolean).join(" ")
+
     if ("tag" in reference) return reference.repository
+
     if ("number" in reference) return referenceLabel(reference)
     const identifier = props.result.identifier ?? reference.id
+
     const owner =
       props.result.team ??
       props.result.project ??
       (reference.kind === "linear-project" ? i18n.t("ui.reference.project") : undefined)
+
     return owner ? `${identifier} · ${owner}` : identifier
   }
 
   // The timestamp that matters most for the item's current state.
   const timestamp = () => {
     const result = props.result
+
     if (result.state === "merged" && result.mergedAt)
       return i18n.t("ui.reference.merged", { when: when(result.mergedAt) ?? "" })
+
     if (kind() === "github-release" && result.publishedAt)
       return i18n.t("ui.reference.published", { when: when(result.publishedAt) ?? "" })
+
     if (result.closedAt && result.state !== "open" && result.state !== "draft")
       return i18n.t("ui.reference.closed", { when: when(result.closedAt) ?? "" })
+
     if (result.createdAt) return i18n.t("ui.reference.opened", { when: when(result.createdAt) ?? "" })
+
     if (result.updatedAt) return i18n.t("ui.reference.updated", { when: when(result.updatedAt) ?? "" })
   }
 
@@ -62,6 +81,7 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
       props.result.startDate && i18n.t("ui.reference.startsOn", { date: date(props.result.startDate) }),
       props.result.targetDate && i18n.t("ui.reference.targetOn", { date: date(props.result.targetDate) }),
     ]
+
     return parts.filter(Boolean).join(" → ")
   }
 
@@ -167,6 +187,7 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
 // Linear and Jira facts. The project shows here only when the eyebrow names the team instead.
 function linearMeta(result: LinkPreviewResult) {
   const priority = visiblePriority(result.priority)
+
   return [
     result.issueType ? { text: result.issueType } : undefined,
     priority ? { text: priority, priority: true } : undefined,
@@ -177,6 +198,7 @@ function linearMeta(result: LinkPreviewResult) {
 
 function Avatar(props: { name: string; url?: string }): JSXElement {
   const [failed, setFailed] = createSignal(false)
+
   return (
     <Show
       when={props.url && !failed()}

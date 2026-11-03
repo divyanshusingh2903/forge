@@ -11,14 +11,19 @@ export function createReferenceStatusCache(fetch: (reference: Reference) => Prom
   return (reference: Reference) => {
     const key = referenceKey(reference)
     const existing = entries.get(key)
+
     if (existing && Date.now() - existing.at < TTL_MS) return existing.result
+
     const result = fetch(reference)
       .catch((): LinkPreviewResult => ({ outcome: "unavailable" }))
       .then((value) => {
         if (value.outcome === "unavailable" && entries.get(key)?.result === result) entries.delete(key)
+
         return value
       })
+
     entries.set(key, { at: Date.now(), result })
+
     return result
   }
 }

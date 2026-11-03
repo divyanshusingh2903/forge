@@ -23,12 +23,14 @@ export function createReviewGit(input: { view: Accessor<MountedSession>; enabled
   const directory = () => view().directory
   const location = () => ({ location: { directory: directory() } })
   const client = () => view().server.client.git
+
   const [store, setStore] = createStore({
     state: undefined as GitState | undefined,
     message: "",
     busy: false,
     error: "",
   })
+
   // Each directory's loads are numbered, so a slow answer for an older moment never replaces a newer one.
   const run = { generation: 0, latest: 0 }
 
@@ -48,6 +50,7 @@ export function createReviewGit(input: { view: Accessor<MountedSession>; enabled
         },
       )
   }
+
   const refresh = debounce(() => void load(), 100)
 
   createKeyed(
@@ -58,6 +61,7 @@ export function createReviewGit(input: { view: Accessor<MountedSession>; enabled
       onCleanup(
         current.data.listen(({ details }) => {
           if (details.location?.directory !== current.directory) return
+
           if (details.type === "git.changed" || details.type === "filesystem.changed") refresh()
         }),
       )
@@ -82,16 +86,20 @@ export function createReviewGit(input: { view: Accessor<MountedSession>; enabled
     const generation = run.generation
     setStore({ busy: true, error: "" })
     optimistic?.()
+
     const result = await action().then(
       (value) => ({ value }),
       (error) => {
         if (generation === run.generation) setStore("error", message(error))
+
         return undefined
       },
     )
+
     if (generation !== run.generation) return
     await load()
     setStore("busy", false)
+
     return result?.value
   }
 
@@ -116,10 +124,12 @@ export function createReviewGit(input: { view: Accessor<MountedSession>; enabled
     discard: (file: string) => act(() => client().discard({ ...location(), file })),
     commit: async (all: boolean) => {
       const text = store.message
+
       const done = await act(
         () => client().commit({ ...location(), message: text, all }),
         all ? () => setStaged(true) : undefined,
       )
+
       if (done && store.message === text) setStore("message", "")
     },
     generate: async (model: { providerID: string; modelID: string; variant?: string } | undefined, all: boolean) => {
@@ -130,6 +140,7 @@ export function createReviewGit(input: { view: Accessor<MountedSession>; enabled
           ...(model ? { model: { providerID: model.providerID, id: model.modelID, variant: model.variant } } : {}),
         }),
       )
+
       if (result) setStore("message", result.data.message)
     },
     fetch: () => act(() => client().fetch(location())),
@@ -167,6 +178,7 @@ export function GitChanges(props: {
   const ctx = usePlugin<typeof Review>()
   const changes = createMemo(() => props.git.store.state?.changes ?? [])
   const byFile = createMemo(() => new Map(changes().map((change) => [change.file, change] as const)))
+
   // Uncommitted lists every change Git reports, such as files inside an untracked folder the diff shows as one row.
   const files = createMemo(
     () => (props.working ? changes().map((change) => change.file) : props.files.filter((file) => !isReviewFolder(file))),
@@ -174,14 +186,18 @@ export function GitChanges(props: {
     // Staging reloads the state without changing which files are listed; keep the tree and its rows mounted.
     { equals: (a, b) => a.length === b.length && a.every((file, index) => file === b[index]) },
   )
+
   const tree = createMemo(() => buildTree(files()))
   const [collapsed, setCollapsed] = createStore<Record<string, boolean>>({})
+
   // A branch's or a turn's list stages only its own files; other uncommitted changes stay out of its count.
   const listed = createMemo(() => {
     if (props.working) return changes()
     const shown = new Set(files())
+
     return changes().filter((change) => shown.has(change.file))
   })
+
   const scope = () => (props.working ? undefined : listed().map((change) => change.file))
   const staged = () => listed().filter((change) => change.staged).length
   const allStaged = () => listed().length > 0 && listed().every(checked)
@@ -194,6 +210,7 @@ export function GitChanges(props: {
       confirm: ctx.t("git.discard"),
       danger: true,
     })
+
     if (confirmed) void props.git.discard(file)
   }
 
@@ -213,6 +230,7 @@ export function GitChanges(props: {
     const tracked = createMemo(() => input.node.files.filter((file) => byFile().has(file)))
     const all = () => tracked().length > 0 && tracked().every((file) => checked(byFile().get(file)!))
     const some = () => tracked().some((file) => byFile().get(file)!.staged)
+
     return (
       <>
         <div
@@ -252,12 +270,16 @@ export function GitChanges(props: {
 
   const File = (input: { file: string; name: string; depth: number }) => {
     const change = () => byFile().get(input.file)
+
     const letter = () => {
       const current = change()
+
       if (props.working && current) return current.conflicted ? "!" : current.untracked ? "U" : "M"
       const kind = props.kinds.get(input.file)
+
       return kind === "add" ? "A" : kind === "del" ? "D" : "M"
     }
+
     return (
       <div
         class="group/git-row flex h-7 shrink-0 cursor-default items-center gap-1.5 rounded-md pe-1 hover:bg-v2-overlay-simple-overlay-hover"
@@ -362,19 +384,26 @@ function buildTree(files: readonly string[]): TreeNode[] {
       parent.files.push(file)
       const path = parts.slice(0, index + 1).join("/")
       const existing = parent.children.find((child) => child.path === path)
+
       if (existing) return existing
       const node: TreeNode = { name, path, files: [], children: [], ...(index === parts.length - 1 ? { file } : {}) }
       parent.children.push(node)
+
       return node
     }, root).files.push(file)
   })
+
   const sort = (nodes: TreeNode[]) =>
     nodes.toSorted((a, b) => (!a.file !== !b.file ? (a.file ? 1 : -1) : a.name.localeCompare(b.name)))
+
   const finish = (node: TreeNode): TreeNode => {
     const only = node.children.length === 1 && !node.children[0].file ? node.children[0] : undefined
+
     if (!node.file && only) return finish({ ...only, name: `${node.name}/${only.name}` })
+
     return { ...node, children: sort(node.children.map(finish)) }
   }
+
   return sort(root.children.map(finish))
 }
 
@@ -394,10 +423,12 @@ export function GitFooter(props: { git: ReviewGit; screen: SessionScreen }) {
 
   const remoteDialog = (mode: "push" | "pull") =>
     ctx.dialogs.open((dialog) => <GitRemoteDialog git={git} mode={mode} dialog={dialog} />)
+
   const push = () => (remote()?.upstream ? void git.push() : void remoteDialog("push"))
 
   const primary = () => {
     if (pushReady()) return push()
+
     if (pullReady()) return void git.pull()
     void git.fetch()
   }

@@ -30,6 +30,7 @@ describe("parseReference", () => {
     })
     expect(parseReference("https://gitlab.com/group/app/-/pipelines/3")).toBeUndefined()
     const id = "36b86afd4db28057b82ec47ff146517e"
+
     for (const href of [
       `https://app.notion.com/p/${id}?pvs=204`,
       `https://www.notion.so/acme/Launch-checklist-${id}`,

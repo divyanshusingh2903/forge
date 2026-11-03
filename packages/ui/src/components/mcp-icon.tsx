@@ -45,6 +45,7 @@ export function isMcpIconName(id: string): id is McpIconName {
 /** The brand mark of a built-in MCP server; renders nothing for any other server name. */
 export const McpIcon: Component<JSX.SVGElementTags["svg"] & { id: string }> = (props) => {
   const [local, rest] = splitProps(props, ["id"])
+
   const path = () => {
     const name = local.id.toLowerCase()
 

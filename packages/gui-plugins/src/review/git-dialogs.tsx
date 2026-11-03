@@ -21,20 +21,26 @@ export function GitRemoteDialog(props: { git: ReviewGit; mode: "push" | "pull"; 
   const [form, setForm] = createStore({ remote: "", branch: "", strategy: "", error: "" })
   const remotes = () => targets()?.remotes ?? []
   const configured = () => targets()?.pull ?? "merge"
+
   // Until the user picks, the branch's upstream remote, else origin, else the only remote.
   const remote = () => {
     if (form.remote) return form.remote
     const target = git.store.state?.remote.target
+
     if (target && remotes().includes(target.remote)) return target.remote
+
     if (remotes().includes("origin")) return "origin"
+
     return remotes().length === 1 ? remotes()[0] : ""
   }
+
   const pullBranch = () => form.branch || (form.remote ? "" : (git.store.state?.remote.target?.branch ?? branch() ?? ""))
   const strategy = () => form.strategy || configured()
   const valid = () => !!remote() && (props.mode === "push" ? !!branch() : !!pullBranch().trim())
 
   const submit = async () => {
     setForm("error", "")
+
     const done =
       props.mode === "push"
         ? await git.push({ remote: remote(), setUpstream: true })
@@ -44,6 +50,7 @@ export function GitRemoteDialog(props: { git: ReviewGit; mode: "push" | "pull"; 
             // Leave the configured strategy to Git, so options such as rebase=merges still apply.
             ...(strategy() === configured() ? {} : { strategy: strategy() === "rebase" ? "rebase" : "merge" }),
           })
+
     if (done) return props.dialog.close()
     setForm("error", git.store.error)
   }
@@ -121,14 +128,17 @@ export function GitStashDialog(props: { git: ReviewGit; dialog: DialogHandle }) 
   const ctx = usePlugin<typeof Review>()
   const git = props.git
   const [stashes, { refetch }] = createResource(() => git.stashes())
+
   const [form, setForm] = createStore({
     message: "",
     includeUntracked: false,
     drop: undefined as GitStash | undefined,
   })
+
   const act = async (action: "apply" | "pop" | "drop", stash: GitStash) => {
     const done = await git.stashAction(action, stash)
     await refetch()
+
     return done
   }
 
@@ -162,6 +172,7 @@ export function GitStashDialog(props: { git: ReviewGit; dialog: DialogHandle }) 
                   ...(form.message.trim() ? { message: form.message.trim() } : {}),
                   includeUntracked: form.includeUntracked,
                 })
+
                 if (done) setForm("message", "")
                 await refetch()
               }}

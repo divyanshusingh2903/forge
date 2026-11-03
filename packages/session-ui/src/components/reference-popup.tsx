@@ -7,8 +7,11 @@ import { parseReference, referenceLabel, type Reference } from "./reference"
 import { createReferenceStatusCache } from "./reference-status"
 
 const HOVER_DELAY_MS = 250
+
 const WIDTH = 320
+
 const GAP = 6
+
 const MARGIN = 8
 
 // A single popup for every `a[data-reference]` in the timeline: GitHub, GitLab, Linear and Jira links. It listens at the document, so links produced by
@@ -21,10 +24,13 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
   const [result, setResult] = createSignal<LinkPreviewResult>()
   const [popup, setPopup] = createSignal<HTMLDivElement>()
   const [position, setPosition] = createSignal({ top: 0, left: 0 })
+
   const reference = createMemo(() => {
     const link = anchor()
+
     return link ? parseReference(link.href) : undefined
   })
+
   let timer: ReturnType<typeof setTimeout> | undefined
 
   const hide = () => {
@@ -41,6 +47,7 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
   createEffect(() => {
     const link = anchor()
     const current = reference()
+
     if (!link || !current) return
     link.setAttribute("aria-describedby", id)
     onCleanup(() => link.removeAttribute("aria-describedby"))
@@ -56,6 +63,7 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
     const link = anchor()
     const element = popup()
     result()
+
     if (!link || !element) return
     const rect = link.getBoundingClientRect()
     const height = element.offsetHeight
@@ -68,27 +76,36 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
   onMount(() => {
     const target = (event: Event) =>
       event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[data-reference]") : null
+
     const over = (event: PointerEvent) => {
       const link = target(event)
+
       if (!link || link === anchor()) return
       clearTimeout(timer)
       timer = setTimeout(() => show(link), HOVER_DELAY_MS)
     }
+
     const out = (event: PointerEvent) => {
       const link = target(event)
+
       if (!link || (event.relatedTarget instanceof Node && link.contains(event.relatedTarget))) return
       hide()
     }
+
     const focus = (event: FocusEvent) => {
       const link = target(event)
+
       if (link) show(link)
     }
+
     const blur = (event: FocusEvent) => {
       if (target(event)) hide()
     }
+
     const key = (event: KeyboardEvent) => {
       if (event.key === "Escape" && anchor()) hide()
     }
+
     document.addEventListener("pointerover", over)
     document.addEventListener("pointerout", out)
     document.addEventListener("focusin", focus)
@@ -149,6 +166,8 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
 
 function messageKey(outcome: LinkPreviewResult["outcome"]) {
   if (outcome === "forbidden") return "ui.reference.forbidden"
+
   if (outcome === "not-found") return "ui.reference.notFound"
+
   return "ui.reference.unavailable"
 }

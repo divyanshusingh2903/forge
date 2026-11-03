@@ -96,6 +96,7 @@ export function createHomeSessionsController(home: HomeController) {
       resolveProject: (session) => home.server.focusedContext()?.projects.forSession(session),
     }),
   )
+
   const sidebarByProject = createMemo(() => {
     const map = new Map<string, HomeSessionRecord[]>()
 
@@ -109,6 +110,7 @@ export function createHomeSessionsController(home: HomeController) {
 
     return map
   })
+
   const groups = createMemo(() => groupSessions(records(), language))
   const prefetched = new Set<string>()
 
@@ -432,6 +434,7 @@ function animateHomeRowsUp(tops: Map<string | undefined, number>) {
   document.querySelectorAll<HTMLElement>(HOME_ROW_SELECTOR).forEach((row) => {
     const before = tops.get(row.dataset.sessionId)
     const delta = before === undefined ? 0 : before - row.getBoundingClientRect().top
+
     if (delta === 0) return
     row.animate([{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }], {
       duration: 180,
@@ -453,8 +456,10 @@ function groupSessions(records: HomeSessionRecord[], language: ReturnType<typeof
   const now = new Date()
   const today = localDay(now)
   const yesterday = localDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1))
+
   const day = (record: HomeSessionRecord) =>
     localDay(new Date(record.session.time.updated ?? record.session.time.created))
+
   const todaySessions = records.filter((record) => day(record) === today)
   const yesterdaySessions = records.filter((record) => day(record) === yesterday)
   const olderSessions = records.filter((record) => day(record) !== today && day(record) !== yesterday)

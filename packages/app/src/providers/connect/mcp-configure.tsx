@@ -37,11 +37,13 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
   })
 
   const location = () => ({ directory: props.directory })
+
   const [integration] = createResource(() =>
     sdk.api.integration
       .get({ integrationID: props.integrationID, location: location() })
       .then((response) => response.data),
   )
+
   const cliMethod = () => integration()?.methods.find((item) => item.type === "command")
   // Servers without a CLI sign-in open on the token tab once their methods load.
   const mode = () => (form.mode === "cli" && integration.state === "ready" && !cliMethod() ? "token" : form.mode)
@@ -52,6 +54,7 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
   let closed = false
   onCleanup(() => {
     closed = true
+
     if (form.attemptID)
       void sdk.api.integration.command
         .cancel({ integrationID: props.integrationID, attemptID: form.attemptID, location: location() })
@@ -60,25 +63,33 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
 
   const signInWithCli = async () => {
     const method = cliMethod()
+
     if (method?.type !== "command") throw new Error(language.t("mcp.configure.cli.unavailable"))
+
     const started = await sdk.api.integration.command.connect({
       integrationID: props.integrationID,
       methodID: method.id,
       location: location(),
     })
+
     setForm({ attemptID: started.data.attemptID, output: "" })
+
     while (!closed) {
       await new Promise((resolve) => setTimeout(resolve, 500))
+
       const result = await sdk.api.integration.command.status({
         integrationID: props.integrationID,
         attemptID: started.data.attemptID,
         location: location(),
       })
+
       if (result.data.status === "pending") {
         setForm("output", result.data.message ?? "")
         continue
       }
+
       setForm("attemptID", undefined)
+
       if (result.data.status === "complete") return
       throw new Error(
         result.data.status === "failed" ? result.data.message : language.t("provider.connect.command.expired"),
@@ -89,8 +100,10 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
   const copyAndOpen = () => {
     const value = code()
     const link = url()
+
     if (value)
       void (platform.writeClipboardText?.(value) ?? navigator.clipboard.writeText(value)).catch(() => undefined)
+
     if (link) platform.openExternal(link)
   }
 
@@ -99,8 +112,10 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
       if (mode() === "cli") {
         await signInWithCli()
         await sdk.api.experimental.mcp.connect({ server: props.name, location: location() })
+
         return
       }
+
       if (mode() === "token") {
         await sdk.api.integration.connect.key({
           integrationID: props.integrationID,
@@ -109,14 +124,17 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
         })
         // A disabled server ignores credential changes, so connect it with the new token.
         await sdk.api.experimental.mcp.connect({ server: props.name, location: location() })
+
         return
       }
+
       const integration = await sdk.api.integration.get({ integrationID: props.integrationID, location: location() })
       const method = integration.data?.methods.find((item) => item.type === "oauth" && !!item.form?.length)
 
       if (method?.type !== "oauth") throw new Error(language.t("mcp.configure.oauth.unavailable", { name: props.name }))
       // Connecting first leaves the server waiting for sign-in, so the finished login brings it online.
       await sdk.api.experimental.mcp.connect({ server: props.name, location: location() })
+
       const attempt = await sdk.api.integration.oauth.connect({
         integrationID: props.integrationID,
         methodID: method.id,
@@ -126,6 +144,7 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
           ...(form.clientSecret.trim() ? { client_secret: form.clientSecret.trim() } : {}),
         },
       })
+
       platform.openExternal(attempt.data.url)
     },
     onSuccess: () => {
@@ -147,6 +166,7 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
     },
     onError: (error) => {
       setForm({ attemptID: undefined, output: "" })
+
       if (closed) return
       showToast({
         variant: "error",
@@ -187,6 +207,7 @@ export function DialogMcpConfigure(props: { name: string; integrationID: string;
             value={mode()}
             onChange={(value) => {
               if (save.isPending) return
+
               if (value === "cli" || value === "token" || value === "oauth") setForm({ mode: value, error: undefined })
             }}
           >

@@ -34,12 +34,14 @@ export function ProjectRail(props: { onHide: () => void; peeking?: boolean }) {
   const sessions = createHomeSessionsController(home)
   const pinned = createPinnedSessions()
   const route = useCurrentRoute()
+
   // Only the session on screen is highlighted; an open background tab is not.
   const isActive = (server: string, id: string) => {
     const current = route()
 
     return current.type === "session" && current.server === server && current.sessionId === id
   }
+
   const [state, setState] = persisted(Persist.global("project-rail"), ProjectRailSchema, { expanded: {} })
 
   const focused = () => {
@@ -47,9 +49,11 @@ export function ProjectRail(props: { onHide: () => void; peeking?: boolean }) {
 
     return conn ? ServerConnection.key(conn) : undefined
   }
+
   // Sessions are indexed for the focused server only, so other servers' projects stay collapsed to their rows.
   const listsSessions = (server: ServerConnection.Any) => ServerConnection.key(server) === focused()
   const expandedKey = (server: ServerConnection.Any, worktree: string) => `${ServerConnection.key(server)}\0${worktree}`
+
   const isOpen = (server: ServerConnection.Any, worktree: string) =>
     listsSessions(server) &&
     (state.expanded[expandedKey(server, worktree)] ??
@@ -163,6 +167,7 @@ function PinnedSessions(props: {
   active: (server: string, id: string) => boolean
 }) {
   const language = useLanguage()
+
   const records = () =>
     props.entries
       .filter((entry) => entry.server === props.server)
@@ -221,6 +226,7 @@ function RailSession(props: {
 
   const saveEditor = async () => {
     const draft = ui.draft
+
     if (draft === undefined) return
     setUI("draft", undefined)
     await props.sessions.session.rename(server(), props.record.session, draft)
@@ -244,11 +250,14 @@ function RailSession(props: {
           onInput={(event) => setUI("draft", event.currentTarget.value)}
           onKeyDown={(event) => {
             event.stopPropagation()
+
             if (event.isComposing || event.keyCode === 229) return
+
             if (event.key === "Enter") {
               event.preventDefault()
               void saveEditor()
             }
+
             if (event.key === "Escape") {
               event.preventDefault()
               setUI("draft", undefined)

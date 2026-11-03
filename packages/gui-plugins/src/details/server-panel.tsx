@@ -38,6 +38,7 @@ const services = [
 ] as const
 
 type MenuService = (typeof services)[number]["type"]
+
 type Service = MenuService | "mcp"
 
 export type ServiceProps = {
@@ -645,8 +646,10 @@ export function useMcp(props: ServiceProps, close: () => void): ServiceSource {
               // GitHub has no dynamic client registration, so its sign-in asks for a token or an OAuth app first.
               if (server().status.status === "needs_auth" && manualSignIn.has(server().name)) {
                 close()
+
                 return builtinContext(ctx).layout.command("mcp.github.signIn")
               }
+
               change(server().status.status === "needs_auth" || !enabled())
             }
 

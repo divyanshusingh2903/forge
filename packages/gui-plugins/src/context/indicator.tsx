@@ -69,6 +69,7 @@ export function SessionContextUsage(props: {
       lastAssistantWithUsage(messages(), info()?.revert?.messageID)?.model ??
       info()?.model ??
       messages().findLast((item) => item.type === "assistant")?.model
+
     return (ref ? catalogModel(props.session, ref)?.model : undefined)?.limit.context || undefined
   })
 
@@ -80,6 +81,7 @@ export function SessionContextUsage(props: {
   const tokens = createMemo(() => {
     const used = compact().format(context()?.total ?? 0)
     const max = limit()
+
     return max ? `${used} / ${compact().format(max)}` : used
   })
 

@@ -13,5 +13,7 @@ export const FORGE_LETTERS = [
 ] as const
 
 export const FORGE_PITCH = 30
+
 export const FORGE_WIDTH = 144
+
 export const FORGE_HEIGHT = 42

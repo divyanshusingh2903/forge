@@ -162,10 +162,12 @@ function HomeProjectsPanel(props: HomeProjectsViewProps) {
   let observer: MutationObserver | undefined
   let frame = 0
   const [contextMenu, setContextMenu] = createStore<{ open: string | undefined }>({ open: undefined })
+
   const updateFades = (element: HTMLDivElement) => {
     element.toggleAttribute("data-fade-top", element.scrollTop > 0)
     element.toggleAttribute("data-fade-bottom", element.scrollTop + element.clientHeight < element.scrollHeight - 1)
   }
+
   onCleanup(() => {
     observer?.disconnect()
     cancelAnimationFrame(frame)

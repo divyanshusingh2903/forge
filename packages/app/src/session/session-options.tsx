@@ -27,6 +27,7 @@ export function SessionOptionsContent(
       onKeyDown={(event: KeyboardEvent) => {
         if (event.altKey || event.ctrlKey || event.metaKey) return
         const run = keys[event.key.toLowerCase()]
+
         if (!run) return
         event.preventDefault()
         event.stopPropagation()
