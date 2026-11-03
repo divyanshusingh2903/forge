@@ -5,7 +5,9 @@ import { Dialog } from "@opencode/ui/dialog"
 import { usePlugin, type DialogHandle, type SetupContext } from "@opencode/plugin/gui"
 import type definition from "./index"
 
-const CHANGELOG_URL = "https://opencode.ai/changelog.json"
+// Forge's releases carry no desktop highlights yet, so this only records the version as seen. OpenCode's changelog
+// would show OpenCode's highlights for unrelated version numbers.
+const CHANGELOG_URL = "https://api.github.com/repos/divyanshusingh2903/forge/releases"
 
 type Highlight = {
   title: string

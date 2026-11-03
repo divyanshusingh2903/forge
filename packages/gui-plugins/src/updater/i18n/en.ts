@@ -4,10 +4,15 @@ export default {
   "action.checking": "Checking…",
   "action.downloading": "Downloading…",
   "action.installRestart": "Install and restart",
-  "action.download": "Download OpenCode",
+  "action.download": "Download Forge",
   "action.installing": "Installing…",
   "toast.latest.title": "You're up to date",
-  "toast.latest.description": "You're running the latest version of OpenCode.",
+  "toast.latest.description": "You're running the latest version of Forge.",
+  "manual.title": "Download Forge {{version}}",
+  "manual.description":
+    "This build of Forge can't install updates itself. Download version {{version}} from the release page, then replace Forge in your Applications folder.",
+  "dialog.manual.message": "Forge {{version}} is available. Download it from the release page?",
+  "dialog.download": "Download",
   "migration.title": "Move from Beta to Stable",
   "migration.description":
     "For now, OpenCode Beta is moving to OpenCode Stable. Download version {{version}}, then install OpenCode from the disk image to continue receiving updates.",

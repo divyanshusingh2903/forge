@@ -10,7 +10,7 @@ type Client = IpcClient<typeof Updater.spec>
 
 type Context = SetupContext<typeof definition>
 
-/** Restarts into the staged update. A beta build moving to stable confirms the installer download first. */
+/** Restarts into the staged update. A build that updates by hand confirms opening the release page first. */
 export function install(ctx: Context, client: Client) {
   const download = () => client.install().catch((cause: unknown) => requestFailed(ctx, cause))
 
@@ -23,7 +23,7 @@ export function install(ctx: Context, client: Client) {
   }
 
   ctx.dialogs.open(
-    (dialog) => <DialogStableDownload ctx={ctx} dialog={dialog} version={state.version} download={download} />,
+    (dialog) => <DialogManualDownload ctx={ctx} dialog={dialog} version={state.version} download={download} />,
     { replace: true },
   )
 }
@@ -73,7 +73,7 @@ function requestFailed(ctx: Context, cause: unknown) {
   })
 }
 
-function DialogStableDownload(props: {
+function DialogManualDownload(props: {
   ctx: Context
   dialog: DialogHandle
   version: string
@@ -90,8 +90,8 @@ function DialogStableDownload(props: {
     <Dialog fit>
       <DialogHeader>
         <DialogTitleGroup
-          title={ctx.t("migration.title")}
-          description={ctx.t("migration.description", { version: props.version })}
+          title={ctx.t("manual.title")}
+          description={ctx.t("manual.description", { version: props.version })}
         />
       </DialogHeader>
       <DialogFooter>

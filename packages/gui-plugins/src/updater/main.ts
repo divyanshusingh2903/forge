@@ -87,14 +87,17 @@ const setup: Plugin.MainSetup = async (ctx) => {
       return
     }
 
-    if (state.status !== "ready") return
+    if (state.status !== "ready" && state.status !== "download-required") return
+
+    // A build that updates by hand opens the release page instead of restarting.
+    const manual = state.status === "download-required"
 
     const response = yield* promise(() =>
       dialog.showMessageBox({
         type: "info",
-        message: ctx.t("dialog.ready.message", { version: state.version }),
+        message: ctx.t(manual ? "dialog.manual.message" : "dialog.ready.message", { version: state.version }),
         title: ctx.t("dialog.ready.title"),
-        buttons: [ctx.t("dialog.restart"), ctx.t("dialog.later")],
+        buttons: [ctx.t(manual ? "dialog.download" : "dialog.restart"), ctx.t("dialog.later")],
         defaultId: 0,
         cancelId: 1,
       }),

@@ -1,9 +1,11 @@
 import { execFile } from "node:child_process"
+import path from "node:path"
 import { promisify } from "node:util"
-import { app, autoUpdater } from "electron"
+import { app, autoUpdater, shell } from "electron"
 import pkg from "electron-updater"
 import { Effect } from "effect"
 import type { Platform } from "./machine"
+import { isManualSignature } from "./signature"
 
 const updateClient = pkg.autoUpdater
 
@@ -13,9 +15,16 @@ const restartTimeout = 10_000
 
 const unpackTimeout = 120_000
 
+const signatureTimeout = 10_000
+
+// Release tags carry both the OpenCode and the Forge version, so the newest release is linked rather than built from
+// the app version. electron-updater found the update on that same latest release.
+const releasePage = "https://github.com/divyanshusingh2903/forge/releases/latest"
+
 export const make = Effect.fn("Updater.platform")(function* (channel: string) {
-  const userAgent = `opencode/${channel === "prod" ? "latest" : channel}/${app.getVersion()}/desktop`
+  const userAgent = `forge/${channel === "prod" ? "latest" : channel}/${app.getVersion()}/desktop`
   const runFork = Effect.runForkWith(yield* Effect.context())
+  const manual = yield* manualInstall
   updateClient.logger = {
     info: (...args) => runFork(Effect.logInfo(...args)),
     warn: (...args) => runFork(Effect.logWarning(...args)),
@@ -27,8 +36,10 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string) {
   updateClient.allowPrerelease = false
   updateClient.allowDowngrade = true
   updateClient.autoDownload = false
-  updateClient.autoInstallOnAppQuit = process.platform === "darwin"
+  // Squirrel.Mac only installs updates signed by the same Developer ID, so a build without one never installs on quit.
+  updateClient.autoInstallOnAppQuit = process.platform === "darwin" && !manual
   yield* Effect.logInfo("auto updater configured", {
+    manual,
     channel: updateClient.channel,
     allowPrerelease: updateClient.allowPrerelease,
     allowDowngrade: updateClient.allowDowngrade,
@@ -54,13 +65,40 @@ export const make = Effect.fn("Updater.platform")(function* (channel: string) {
           )
         }
 
+        if (manual) return { mode: "external", version: result.updateInfo.version, url: releasePage } as const
+
         return { mode: "restart", version: result.updateInfo.version } as const
       },
       catch: (error) => error,
     }),
     stageUpdate,
     installAndRestart,
+    externalInstall: (url) => Effect.tryPromise(() => shell.openExternal(url)),
   } satisfies Platform
+})
+
+/**
+ * Whether this build must be updated by hand. Release builds without an Apple Developer ID are ad-hoc signed, and
+ * Squirrel.Mac rejects an update whose signature does not match the running app's, so those builds open the release
+ * page instead. A signature that cannot be read counts as ad-hoc, so it never reaches Squirrel.
+ */
+const manualInstall = Effect.gen(function* () {
+  if (process.platform !== "darwin") return false
+
+  const bundle = path.resolve(path.dirname(process.execPath), "../..")
+
+  const signature = yield* Effect.tryPromise(() =>
+    execFileAsync("/usr/bin/codesign", ["-dv", "--verbose=4", bundle], { timeout: signatureTimeout }),
+  ).pipe(
+    Effect.map((result) => result.stderr),
+    Effect.catch((error) =>
+      Effect.logWarning("app signature unreadable, updating by hand", { message: String(error.cause) }).pipe(
+        Effect.as(undefined),
+      ),
+    ),
+  )
+
+  return signature === undefined || isManualSignature(signature)
 })
 
 function stageUpdate(options: { readonly differential: boolean }) {
