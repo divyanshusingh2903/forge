@@ -20,6 +20,20 @@ const decode = Schema.decodeUnknownSync(schema)
 const encode = Schema.encodeSync(schema)
 
 describe("settings timeline detail migration", () => {
+  test("reads a Compact saved before the expanded default as unchosen, once", () => {
+    const migrated = decode({ general: { timelineDetail: timelinePresets[2].value } })
+    expect(migrated.general.timelineDetail).toEqual(timelinePresets[0].value)
+    expect(migrated.general.timelineExpanded).toBe(true)
+
+    // Choosing Compact afterwards saves the marker with it, so the choice stays.
+    expect(
+      decode({ general: { timelineDetail: timelinePresets[2].value, timelineExpanded: true } }).general.timelineDetail,
+    ).toEqual(timelinePresets[2].value)
+    expect(decode({ general: { timelineDetail: timelinePresets[3].value } }).general.timelineDetail).toEqual(
+      timelinePresets[3].value,
+    )
+  })
+
   test("migrates saved switches and round trips the current settings", () => {
     const settings = decode({
       general: { shellToolPartsExpanded: true, editToolPartsExpanded: false, showReasoningSummaries: true },
@@ -27,9 +41,8 @@ describe("settings timeline detail migration", () => {
     })
 
     expect(settings.general.timelineDetail).toEqual({
-      ...timelinePresets[2].value,
-      shell: { placement: "separate", details: "expanded" },
-      thinking: { placement: "separate", details: "expanded" },
+      ...timelinePresets[0].value,
+      edit: { placement: "grouped", details: "collapsed" },
     })
     expect(settings.appearance.fontSize).toBe(16)
     expect(decode(encode(settings))).toEqual(settings)
@@ -90,7 +103,7 @@ describe("settings schema", () => {
   test("supplies the existing defaults for an empty document", () => {
     expect(decode({})).toEqual({
       general: {
-        timelineDetail: timelinePresets[2].value,
+        timelineDetail: timelinePresets[0].value,
         showCustomAgents: false,
         showTurnDiffs: false,
         backgroundActivity: "left",
@@ -100,6 +113,7 @@ describe("settings schema", () => {
         newQuestionUI: false,
         mobileTitlebarPosition: "top",
         followUpBehavior: "steer",
+        timelineExpanded: true,
       },
       appearance: {
         fontSize: 14,
@@ -150,7 +164,7 @@ describe("settings schema", () => {
     expect(settings.general).toMatchObject({
       showTerminal: true,
       autoSave: false,
-      timelineDetail: timelinePresets[2].value,
+      timelineDetail: timelinePresets[0].value,
       followUpBehavior: "steer",
       backgroundActivity: "left",
       timelineWidth: "comfortable",

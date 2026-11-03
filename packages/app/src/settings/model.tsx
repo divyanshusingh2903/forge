@@ -4,7 +4,13 @@ import { createMediaQuery } from "@solid-primitives/media"
 import { Effect, Option, Predicate, Schema, SchemaGetter } from "effect"
 import { createSimpleContext } from "@opencode/ui/context"
 import { setNewIcons } from "@opencode/ui/icon"
-import { timelinePresets, type TimelineCategory, type TimelineDetail } from "@opencode/session-ui/timeline/detail"
+import {
+  timelineCategories,
+  timelinePreset,
+  timelinePresets,
+  type TimelineCategory,
+  type TimelineDetail,
+} from "@opencode/session-ui/timeline/detail"
 import { persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { ScopedKey, type ServerScope } from "@/runtime/server/scope"
@@ -137,6 +143,8 @@ const generalSchema = Persistence.struct({
   // Owned by the review plugin, which copies it out once; kept so settings rewrites cannot drop it first.
   mobileDiffWrap: Persistence.optional(Schema.Boolean),
   followUpBehavior: Schema.Literals(["queue", "steer"]),
+  // Set once a saved timeline has been read under Forge's expanded default, so a later Compact choice stays.
+  timelineExpanded: Persistence.optional(Schema.Boolean),
 })
 
 const appearanceSchema = Persistence.struct({
@@ -246,6 +254,14 @@ function legacyTimelineActivity(value: boolean | "hidden" | "compact" | "full" |
   } as const
 }
 
+function isCompact(detail: unknown) {
+  if (!Predicate.isObject(detail) || !timelineCategories.every((category) => Predicate.isObject(detail[category])))
+    return false
+
+  // SAFETY: every category is an object; timelinePreset only compares their placement and details fields.
+  return timelinePreset(detail as TimelineDetail)?.id === "compact"
+}
+
 export const settingsPersistence = Persistence.migrate(
   settingsSchema,
   Persistence.legacy({
@@ -270,6 +286,7 @@ export const settingsPersistence = Persistence.migrate(
         showReasoningSummaries: Persistence.optional(Schema.Boolean),
         shellToolPartsExpanded: Persistence.optional(Schema.Boolean),
         editToolPartsExpanded: Persistence.optional(Schema.Boolean),
+        timelineExpanded: Persistence.optional(Schema.Boolean),
       }),
     ),
   }).pipe(
@@ -277,7 +294,22 @@ export const settingsPersistence = Persistence.migrate(
       decode: SchemaGetter.transform((value) => {
         const general = value.general
 
-        if (!general || general.timelineDetail !== undefined) return value
+        if (!general) return value
+
+        if (general.timelineDetail !== undefined)
+          return {
+            ...value,
+            general: {
+              ...general,
+              // Forge shows every action by default. v2 saved its Compact default along with any other setting, so a
+              // Compact saved before Forge's default was read is taken as never chosen, once.
+              timelineDetail:
+                !general.timelineExpanded && isCompact(general.timelineDetail)
+                  ? { ...timelinePresets[0].value }
+                  : general.timelineDetail,
+              timelineExpanded: true,
+            },
+          }
 
         return {
           ...value,
@@ -300,7 +332,8 @@ export const settingsPersistence = Persistence.migrate(
 
 export const defaultSettings: Settings = {
   general: {
-    timelineDetail: { ...timelinePresets[2].value },
+    // Every action stays open in the timeline, so the person sees each one the agent takes.
+    timelineDetail: { ...timelinePresets[0].value },
     showCustomAgents: false,
     showTurnDiffs: false,
     backgroundActivity: "left",
@@ -310,6 +343,7 @@ export const defaultSettings: Settings = {
     newQuestionUI: false,
     mobileTitlebarPosition: "top",
     followUpBehavior: "steer",
+    timelineExpanded: true,
   },
   appearance: { fontSize: 14, mono: "", sans: "", terminal: "", tabLayout: "horizontal", reduceMotion: "system" },
   keybinds: {},
