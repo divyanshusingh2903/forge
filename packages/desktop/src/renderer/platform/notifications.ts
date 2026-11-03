@@ -1,6 +1,7 @@
 import type { Platform } from "@opencode/app/desktop"
 import type { ElectronAPI } from "../api-types"
-import icon from "../../../resources/icons/128x128.png"
+// The committed source, not resources/icons: that copy is generated at build time and gitignored. All channels share it.
+import icon from "../../../icons/prod/128x128.png"
 
 type DesktopNotifyAPI = Pick<ElectronAPI, "getWindowFocused" | "showWindow" | "setWindowFocus">
 

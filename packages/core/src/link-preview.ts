@@ -72,7 +72,7 @@ const layer = Layer.effect(
               ? (map(result.stdout.toString("utf8")) ?? unavailable)
               : failureResult(result.stderr.toString("utf8")),
           ),
-          Effect.catch(() => Effect.succeed(unavailable)),
+          Effect.orElseSucceed(() => unavailable),
         )
     })
 
@@ -91,7 +91,7 @@ const layer = Layer.effect(
           return raw.isError ? failureResult(text) : (map(text) ?? unavailable)
         }),
         Effect.timeoutOrElse({ duration: REQUEST_TIMEOUT, orElse: () => Effect.succeed(unavailable) }),
-        Effect.catch(() => Effect.succeed(unavailable)),
+        Effect.orElseSucceed(() => unavailable),
       )
     })
 
