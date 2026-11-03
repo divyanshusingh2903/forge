@@ -623,6 +623,8 @@ it.live(
             directory: fixture.sdk.AbsolutePath.make(fixture.directory),
             workspaceID,
           }),
+          // Forge asks before shell commands; Auto lets the tool reach provisioning without an approval.
+          metadata: { "forge.mode": "auto" },
         })
         expect(calls).toEqual([])
 
