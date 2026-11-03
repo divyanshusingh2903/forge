@@ -168,7 +168,7 @@ test("an SSH host that asks for sign-in again opens the dialog once per selected
   await expectSessionTitle(page, box.title)
   const connects = page.getByLabel("SSH connects")
   const signIn = page.getByRole("button", { name: "Require SSH sign-in" })
-  const authenticate = page.getByRole("button", { name: "Authenticate", exact: true })
+  const authenticate = page.getByRole("main").getByRole("button", { name: "Authenticate", exact: true })
 
   // The first request on the tab opens sign-in by itself; the fixture's host connects without a prompt.
   await signIn.click()

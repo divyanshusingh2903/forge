@@ -941,13 +941,15 @@ function mockHandlers(
           }).pipe(Effect.andThen(noContent))
         },
         vcsStatus: () => Effect.succeed({ location: location(config), data: [] }),
-        // A repository on its default branch with nothing changed and no remote.
+        // A repository on its default branch with no remote, whose working tree holds the files the diff lists.
         gitState: () =>
           Effect.succeed({
             location: location(config),
             data: {
               branch: "main",
-              changes: [],
+              changes: (Predicate.isFunction(config.vcsDiff) ? config.vcsDiff({ mode: "git" }) : (config.vcsDiff ?? []))
+                .flatMap((diff) => (typeof (diff as { file?: unknown }).file === "string" ? [(diff as { file: string }).file] : []))
+                .map((file) => ({ file, staged: false, unstaged: true, untracked: false })),
               remote: { upstream: false, ahead: 0, behind: 0, remotes: false },
             },
           }),

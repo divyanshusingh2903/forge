@@ -2,7 +2,7 @@ import type { OpenCodeEvent, SessionMessageInfo } from "@opencode/client/promise
 import { expect, test, type Locator, type Page } from "@playwright/test"
 import { base64Encode } from "@opencode/util/encode"
 import { SERVER, holdRoute, project, provider, session } from "../utils/app"
-import { browseFiles, openFileLauncher, openReviewLauncher, reviewTabs } from "../utils/side-panel"
+import { browseFiles, openFileLauncher, openReviewLauncher, reviewFile, reviewTabs } from "../utils/side-panel"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { fileDiff, fileNode, openSession } from "../utils/workspace"
 import { expectSessionTitle } from "../utils/waits"
@@ -1246,7 +1246,7 @@ test("image files load into the review panel and keep it painted while loading",
     page.evaluate(() => (window as Window & { e2eImageProbe?: ImageProbe }).e2eImageProbe!.frames)
 
   const response = page.waitForResponse((item) => item.url().includes(`/api/fs/read/${image}`))
-  await page.getByRole("treeitem", { name: /preview\.png/ }).click()
+  await reviewFile(page.locator("#review-panel"), "preview.png").click()
   await read.promise
   const pending = await frames()
   await expect.poll(frames).toBeGreaterThan(pending)
@@ -1452,7 +1452,7 @@ test("restores review state and the side-panel tab per session", async ({ page }
   // Each session selects a file other than the first, which the review would show without a stored selection.
   await toggle.click()
   await openReviewLauncher(panel)
-  await page.getByRole("treeitem", { name: "gamma.ts" }).click()
+  await reviewFile(panel, "gamma.ts").click()
   await selectedFile("gamma.ts")
   await openFileLauncher(panel)
   await panel.getByRole("treeitem", { name: "README.md" }).click()
@@ -1464,7 +1464,7 @@ test("restores review state and the side-panel tab per session", async ({ page }
   await expect(review).toHaveAttribute("aria-selected", "true")
   await page.getByRole("button", { name: "Git changes" }).click()
   await page.getByRole("option", { name: "Branch changes" }).click()
-  await page.getByRole("treeitem", { name: "beta.ts" }).click()
+  await reviewFile(panel, "beta.ts").click()
   await selectedFile("beta.ts")
   await page.getByRole("button", { name: "Toggle session context" }).click()
   await selectedTab("Context")

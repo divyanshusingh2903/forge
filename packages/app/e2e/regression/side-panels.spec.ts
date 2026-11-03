@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test"
 import { fileDiff, openSession } from "../utils/workspace"
-import { openReviewLauncher } from "../utils/side-panel"
+import { openReviewLauncher, reviewFile } from "../utils/side-panel"
 import { base64Encode } from "@opencode/util/encode"
 
 test("review content stays aligned with the side region in both directions", async ({ page }) => {
@@ -103,7 +103,7 @@ test("closing the last New tab closes the side region, and only a New tab lists 
   const panel = page.locator("#review-panel")
   const toggle = page.getByRole("button", { name: "Toggle review", exact: true })
   const newTab = panel.getByRole("tab", { name: "New tab", exact: true })
-  const review = panel.getByRole("button", { name: /^Review/ })
+  const review = panel.getByRole("button", { name: /^Review(?! plan)/ })
 
   // An empty side region opens on a New tab listing the launchers.
   await expect(newTab).toHaveAttribute("aria-selected", "true")
@@ -167,11 +167,10 @@ test("tabs in a narrow side strip shrink to keep their close buttons, and a tab'
 })
 
 async function expectTreeSentinel(page: Page) {
-  const tree = page.locator('#review-panel [data-component="file-tree-v2"]')
-  await expect(tree.getByRole("treeitem", { name: "action.yml" })).toBeVisible()
-  const rows = await tree.locator('[data-type="item"]').count()
-  expect(rows).toBeGreaterThan(0)
-  expect(rows).toBeLessThanOrEqual(60)
+  const panel = page.locator("#review-panel")
+  await expect(reviewFile(panel, "action.yml")).toBeVisible()
+  // Upstream's tree mounted at most 60 rows. Forge's change list renders every row, so only the sentinel is checked.
+  expect(await panel.locator("bdi").count()).toBeGreaterThan(0)
 }
 
 function sideContentOffset(page: Page, direction: "ltr" | "rtl") {

@@ -17,6 +17,14 @@ export async function openReviewLauncher(panel: Locator) {
   await panel.getByRole("button", { name: /^Review(?! plan)/ }).click()
 }
 
+/**
+ * A changed file's row in the Review tab. In a Git repository Forge lists changes with its own staging rows, which
+ * carry no tree roles, so the row is found by the file name it shows.
+ */
+export function reviewFile(scope: Locator | Page, name: string) {
+  return scope.locator("bdi", { hasText: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`) })
+}
+
 /** Storage that restores the Review tab, selected, in each session's side strip, as the app writes it. */
 export function reviewTabs(directory: string, ...sessions: string[]) {
   return {
