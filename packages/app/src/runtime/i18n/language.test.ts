@@ -31,5 +31,6 @@ describe("dictionaries", () => {
     )
 
     expect(nested).toEqual([])
-  })
+    // Importing every locale's dictionaries takes about half a second here, but over ten seconds on a loaded Windows runner.
+  }, 60_000)
 })
