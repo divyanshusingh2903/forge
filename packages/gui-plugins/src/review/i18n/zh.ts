@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("zh"),
   "tab.title": "审查",
   "tab.count.one": "{{count}} 个文件已更改",
   "tab.count.other": "{{count}} 个文件已更改",

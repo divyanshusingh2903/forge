@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("ko"),
   "tab.title": "검토",
   "tab.count.one": "{{count}}개의 파일이 변경되었습니다.",
   "tab.count.other": "{{count}}개의 파일이 변경되었습니다.",

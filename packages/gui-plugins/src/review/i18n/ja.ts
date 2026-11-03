@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("ja"),
   "tab.title": "レビュー",
   "tab.count.one": "{{count}} ファイルが変更されました",
   "tab.count.other": "{{count}} 個のファイルが変更されました",

@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("sk"),
   "tab.title": "Revízia",
   "tab.count.one": "{{count}} súbor zmenený",
   "tab.count.few": "{{count}} súbory zmenené",

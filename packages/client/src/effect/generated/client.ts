@@ -311,6 +311,36 @@ import type {
   WebsearchQueryOutput,
   LinkPreviewResolveInput,
   LinkPreviewResolveOutput,
+  GitStateInput,
+  GitStateOutput,
+  GitStageInput,
+  GitStageOutput,
+  GitUnstageInput,
+  GitUnstageOutput,
+  GitDiscardInput,
+  GitDiscardOutput,
+  GitCommitInput,
+  GitCommitOutput,
+  GitMessageInput,
+  GitMessageOutput,
+  GitFetchInput,
+  GitFetchOutput,
+  GitPushInput,
+  GitPushOutput,
+  GitPullInput,
+  GitPullOutput,
+  GitTargetsInput,
+  GitTargetsOutput,
+  GitStashListInput,
+  GitStashListOutput,
+  GitStashCreateInput,
+  GitStashCreateOutput,
+  GitStashApplyInput,
+  GitStashApplyOutput,
+  GitStashPopInput,
+  GitStashPopOutput,
+  GitStashDropInput,
+  GitStashDropOutput,
   ExperimentalUsageLimitsInput,
   ExperimentalUsageLimitsOutput,
   ConfigGetInput,
@@ -1931,6 +1961,131 @@ const EndpointLinkPreviewResolve = (raw: RawClient["server.linkPreview"]) => (in
 
 const adaptGroupLinkPreview = (raw: RawClient["server.linkPreview"]) => ({ resolve: EndpointLinkPreviewResolve(raw) })
 
+const EndpointGitState = (raw: RawClient["server.git"]) => (input?: GitStateInput) =>
+  preserveEffect<GitStateOutput>()(
+    raw["git.state"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitStage = (raw: RawClient["server.git"]) => (input?: GitStageInput) =>
+  preserveEffect<GitStageOutput>()(
+    raw["git.stage"]({ query: { location: input?.["location"] }, payload: { files: input?.["files"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointGitUnstage = (raw: RawClient["server.git"]) => (input?: GitUnstageInput) =>
+  preserveEffect<GitUnstageOutput>()(
+    raw["git.unstage"]({ query: { location: input?.["location"] }, payload: { files: input?.["files"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointGitDiscard = (raw: RawClient["server.git"]) => (input: GitDiscardInput) =>
+  preserveEffect<GitDiscardOutput>()(
+    raw["git.discard"]({ query: { location: input["location"] }, payload: { file: input["file"] } }).pipe(
+      Effect.mapError(mapClientError),
+    ),
+  )
+
+const EndpointGitCommit = (raw: RawClient["server.git"]) => (input: GitCommitInput) =>
+  preserveEffect<GitCommitOutput>()(
+    raw["git.commit"]({
+      query: { location: input["location"] },
+      payload: { message: input["message"], all: input["all"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitMessage = (raw: RawClient["server.git"]) => (input?: GitMessageInput) =>
+  preserveEffect<GitMessageOutput>()(
+    raw["git.message"]({
+      query: { location: input?.["location"] },
+      payload: { model: input?.["model"], all: input?.["all"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitFetch = (raw: RawClient["server.git"]) => (input?: GitFetchInput) =>
+  preserveEffect<GitFetchOutput>()(
+    raw["git.fetch"]({ query: { location: input?.["location"] }, payload: {} }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitPush = (raw: RawClient["server.git"]) => (input?: GitPushInput) =>
+  preserveEffect<GitPushOutput>()(
+    raw["git.push"]({
+      query: { location: input?.["location"] },
+      payload: { remote: input?.["remote"], setUpstream: input?.["setUpstream"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitPull = (raw: RawClient["server.git"]) => (input?: GitPullInput) =>
+  preserveEffect<GitPullOutput>()(
+    raw["git.pull"]({
+      query: { location: input?.["location"] },
+      payload: { remote: input?.["remote"], branch: input?.["branch"], strategy: input?.["strategy"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitTargets = (raw: RawClient["server.git"]) => (input?: GitTargetsInput) =>
+  preserveEffect<GitTargetsOutput>()(
+    raw["git.targets"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitStashList = (raw: RawClient["server.git"]) => (input?: GitStashListInput) =>
+  preserveEffect<GitStashListOutput>()(
+    raw["git.stash.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitStashCreate = (raw: RawClient["server.git"]) => (input?: GitStashCreateInput) =>
+  preserveEffect<GitStashCreateOutput>()(
+    raw["git.stash.create"]({
+      query: { location: input?.["location"] },
+      payload: { message: input?.["message"], includeUntracked: input?.["includeUntracked"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitStashApply = (raw: RawClient["server.git"]) => (input: GitStashApplyInput) =>
+  preserveEffect<GitStashApplyOutput>()(
+    raw["git.stash.apply"]({
+      query: { location: input["location"] },
+      payload: { ref: input["ref"], oid: input["oid"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitStashPop = (raw: RawClient["server.git"]) => (input: GitStashPopInput) =>
+  preserveEffect<GitStashPopOutput>()(
+    raw["git.stash.pop"]({
+      query: { location: input["location"] },
+      payload: { ref: input["ref"], oid: input["oid"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointGitStashDrop = (raw: RawClient["server.git"]) => (input: GitStashDropInput) =>
+  preserveEffect<GitStashDropOutput>()(
+    raw["git.stash.drop"]({
+      query: { location: input["location"] },
+      payload: { ref: input["ref"], oid: input["oid"] },
+    }).pipe(Effect.mapError(mapClientError)),
+  )
+
+const adaptGroupGit = (raw: RawClient["server.git"]) => ({
+  state: EndpointGitState(raw),
+  stage: EndpointGitStage(raw),
+  unstage: EndpointGitUnstage(raw),
+  discard: EndpointGitDiscard(raw),
+  commit: EndpointGitCommit(raw),
+  message: EndpointGitMessage(raw),
+  fetch: EndpointGitFetch(raw),
+  push: EndpointGitPush(raw),
+  pull: EndpointGitPull(raw),
+  targets: EndpointGitTargets(raw),
+  stash: {
+    list: EndpointGitStashList(raw),
+    create: EndpointGitStashCreate(raw),
+    apply: EndpointGitStashApply(raw),
+    pop: EndpointGitStashPop(raw),
+    drop: EndpointGitStashDrop(raw),
+  },
+})
+
 const EndpointExperimentalUsageLimits = (raw: RawClient["server.usage"]) => (input?: ExperimentalUsageLimitsInput) =>
   preserveEffect<ExperimentalUsageLimitsOutput>()(
     raw["usage.limits"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
@@ -2003,6 +2158,7 @@ const adaptClient = (raw: RawClient) => {
     debug: adaptGroupDebug(raw["server.debug"]),
     websearch: adaptGroupWebsearch(raw["server.websearch"]),
     linkPreview: adaptGroupLinkPreview(raw["server.linkPreview"]),
+    git: adaptGroupGit(raw["server.git"]),
     config: adaptGroupConfig(raw["server.config"]),
   }
   return {

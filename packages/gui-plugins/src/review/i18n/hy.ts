@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("hy"),
   "tab.title": "Վերանայել",
   "tab.count.one": "{{count}} ֆայլ փոխվել է",
   "tab.count.other": "{{count}} ֆայլեր փոխվել են",

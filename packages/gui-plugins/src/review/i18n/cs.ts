@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("cs"),
   "tab.title": "Recenze",
   "tab.count.one": "{{count}} soubor změněn",
   "tab.count.few": "{{count}} soubory změněny",

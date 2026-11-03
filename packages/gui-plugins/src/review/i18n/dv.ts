@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("dv"),
   "tab.title": "ރިވިއު",
   "tab.count.one": "⁨{{count}}⁩ ފައިލް ބަދަލުވެއްޖެއެވެ",
   "tab.count.other": "⁨{{count}}⁩ ފައިލްތައް ބަދަލުވެއްޖެއެވެ",

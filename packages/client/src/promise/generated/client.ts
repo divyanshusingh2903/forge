@@ -313,6 +313,36 @@ import type {
   WebsearchQueryOutput,
   LinkPreviewResolveInput,
   LinkPreviewResolveOutput,
+  GitStateInput,
+  GitStateOutput,
+  GitStageInput,
+  GitStageOutput,
+  GitUnstageInput,
+  GitUnstageOutput,
+  GitDiscardInput,
+  GitDiscardOutput,
+  GitCommitInput,
+  GitCommitOutput,
+  GitMessageInput,
+  GitMessageOutput,
+  GitFetchInput,
+  GitFetchOutput,
+  GitPushInput,
+  GitPushOutput,
+  GitPullInput,
+  GitPullOutput,
+  GitTargetsInput,
+  GitTargetsOutput,
+  GitStashListInput,
+  GitStashListOutput,
+  GitStashCreateInput,
+  GitStashCreateOutput,
+  GitStashApplyInput,
+  GitStashApplyOutput,
+  GitStashPopInput,
+  GitStashPopOutput,
+  GitStashDropInput,
+  GitStashDropOutput,
   ExperimentalUsageLimitsInput,
   ExperimentalUsageLimitsOutput,
   ConfigGetInput,
@@ -2665,6 +2695,202 @@ export function make(options: ClientOptions) {
           },
           requestOptions,
         ),
+    },
+    git: {
+      state: (input?: GitStateInput, requestOptions?: RequestOptions) =>
+        request<GitStateOutput>(
+          {
+            method: "GET",
+            path: `/api/git/state`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      stage: (input?: GitStageInput, requestOptions?: RequestOptions) =>
+        request<GitStageOutput>(
+          {
+            method: "POST",
+            path: `/api/git/stage`,
+            query: { location: input?.["location"] },
+            body: { files: input?.["files"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      unstage: (input?: GitUnstageInput, requestOptions?: RequestOptions) =>
+        request<GitUnstageOutput>(
+          {
+            method: "POST",
+            path: `/api/git/unstage`,
+            query: { location: input?.["location"] },
+            body: { files: input?.["files"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      discard: (input: GitDiscardInput, requestOptions?: RequestOptions) =>
+        request<GitDiscardOutput>(
+          {
+            method: "POST",
+            path: `/api/git/discard`,
+            query: { location: input["location"] },
+            body: { file: input["file"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      commit: (input: GitCommitInput, requestOptions?: RequestOptions) =>
+        request<GitCommitOutput>(
+          {
+            method: "POST",
+            path: `/api/git/commit`,
+            query: { location: input["location"] },
+            body: { message: input["message"], all: input["all"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      message: (input?: GitMessageInput, requestOptions?: RequestOptions) =>
+        request<GitMessageOutput>(
+          {
+            method: "POST",
+            path: `/api/git/message`,
+            query: { location: input?.["location"] },
+            body: { model: input?.["model"], all: input?.["all"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      fetch: (input?: GitFetchInput, requestOptions?: RequestOptions) =>
+        request<GitFetchOutput>(
+          {
+            method: "POST",
+            path: `/api/git/fetch`,
+            query: { location: input?.["location"] },
+            body: {},
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      push: (input?: GitPushInput, requestOptions?: RequestOptions) =>
+        request<GitPushOutput>(
+          {
+            method: "POST",
+            path: `/api/git/push`,
+            query: { location: input?.["location"] },
+            body: { remote: input?.["remote"], setUpstream: input?.["setUpstream"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      pull: (input?: GitPullInput, requestOptions?: RequestOptions) =>
+        request<GitPullOutput>(
+          {
+            method: "POST",
+            path: `/api/git/pull`,
+            query: { location: input?.["location"] },
+            body: { remote: input?.["remote"], branch: input?.["branch"], strategy: input?.["strategy"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      targets: (input?: GitTargetsInput, requestOptions?: RequestOptions) =>
+        request<GitTargetsOutput>(
+          {
+            method: "GET",
+            path: `/api/git/targets`,
+            query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401, 404, 409],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      stash: {
+        list: (input?: GitStashListInput, requestOptions?: RequestOptions) =>
+          request<GitStashListOutput>(
+            {
+              method: "GET",
+              path: `/api/git/stash`,
+              query: { location: input?.["location"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        create: (input?: GitStashCreateInput, requestOptions?: RequestOptions) =>
+          request<GitStashCreateOutput>(
+            {
+              method: "POST",
+              path: `/api/git/stash`,
+              query: { location: input?.["location"] },
+              body: { message: input?.["message"], includeUntracked: input?.["includeUntracked"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        apply: (input: GitStashApplyInput, requestOptions?: RequestOptions) =>
+          request<GitStashApplyOutput>(
+            {
+              method: "POST",
+              path: `/api/git/stash/apply`,
+              query: { location: input["location"] },
+              body: { ref: input["ref"], oid: input["oid"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        pop: (input: GitStashPopInput, requestOptions?: RequestOptions) =>
+          request<GitStashPopOutput>(
+            {
+              method: "POST",
+              path: `/api/git/stash/pop`,
+              query: { location: input["location"] },
+              body: { ref: input["ref"], oid: input["oid"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        drop: (input: GitStashDropInput, requestOptions?: RequestOptions) =>
+          request<GitStashDropOutput>(
+            {
+              method: "POST",
+              path: `/api/git/stash/drop`,
+              query: { location: input["location"] },
+              body: { ref: input["ref"], oid: input["oid"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 409],
+              empty: false,
+            },
+            requestOptions,
+          ),
+      },
     },
     config: {
       get: (input?: ConfigGetInput, requestOptions?: RequestOptions) =>

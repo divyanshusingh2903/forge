@@ -34,6 +34,7 @@ import {
 } from "./kinds"
 import type { ReviewModel } from "./model"
 import { ReviewPanelEmpty, ReviewTitle } from "./parts"
+import { GitChanges, GitFooter, createReviewGit, type ReviewGit } from "./git"
 
 type ReviewPanelState = {
   sidebar: PanelSidebar
@@ -70,6 +71,10 @@ type ReviewPanelProps = {
   comments?: SessionReviewComment[]
   focusedComment?: SessionReviewFocus | null
   onFocusedCommentChange?: (focus: SessionReviewFocus | null) => void
+  /** Staging and commit controls, in a Git repository. */
+  git?: ReviewGit
+  /** Whether the working tree's changes are shown, rather than a branch's or a turn's. */
+  working: boolean
 }
 
 /** The desktop review panel. */
@@ -82,9 +87,13 @@ export default function ReviewPanelContent(props: {
   onExpandModeChange: (mode: SessionReviewExpandMode) => void
 }) {
   const panel = usePanel()
+  const gitEnabled = () => props.session.project?.vcs === "git"
+  const git = createReviewGit({ view: () => props.session, enabled: gitEnabled })
 
   return (
     <ReviewPanel
+      git={gitEnabled() ? git : undefined}
+      working={props.review.mode() === "git"}
       session={props.session}
       screen={props.review.screen}
       title={<ReviewTitle review={props.review} />}
@@ -227,6 +236,8 @@ function ReviewPanel(props: ReviewPanelProps) {
           kinds={treeKinds()}
           folderLabels={props.folderLabels}
           activeDiff={activeDiff()}
+          git={props.git}
+          working={props.working}
         />
       }
       activeFile={activeDiff()}
@@ -280,6 +291,8 @@ function ReviewPanelSidebar(props: {
   kinds: ReturnType<typeof reviewDiffKinds>
   folderLabels?: ReadonlyMap<string, string>
   activeDiff: string | undefined
+  git?: ReviewGit
+  working: boolean
 }) {
   const ctx = usePlugin<typeof Review>()
 
@@ -325,6 +338,7 @@ function ReviewPanelSidebar(props: {
       onWidthChange={props.state.sidebar.resize}
       minWidth={SESSION_REVIEW_V2_SIDEBAR_WIDTH_MIN}
       maxWidth={SESSION_REVIEW_V2_SIDEBAR_WIDTH_MAX}
+      footer={<Show when={props.git}>{(git) => <GitFooter git={git()} screen={props.screen} />}</Show>}
     >
       <Show
         when={props.diffsReady}
@@ -338,17 +352,33 @@ function ReviewPanelSidebar(props: {
         <Show
           when={props.searching}
           fallback={
-            <Show when={views()}>
-              {(views) => (
-                <Dynamic
-                  component={views().Tree}
-                  screen={props.screen}
-                  session={props.session}
-                  allowed={props.filteredFiles}
+            <Show
+              when={props.git?.store.state && props.git}
+              fallback={
+                <Show when={views()}>
+                  {(views) => (
+                    <Dynamic
+                      component={views().Tree}
+                      screen={props.screen}
+                      session={props.session}
+                      allowed={props.filteredFiles}
+                      kinds={props.kinds}
+                      labels={props.folderLabels}
+                      active={props.activeDiff}
+                      onFileClick={props.onSelectFile}
+                    />
+                  )}
+                </Show>
+              }
+            >
+              {(git) => (
+                <GitChanges
+                  git={git()}
+                  working={props.working}
+                  files={props.filteredFiles}
                   kinds={props.kinds}
-                  labels={props.folderLabels}
                   active={props.activeDiff}
-                  onFileClick={props.onSelectFile}
+                  onSelectFile={props.onSelectFile}
                 />
               )}
             </Show>

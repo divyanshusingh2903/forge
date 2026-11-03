@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("sq"),
   "tab.title": "Rishikimi",
   "tab.count.one": "{{count}} skedar u ndryshua",
   "tab.count.other": "{{count}} skedarë u ndryshuan",

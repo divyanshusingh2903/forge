@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("km"),
   "tab.title": "ពិនិត្យ",
   "tab.count.one": "ឯកសារ {{count}} បានផ្លាស់ប្តូរ",
   "tab.count.other": "ឯកសារ {{count}} បានផ្លាស់ប្តូរ",

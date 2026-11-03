@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("uz"),
   "tab.title": "Koʻrib chiqish",
   "tab.count.one": "{{count}} ta fayl o‘zgardi",
   "tab.count.other": "{{count}} ta fayl o‘zgardi",

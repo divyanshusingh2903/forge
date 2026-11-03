@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("et"),
   "tab.title": "Ülevaade",
   "tab.count.one": "{{count}} faili muudetud",
   "tab.count.other": "{{count}} faili muudetud",

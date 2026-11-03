@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("lv"),
   "tab.title": "Pārskats",
   "tab.count.zero": "Mainīti {{count}} failu",
   "tab.count.one": "{{count}} fails mainīts",

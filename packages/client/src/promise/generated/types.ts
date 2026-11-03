@@ -398,6 +398,16 @@ export type LinkPreviewResult = {
   fields?: Array<{ name: string; value: string }>
 }
 
+export type GitChange = { file: string; staged: boolean; unstaged: boolean; untracked: boolean; conflicted?: boolean }
+
+export type GitUpstream = { remote: string; branch: string }
+
+export type GitOutput = { output: string }
+
+export type GitMessage = { message: string }
+
+export type GitStash = { ref: string; oid: string; message: string; createdAt: number }
+
 export type UsageLimitsMeter = { percent: number; limited: boolean; resetsAt: number }
 
 export type McpProtocol = "legacy" | "auto" | "2026-07-28"
@@ -973,6 +983,10 @@ export type ArtifactInfo = {
 export type VcsInfo = { provider?: string; branch: VcsBranch }
 
 export type WebSearchProvider = { id: WebSearchID; name: string }
+
+export type GitRemote = { upstream: boolean; ahead: number; behind: number; target?: GitUpstream; remotes: boolean }
+
+export type GitTargets = { remotes: Array<string>; branches: Array<GitUpstream>; pull: "merge" | "rebase" }
 
 export type UsageLimitsGo = { rolling: UsageLimitsMeter; weekly: UsageLimitsMeter; monthly: UsageLimitsMeter }
 
@@ -1974,6 +1988,15 @@ export type ArtifactUpdated = {
   data: {}
 }
 
+export type GitChanged = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "git.changed"
+  location?: LocationRef
+  data: {}
+}
+
 export type SessionStatusUpdated = {
   id: EventID
   created: number
@@ -2226,6 +2249,8 @@ export type FormReplied = {
 export type ScheduleWhen = ScheduleWhenIn | ScheduleWhenAt | ScheduleWhenEvery | ScheduleWhenCron
 
 export type ArtifactContent = { info: ArtifactInfo; files: { [x: string]: string } }
+
+export type GitState = { branch?: string; changes: Array<GitChange>; remote: GitRemote }
 
 export type SessionInboxMove = {
   id: SessionMessageID
@@ -2914,6 +2939,7 @@ export type V2Event =
   | FormCancelled
   | WebsearchUpdated
   | ArtifactUpdated
+  | GitChanged
   | SessionStatusUpdated
   | SessionIdle
   | TuiPromptAppend
@@ -3245,6 +3271,29 @@ export type VcsInitNotSupportedError = {
 }
 export const isVcsInitNotSupportedError = (value: unknown): value is VcsInitNotSupportedError =>
   typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "VcsInitNotSupportedError"
+
+export type GitOperationError = {
+  readonly _tag: "GitOperationError"
+  readonly operation:
+    | "state"
+    | "stage"
+    | "unstage"
+    | "discard"
+    | "commit"
+    | "message"
+    | "fetch"
+    | "push"
+    | "pull"
+    | "targets"
+    | "stash-list"
+    | "stash-create"
+    | "stash-apply"
+    | "stash-pop"
+    | "stash-drop"
+  readonly message: string
+}
+export const isGitOperationError = (value: unknown): value is GitOperationError =>
+  typeof value === "object" && value !== null && "_tag" in value && value["_tag"] === "GitOperationError"
 
 export type ServerInfoOutput = ServerInfo
 
@@ -4404,6 +4453,7 @@ export type EventSubscribeInput = {
         | "form.cancelled"
         | "websearch.updated"
         | "artifact.updated"
+        | "git.changed"
         | "session.status"
         | "session.idle"
         | "tui.prompt.append"
@@ -4836,6 +4886,108 @@ export type LinkPreviewResolveInput = {
 }
 
 export type LinkPreviewResolveOutput = { location: LocationPublicRef; data: LinkPreviewResult }
+
+export type GitStateInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+
+export type GitStateOutput = { location: LocationPublicRef; data: GitState }
+
+export type GitStageInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly files?: ReadonlyArray<string> | undefined
+}
+
+export type GitStageOutput = { location: LocationPublicRef; data: {} }
+
+export type GitUnstageInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly files?: ReadonlyArray<string> | undefined
+}
+
+export type GitUnstageOutput = { location: LocationPublicRef; data: {} }
+
+export type GitDiscardInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly file: string
+}
+
+export type GitDiscardOutput = { location: LocationPublicRef; data: {} }
+
+export type GitCommitInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly message: string
+  readonly all?: boolean | undefined
+}
+
+export type GitCommitOutput = { location: LocationPublicRef; data: GitOutput }
+
+export type GitMessageInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly model?: { readonly id: string; readonly providerID: string; readonly variant?: string } | undefined
+  readonly all?: boolean | undefined
+}
+
+export type GitMessageOutput = { location: LocationPublicRef; data: GitMessage }
+
+export type GitFetchInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+
+export type GitFetchOutput = { location: LocationPublicRef; data: GitOutput }
+
+export type GitPushInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly remote?: string | undefined
+  readonly setUpstream?: boolean | undefined
+}
+
+export type GitPushOutput = { location: LocationPublicRef; data: GitOutput }
+
+export type GitPullInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly remote?: string | undefined
+  readonly branch?: string | undefined
+  readonly strategy?: "merge" | "rebase" | undefined
+}
+
+export type GitPullOutput = { location: LocationPublicRef; data: GitOutput }
+
+export type GitTargetsInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+
+export type GitTargetsOutput = { location: LocationPublicRef; data: GitTargets }
+
+export type GitStashListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+
+export type GitStashListOutput = { location: LocationPublicRef; data: Array<GitStash> }
+
+export type GitStashCreateInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly message?: string | undefined
+  readonly includeUntracked?: boolean | undefined
+}
+
+export type GitStashCreateOutput = { location: LocationPublicRef; data: GitOutput }
+
+export type GitStashApplyInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly ref: string
+  readonly oid: string
+}
+
+export type GitStashApplyOutput = { location: LocationPublicRef; data: GitOutput }
+
+export type GitStashPopInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly ref: string
+  readonly oid: string
+}
+
+export type GitStashPopOutput = { location: LocationPublicRef; data: GitOutput }
+
+export type GitStashDropInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly ref: string
+  readonly oid: string
+}
+
+export type GitStashDropOutput = { location: LocationPublicRef; data: GitOutput }
 
 export type ExperimentalUsageLimitsInput = {
   readonly location?: { readonly directory?: string | undefined } | undefined

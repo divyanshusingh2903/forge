@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("lt"),
   "tab.title": "Apžvalga",
   "tab.count.one": "Pakeistas failas: {{count}}",
   "tab.count.few": "Pakeisti {{count}} failai",

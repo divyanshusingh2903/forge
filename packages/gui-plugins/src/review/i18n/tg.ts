@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("tg"),
   "tab.title": "Барраси",
   "tab.count.one": "{{count}} файл тағйир ёфт",
   "tab.count.other": "{{count}} файл тағйир ёфтанд",

@@ -201,14 +201,18 @@ export function createReviewModel(input: {
     void queryClient.invalidateQueries({ queryKey: detailsKey() })
   }, 100)
 
-  // The server reports file changes in the directory; its event stream follows a restarted server. Routing another
+  // The server reports file and Git changes in the directory, from Forge or elsewhere; its event stream follows a restarted server. Routing another
   // session of the same directory and server keeps the listener.
   createKeyed(
     () => ({ directory: directory(), data: view().server.data }),
     (current) =>
       onCleanup(
         current.data.listen(({ details }) => {
-          if (details.type === "filesystem.changed" && details.location?.directory === current.directory) refresh()
+          if (
+            (details.type === "filesystem.changed" || details.type === "git.changed") &&
+            details.location?.directory === current.directory
+          )
+            refresh()
         }),
       ),
     { equals: (previous, next) => previous.directory === next.directory && previous.data === next.data },

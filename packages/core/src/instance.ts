@@ -38,6 +38,7 @@ import { Reference } from "./reference.js"
 import { Rpc } from "./rpc.js"
 import { WebSearch } from "./websearch.js"
 import { LinkPreview } from "./link-preview.js"
+import { GitActions } from "./git-actions.js"
 import { ReferenceInstructions } from "./reference/instructions.js"
 import { SessionRunnerLLM } from "./session/runner/llm.js"
 import { SessionRunnerModel } from "./session/runner/model.js"
@@ -93,6 +94,7 @@ const nodes = [
   Formatter.node,
   Mcp.node,
   LinkPreview.node,
+  GitActions.node,
   Permission.node,
   Tool.node,
   ToolOutput.node,

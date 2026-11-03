@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("pa"),
   "tab.title": "جائزہ",
   "tab.count.one": "⁨{{count}}⁩ فائل بدلی گئی",
   "tab.count.other": "⁨{{count}}⁩ فائلاں بدلیاں گئیاں",

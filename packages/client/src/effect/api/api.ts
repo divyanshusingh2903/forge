@@ -2132,6 +2132,7 @@ export type EventSubscribeInput = {
         | "form.cancelled"
         | "websearch.updated"
         | "artifact.updated"
+        | "git.changed"
         | "session.status"
         | "session.idle"
         | "tui.prompt.append"
@@ -2802,6 +2803,162 @@ export interface LinkPreviewApi<E = never> {
   readonly resolve: LinkPreviewResolveOperation<E>
 }
 
+export type GitStateInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type GitStateOutput = {
+  readonly location: Location.PublicRef
+  readonly data: {
+    readonly branch?: string | undefined
+    readonly changes: ReadonlyArray<{
+      readonly file: string
+      readonly staged: boolean
+      readonly unstaged: boolean
+      readonly untracked: boolean
+      readonly conflicted?: boolean | undefined
+    }>
+    readonly remote: {
+      readonly upstream: boolean
+      readonly ahead: number
+      readonly behind: number
+      readonly target?: { readonly remote: string; readonly branch: string } | undefined
+      readonly remotes: boolean
+    }
+  }
+}
+export type GitStateOperation<E = never> = (input?: GitStateInput) => Effect.Effect<GitStateOutput, E>
+
+export type GitStageInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly files?: ReadonlyArray<string> | undefined
+}
+export type GitStageOutput = { readonly location: Location.PublicRef; readonly data: {} }
+export type GitStageOperation<E = never> = (input?: GitStageInput) => Effect.Effect<GitStageOutput, E>
+
+export type GitUnstageInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly files?: ReadonlyArray<string> | undefined
+}
+export type GitUnstageOutput = { readonly location: Location.PublicRef; readonly data: {} }
+export type GitUnstageOperation<E = never> = (input?: GitUnstageInput) => Effect.Effect<GitUnstageOutput, E>
+
+export type GitDiscardInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly file: string
+}
+export type GitDiscardOutput = { readonly location: Location.PublicRef; readonly data: {} }
+export type GitDiscardOperation<E = never> = (input: GitDiscardInput) => Effect.Effect<GitDiscardOutput, E>
+
+export type GitCommitInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly message: string
+  readonly all?: boolean | undefined
+}
+export type GitCommitOutput = { readonly location: Location.PublicRef; readonly data: { readonly output: string } }
+export type GitCommitOperation<E = never> = (input: GitCommitInput) => Effect.Effect<GitCommitOutput, E>
+
+export type GitMessageInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly model?: Model.Ref | undefined
+  readonly all?: boolean | undefined
+}
+export type GitMessageOutput = { readonly location: Location.PublicRef; readonly data: { readonly message: string } }
+export type GitMessageOperation<E = never> = (input?: GitMessageInput) => Effect.Effect<GitMessageOutput, E>
+
+export type GitFetchInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type GitFetchOutput = { readonly location: Location.PublicRef; readonly data: { readonly output: string } }
+export type GitFetchOperation<E = never> = (input?: GitFetchInput) => Effect.Effect<GitFetchOutput, E>
+
+export type GitPushInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly remote?: string | undefined
+  readonly setUpstream?: boolean | undefined
+}
+export type GitPushOutput = { readonly location: Location.PublicRef; readonly data: { readonly output: string } }
+export type GitPushOperation<E = never> = (input?: GitPushInput) => Effect.Effect<GitPushOutput, E>
+
+export type GitPullInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly remote?: string | undefined
+  readonly branch?: string | undefined
+  readonly strategy?: "merge" | "rebase" | undefined
+}
+export type GitPullOutput = { readonly location: Location.PublicRef; readonly data: { readonly output: string } }
+export type GitPullOperation<E = never> = (input?: GitPullInput) => Effect.Effect<GitPullOutput, E>
+
+export type GitTargetsInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type GitTargetsOutput = {
+  readonly location: Location.PublicRef
+  readonly data: {
+    readonly remotes: ReadonlyArray<string>
+    readonly branches: ReadonlyArray<{ readonly remote: string; readonly branch: string }>
+    readonly pull: "merge" | "rebase"
+  }
+}
+export type GitTargetsOperation<E = never> = (input?: GitTargetsInput) => Effect.Effect<GitTargetsOutput, E>
+
+export type GitStashListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
+export type GitStashListOutput = {
+  readonly location: Location.PublicRef
+  readonly data: ReadonlyArray<{
+    readonly ref: string
+    readonly oid: string
+    readonly message: string
+    readonly createdAt: number
+  }>
+}
+export type GitStashListOperation<E = never> = (input?: GitStashListInput) => Effect.Effect<GitStashListOutput, E>
+
+export type GitStashCreateInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly message?: string | undefined
+  readonly includeUntracked?: boolean | undefined
+}
+export type GitStashCreateOutput = { readonly location: Location.PublicRef; readonly data: { readonly output: string } }
+export type GitStashCreateOperation<E = never> = (input?: GitStashCreateInput) => Effect.Effect<GitStashCreateOutput, E>
+
+export type GitStashApplyInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly ref: string
+  readonly oid: string
+}
+export type GitStashApplyOutput = { readonly location: Location.PublicRef; readonly data: { readonly output: string } }
+export type GitStashApplyOperation<E = never> = (input: GitStashApplyInput) => Effect.Effect<GitStashApplyOutput, E>
+
+export type GitStashPopInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly ref: string
+  readonly oid: string
+}
+export type GitStashPopOutput = { readonly location: Location.PublicRef; readonly data: { readonly output: string } }
+export type GitStashPopOperation<E = never> = (input: GitStashPopInput) => Effect.Effect<GitStashPopOutput, E>
+
+export type GitStashDropInput = {
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly ref: string
+  readonly oid: string
+}
+export type GitStashDropOutput = { readonly location: Location.PublicRef; readonly data: { readonly output: string } }
+export type GitStashDropOperation<E = never> = (input: GitStashDropInput) => Effect.Effect<GitStashDropOutput, E>
+
+export interface GitApi<E = never> {
+  readonly state: GitStateOperation<E>
+  readonly stage: GitStageOperation<E>
+  readonly unstage: GitUnstageOperation<E>
+  readonly discard: GitDiscardOperation<E>
+  readonly commit: GitCommitOperation<E>
+  readonly message: GitMessageOperation<E>
+  readonly fetch: GitFetchOperation<E>
+  readonly push: GitPushOperation<E>
+  readonly pull: GitPullOperation<E>
+  readonly targets: GitTargetsOperation<E>
+  readonly stash: {
+    readonly list: GitStashListOperation<E>
+    readonly create: GitStashCreateOperation<E>
+    readonly apply: GitStashApplyOperation<E>
+    readonly pop: GitStashPopOperation<E>
+    readonly drop: GitStashDropOperation<E>
+  }
+}
+
 export type ExperimentalUsageLimitsInput = {
   readonly location?: { readonly directory?: string | undefined } | undefined
 }
@@ -3116,6 +3273,7 @@ export interface AppApi<E = never> {
   readonly debug: DebugApi<E>
   readonly websearch: WebsearchApi<E>
   readonly linkPreview: LinkPreviewApi<E>
+  readonly git: GitApi<E>
   readonly config: ConfigApi<E>
 
   /** @deprecated Use `client.experimental.generate`. Removed in the next minor. */

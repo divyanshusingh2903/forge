@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("my"),
   "tab.title": "သုံးသပ်ချက်",
   "tab.count.one": "ဖိုင် {{count}} ဖိုင်ကို ပြောင်းထားသည်။",
   "tab.count.other": "ဖိုင် {{count}} ဖိုင်ကို ပြောင်းထားသည်။",

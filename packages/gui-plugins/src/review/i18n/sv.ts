@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("sv"),
   "tab.title": "Granskning",
   "tab.count.one": "{{count}} fil ändrad",
   "tab.count.other": "{{count}} filer ändrade",

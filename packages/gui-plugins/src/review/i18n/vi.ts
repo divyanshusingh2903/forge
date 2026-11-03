@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("vi"),
   "tab.title": "Xem lại",
   "tab.count.one": "{{count}} tệp đã thay đổi",
   "tab.count.other": "{{count}} tệp đã thay đổi",

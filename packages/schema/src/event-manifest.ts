@@ -37,6 +37,7 @@ import { VcsEvent } from "./vcs-event.js"
 import { WorkspaceEvent } from "./workspace-event.js"
 import { WorktreeEvent } from "./worktree-event.js"
 import { WebSearch } from "./websearch.js"
+import { Git } from "./git.js"
 
 const coreDefinitions = Event.inventory(...SessionEvent.Definitions)
 
@@ -67,6 +68,7 @@ const featureDefinitions = Event.inventory(
   ...Form.Event.Definitions,
   ...WebSearch.Event.Definitions,
   ...Artifact.Event.Definitions,
+  ...Git.Definitions,
 )
 
 export const ServerDefinitions = Event.inventory(

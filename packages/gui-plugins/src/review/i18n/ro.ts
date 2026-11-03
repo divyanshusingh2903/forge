@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("ro"),
   "tab.title": "Revizuire",
   "tab.count.one": "{{count}} fișier a fost modificat",
   "tab.count.few": "{{count}} fișiere modificate",

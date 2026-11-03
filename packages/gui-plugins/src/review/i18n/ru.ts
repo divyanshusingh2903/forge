@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("ru"),
   "tab.title": "Обзор",
   "tab.count.one": "{{count}} файл изменён",
   "tab.count.few": "{{count}} файла изменено",

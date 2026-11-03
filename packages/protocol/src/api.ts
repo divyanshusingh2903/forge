@@ -28,6 +28,7 @@ import { makeLocationGroup } from "./groups/location.js"
 import { IntegrationGroup } from "./groups/integration.js"
 import { WebSearchGroup } from "./groups/websearch.js"
 import { LinkPreviewGroup } from "./groups/link-preview.js"
+import { GitGroup } from "./groups/git.js"
 import { UsageGroup } from "./groups/usage.js"
 import { makeMcpGroup } from "./groups/mcp.js"
 import { CredentialGroup } from "./groups/credential.js"
@@ -45,6 +46,7 @@ type LocationGroups<LocationId extends HttpApiMiddleware.AnyId> =
   | HttpApiGroup.AddMiddleware<typeof IntegrationGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof WebSearchGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof LinkPreviewGroup, LocationId>
+  | HttpApiGroup.AddMiddleware<typeof GitGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof UsageGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof FileSystemGroup, LocationId>
   | HttpApiGroup.AddMiddleware<typeof CommandGroup, LocationId>
@@ -198,6 +200,7 @@ const makeApiFromGroup = <
     .add(MigrationGroup)
     .add(WebSearchGroup.middleware(locationMiddleware))
     .add(LinkPreviewGroup.middleware(locationMiddleware))
+    .add(GitGroup.middleware(locationMiddleware))
     .add(UsageGroup.middleware(locationMiddleware))
     .add(ConfigGroup.middleware(locationMiddleware))
     .annotateMerge(

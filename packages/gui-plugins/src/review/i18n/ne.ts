@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("ne"),
   "tab.title": "समीक्षा गर्नुहोस्",
   "tab.count.one": "{{count}} फाइल परिवर्तन भयो",
   "tab.count.other": "{{count}} फाइलहरू परिवर्तन भए",

@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("fa"),
   "tab.title": "بررسی کنید",
   "tab.count.one": "{{count}} فایل تغییر کرد",
   "tab.count.other": "{{count}} فایل تغییر کرد",

@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("is"),
   "tab.title": "Upprifjun",
   "tab.count.one": "{{count}} skrá breytt",
   "tab.count.other": "{{count}} skrám breytt",

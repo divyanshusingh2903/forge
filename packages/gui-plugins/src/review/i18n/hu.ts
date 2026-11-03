@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("hu"),
   "tab.title": "Tekintse át",
   "tab.count.one": "{{count}} fájl megváltozott",
   "tab.count.other": "{{count}} fájl megváltozott",

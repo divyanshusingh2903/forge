@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("am"),
   "tab.title": "ግምገማ",
   "tab.count.one": "{{count}} ፋይል ተቀይሯል",
   "tab.count.other": "{{count}} ፋይሎች ተቀይረዋል",

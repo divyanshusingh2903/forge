@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("si"),
   "tab.title": "සමාලෝචනය කරන්න",
   "tab.count.one": "ගොනුව {{count}}ක් වෙනස් විය",
   "tab.count.other": "ගොනු {{count}}ක් වෙනස් විය",

@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("fi"),
   "tab.title": "Tarkistus",
   "tab.count.one": "{{count}} tiedosto muuttunut",
   "tab.count.other": "{{count}} tiedostoa muuttunut",

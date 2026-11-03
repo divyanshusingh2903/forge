@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("lo"),
   "tab.title": "ການທົບທວນຄືນ",
   "tab.count.one": "ປ່ຽນໄຟລ໌ {{count}} ແລ້ວ",
   "tab.count.other": "ປ່ຽນ {{count}} ໄຟລ໌",

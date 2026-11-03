@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("ka"),
   "tab.title": "მიმოხილვა",
   "tab.count.one": "{{count}} ფაილი შეიცვალა",
   "tab.count.other": "{{count}} ფაილი შეიცვალა",

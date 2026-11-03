@@ -1,4 +1,7 @@
+import { gitDict } from "./git"
+
 export default {
+  ...gitDict("ms"),
   "tab.title": "Semak",
   "tab.count.one": "{{count}} fail ditukar",
   "tab.count.other": "{{count}} fail ditukar",
