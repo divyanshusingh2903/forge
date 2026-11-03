@@ -1,5 +1,6 @@
 {
   "name": "@opencode/desktop",
+  "productName": "Forge Dev",
   "private": true,
   "version": "2.2.5",
   "description": "A personal, human-in-the-loop fork of OpenCode.",
