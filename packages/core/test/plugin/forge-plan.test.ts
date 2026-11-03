@@ -1,3 +1,4 @@
+import path from "node:path"
 import { describe, expect } from "bun:test"
 import { Effect, Exit, Option, Stream, Types } from "effect"
 import { Message } from "@opencode/ai/effect"
@@ -168,7 +169,8 @@ describe("ForgePlanPlugin", () => {
       const info = ForgePlan.read(result.state.metadata)
       expect(info?.status).toBe("drafting")
       expect(info?.path).toStartWith(".opencode/plans/")
-      expect(result.synthetic[0]).toContain(`/workspace/${info!.path}`)
+      // The reminder names the file by its native absolute path, so this matches on Windows too.
+      expect(result.synthetic[0]).toContain(path.join("/workspace", info!.path))
     }),
   )
 
