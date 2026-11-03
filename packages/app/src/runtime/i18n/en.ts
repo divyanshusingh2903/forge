@@ -1206,6 +1206,9 @@ export const dict = {
   "settings.permissions.tool.read.description": "Reading a file (matches the file path)",
   "settings.permissions.tool.edit.title": "Edit",
   "settings.permissions.tool.edit.description": "Modify files, including edits, writes, and patches",
+  "settings.permissions.tool.shell.description": "Run shell commands",
+  "settings.permissions.tool.browser.description":
+    "Act in the desktop browser: open pages, click, type and run scripts",
   "settings.permissions.tool.glob.title": "Glob",
   "settings.permissions.tool.glob.description": "Match files using glob patterns",
   "settings.permissions.tool.grep.title": "Grep",

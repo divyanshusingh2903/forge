@@ -9,6 +9,35 @@ import { Browser } from "./rpc.js"
 import { BrowserSkill } from "./skill.js"
 import { BrowserTunnel } from "./tunnel.js"
 
+// Operations that only read the page or the browser's own records, which an attachment allows without asking.
+const reads = [
+  "tabs.list",
+  "tabs.focus",
+  "preview",
+  "frames",
+  "snapshot",
+  "find",
+  "screenshot",
+  "wait",
+  "console",
+  "network.list",
+  "network.get",
+  "files.list",
+  "files.get",
+  "trace.start",
+  "trace.stop",
+  "trace.analyze",
+  "cpu.start",
+  "cpu.stop",
+  "cpu.analyze",
+  "heap.snapshot",
+  "heap.summary",
+  "heap.query",
+  "heap.object",
+  "heap.compare",
+  "lighthouse",
+] satisfies ReadonlyArray<Browser.Method>
+
 type Attachment = {
   connectionID: string
   state: Browser.State
@@ -23,16 +52,23 @@ export const make = Effect.fn("BrowserConnection.make")(function* (
   ctx: Pick<Context, "agent" | "rpc" | "session" | "location" | "event">,
 ) {
   const browsers = new Map<Session.ID, Attachment>()
-  // The browser tools and their skill, which an attachment allows together.
-  const access = [
+  // The browser tools and their skill, which an attachment opens together.
+  const hidden = [
     { action: "browser", resource: "*" },
     { action: "skill", resource: BrowserSkill.id },
   ] as const
-  // Appended after config, so every agent hides the browser until an attachment allows it.
+  // An attachment lets the agent read pages, but every call that acts on the browser asks, so it never acts on its own
+  // unless the session's mode allows it. Each call's resource is its operation.
+  const access = [
+    { action: "browser", resource: "*", effect: "ask" },
+    ...reads.map((resource) => ({ action: "browser", resource, effect: "allow" }) as const),
+    { action: "skill", resource: BrowserSkill.id, effect: "allow" },
+  ] as const
+  // Appended after config, so every agent hides the browser until an attachment opens it.
   yield* ctx.agent.transform((editor) =>
     editor
       .list()
-      .forEach((agent) => agent.permissions.push(...access.map((rule) => ({ ...rule, effect: "deny" as const })))),
+      .forEach((agent) => agent.permissions.push(...hidden.map((rule) => ({ ...rule, effect: "deny" as const })))),
   )
   // Each attachment adds and removes its own allows, so a replaced attachment keeps the new one's.
   const grant = (sessionID: Session.ID) =>
@@ -41,9 +77,13 @@ export const make = Effect.fn("BrowserConnection.make")(function* (
         Effect.flatMap((session) =>
           ctx.session.update({
             sessionID,
+            // Earlier versions granted every browser call outright and could leave that grant behind, which would
+            // outrank the asks; drop it.
             permissions: [
-              ...(session.permissions ?? []),
-              ...access.map((rule) => ({ ...rule, effect: "allow" as const })),
+              ...(session.permissions ?? []).filter(
+                (rule) => !(rule.action === "browser" && rule.resource === "*" && rule.effect === "allow"),
+              ),
+              ...access,
             ],
           }),
         ),
@@ -53,9 +93,12 @@ export const make = Effect.fn("BrowserConnection.make")(function* (
         ctx.session.get({ sessionID }).pipe(
           Effect.flatMap((session) => {
             const current = session.permissions ?? []
-            const permissions = access.reduce((rules, allow) => {
+            const permissions = access.reduce((rules, granted) => {
               const index = rules.findIndex(
-                (rule) => rule.action === allow.action && rule.resource === allow.resource && rule.effect === "allow",
+                (rule) =>
+                  rule.action === granted.action &&
+                  rule.resource === granted.resource &&
+                  rule.effect === granted.effect,
               )
               return index === -1 ? rules : rules.toSpliced(index, 1)
             }, current)

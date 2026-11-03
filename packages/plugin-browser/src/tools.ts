@@ -11,7 +11,7 @@ import { Browser } from "./rpc.js"
 import { BrowserSkill } from "./skill.js"
 
 export const register = Effect.fn("BrowserTools.register")(function* (
-  ctx: Pick<Context, "tool" | "skill" | "location">,
+  ctx: Pick<Context, "tool" | "skill" | "location" | "permission">,
   connection: BrowserConnection.Connection,
 ) {
   const labels = new Map<string, BrowserDisplay.Labels>()
@@ -26,14 +26,25 @@ export const register = Effect.fn("BrowserTools.register")(function* (
       catch: (error) => new Tool.Error({ message: invalidURL, error }),
     })
     const target = yield* connection.target(tool.sessionID, action)
+    const session = labels.get(tool.sessionID) ?? new Map<string, string>()
+    labels.set(tool.sessionID, session)
+    // "Allow always" covers this operation only. The approval card names the call's element and tab from what earlier
+    // calls read, as its timeline row will.
+    yield* ctx.permission.assert({
+      sessionID: tool.sessionID,
+      agent: tool.agent,
+      action: "browser",
+      resources: [operation.name],
+      save: [operation.name],
+      metadata: { input: action, display: BrowserDisplay.describe(action, undefined, session) },
+      source: { type: "tool", messageID: tool.messageID, id: tool.id },
+    })
     const uploads =
       action.type === "files.upload" || action.type === "files.drop"
         ? yield* BrowserFiles.read(action.paths, ctx.location.directory)
         : []
     const response = yield* target.request(uploads)
     const output = yield* Effect.fromResult(decodeResult(operation, response))
-    const session = labels.get(tool.sessionID) ?? new Map<string, string>()
-    labels.set(tool.sessionID, session)
     const result = yield* exportResult(output, response.files)
     const display = BrowserDisplay.describe(action, output, session, result.saved)
     const exported = { output: result.output, content: result.content }

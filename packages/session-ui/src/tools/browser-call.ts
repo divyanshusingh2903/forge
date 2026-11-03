@@ -1,3 +1,4 @@
+import type { PermissionRequest } from "@opencode/client/promise"
 import type { UiI18n } from "@opencode/ui/context/i18n"
 import { Option, Schema } from "effect"
 import type { ExecuteToolCall } from "../message/current-tool-state"
@@ -26,16 +27,32 @@ const Fields = Schema.Struct({
   matches: Schema.optionalKey(Schema.Number),
   truncated: Schema.optionalKey(Schema.Boolean),
   image: Schema.optionalKey(Schema.String),
+  page: Schema.optionalKey(Schema.String),
+  tabs: Schema.optionalKey(Schema.Number),
+  frames: Schema.optionalKey(Schema.Number),
+  messages: Schema.optionalKey(Schema.Number),
+  requests: Schema.optionalKey(Schema.Number),
+  files: Schema.optionalKey(Schema.Number),
+  request: Schema.optionalKey(Schema.String),
+  path: Schema.optionalKey(Schema.String),
+  paths: Schema.optionalKey(Schema.Array(Schema.String)),
 })
 
 const decodeFields = Schema.decodeUnknownOption(Fields)
+
+const decodePermission = Schema.decodeUnknownOption(
+  Schema.Struct({
+    input: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+    display: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+  }),
+)
 
 const none: typeof Fields.Type = {}
 
 /**
  * Describes a Code Mode browser call in words: the element it touched, by role and name when the server knew it, the
- * text it typed, the page it reached, or what a snapshot or screenshot read. Undefined for other calls, which keep
- * their argument list.
+ * text it typed, the page it reached, the tab it worked on, or what a snapshot, screenshot or listing read. Undefined
+ * for other tools, and for browser calls the server described nothing about, which keep their argument list.
  */
 export function browserCallSummary(call: ExecuteToolCall, i18n: Pick<UiI18n, "t" | "plural">) {
   if (!call.tool.startsWith("browser.")) return undefined
@@ -47,6 +64,23 @@ export function browserCallSummary(call: ExecuteToolCall, i18n: Pick<UiI18n, "t"
   const parts = summary(call.tool.slice("browser.".length), input, display, target, i18n)
 
   return parts.filter((part): part is string => !!part).join(" · ") || undefined
+}
+
+/**
+ * Describes a browser permission request for its approval card, as its timeline row will: the operation is the
+ * request's resource, and its metadata carries the call's input and what the server already knew about its targets.
+ */
+export function browserPermissionSummary(
+  operation: string,
+  metadata: PermissionRequest["metadata"],
+  i18n: Pick<UiI18n, "t" | "plural">,
+) {
+  const request = Option.getOrUndefined(decodePermission(metadata ?? {}))
+
+  return browserCallSummary(
+    { tool: `browser.${operation}`, status: "running", input: request?.input, display: request?.display },
+    i18n,
+  )
 }
 
 /** The server-local path of the image a browser screenshot saved, when the server reported one. */
@@ -64,6 +98,8 @@ function summary(
   i18n: Pick<UiI18n, "t" | "plural">,
 ): Array<string | undefined> {
   switch (operation) {
+    case "tabs.list":
+      return [count(display.tabs, "ui.tool.browser.tabs", i18n)]
     case "tabs.open":
     case "navigate":
     case "back":
@@ -99,9 +135,25 @@ function summary(
     case "evaluate":
       return [target, input.script?.split("\n", 1)[0]?.slice(0, 120)]
     case "dialog":
-      return [input.action]
+      return [input.action, display.page]
+    case "preview":
+      return [input.path]
+    case "frames":
+      return [display.page, count(display.frames, "ui.tool.browser.frames", i18n)]
+    case "console":
+      return [display.page, count(display.messages, "ui.tool.browser.messages", i18n)]
+    case "network.list":
+      return [display.page, count(display.requests, "ui.tool.browser.requests", i18n)]
+    case "network.get":
+      return [display.request ?? display.page]
+    case "files.list":
+      return [display.page, count(display.files, "ui.tool.browser.files", i18n)]
+    case "files.upload":
+    case "files.drop":
+      return [target, input.paths?.map((path) => path.split(/[\\/]/).pop()).join(", ")]
     default:
-      return []
+      // Tab calls such as focus, close, stop and the performance captures name the tab they worked on.
+      return [display.page]
   }
 }
 
@@ -115,7 +167,14 @@ function quote(value: string | undefined) {
 
 function count(
   value: number | undefined,
-  key: "ui.tool.browser.elements" | "ui.tool.browser.matches",
+  key:
+    | "ui.tool.browser.elements"
+    | "ui.tool.browser.matches"
+    | "ui.tool.browser.tabs"
+    | "ui.tool.browser.frames"
+    | "ui.tool.browser.messages"
+    | "ui.tool.browser.requests"
+    | "ui.tool.browser.files",
   i18n: Pick<UiI18n, "plural">,
 ) {
   return value === undefined ? undefined : i18n.plural(key, value)

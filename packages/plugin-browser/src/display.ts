@@ -6,13 +6,22 @@ import type { Browser } from "./rpc.js"
 // Snapshot lines read `@e12 [button] "Save" checked=false`; the name is JSON-quoted.
 const ELEMENT = /^\s*@(\S+) \[([^\]]*)\] ("(?:[^"\\]|\\.)*")/gm
 
-// Refs are unique across a session's tabs and pages, so one map per session names any ref the agent can use.
-// Old pages' refs are never valid again, so the map only needs to outlive a few snapshots.
+// Refs are unique across a session's tabs and pages, so one map per session names any ref the agent can use. Tab IDs
+// share the map, since they never look like refs. Old pages' refs are never valid again, so the map only needs to
+// outlive a few snapshots.
 const MAX_LABELS = 5_000
 
 const decodeName = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.String))
 
-/** Element names by ref, as `role "name"`, from the snapshots and finds a session has read. */
+// The output field each listing operation counts.
+const LISTS = new Map([
+  ["frames", "frames"],
+  ["console", "messages"],
+  ["network.list", "requests"],
+  ["files.list", "files"],
+])
+
+/** Element names by ref, as `role "name"`, and tab names by ID, from what a session's calls have returned. */
 export type Labels = Map<string, string>
 
 /** What a browser call's Code Mode row shows. */
@@ -51,7 +60,28 @@ export function describe(
 
   if (label) display.target = label
 
-  const page = Option.getOrUndefined(decodePage(output))
+  const page = Option.getOrUndefined(decodePage(output)) ?? Option.getOrUndefined(decodeOnPage(output))?.tab
+  const state = Option.getOrUndefined(decodeState(output))
+
+  // A tab is named by its title, or its URL while it has none. Closed tabs keep their name for the close call.
+  ;[page, ...(state?.tabs ?? [])].forEach((tab) => {
+    if (tab) labels.set(tab.id, tab.title || tab.url)
+  })
+
+  const tabName = "tabID" in action ? labels.get(action.tabID) : undefined
+
+  if (tabName) display.page = tabName
+
+  if (state) display.tabs = state.tabs.length
+
+  const list = LISTS.get(action.type)
+  const items = list ? Option.getOrUndefined(decodeRecord(output))?.[list] : undefined
+
+  if (list && Array.isArray(items)) display[list] = items.length
+
+  const request = Option.getOrUndefined(decodeRequest(output))?.request
+
+  if (request) display.request = `${request.method} ${request.url}`
 
   if (page && ["navigate", "back", "forward", "reload", "tabs.open"].includes(action.type)) {
     display.url = page.url
@@ -86,4 +116,16 @@ function remember(labels: Labels, content: string | undefined) {
 
 const decodeSnapshot = Schema.decodeUnknownOption(Schema.Struct({ content: Schema.String, truncated: Schema.Boolean }))
 
-const decodePage = Schema.decodeUnknownOption(Schema.Struct({ url: Schema.String, title: Schema.String }))
+const Page = Schema.Struct({ id: Schema.String, url: Schema.String, title: Schema.String })
+
+const decodePage = Schema.decodeUnknownOption(Page)
+
+const decodeOnPage = Schema.decodeUnknownOption(Schema.Struct({ tab: Page }))
+
+const decodeState = Schema.decodeUnknownOption(Schema.Struct({ tabs: Schema.Array(Page) }))
+
+const decodeRecord = Schema.decodeUnknownOption(Schema.Record(Schema.String, Schema.Unknown))
+
+const decodeRequest = Schema.decodeUnknownOption(
+  Schema.Struct({ request: Schema.Struct({ method: Schema.String, url: Schema.String }) }),
+)

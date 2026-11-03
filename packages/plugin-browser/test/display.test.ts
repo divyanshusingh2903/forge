@@ -32,7 +32,7 @@ test("a snapshot names its elements for later calls and reports what it read", (
       { tab: tab("https://shop.test/checkout", "Checkout"), content: snapshot, truncated: true },
       labels,
     ),
-  ).toEqual({ elements: 4, truncated: true })
+  ).toEqual({ elements: 4, truncated: true, page: "Checkout" })
 
   expect(BrowserDisplay.describe({ type: "fill", tabID, ref: ref("e2"), text: "Ada" }, tab("", ""), labels)).toEqual({
     target: 'textbox "Customer "name":"',
@@ -77,6 +77,7 @@ test("find counts its matches, screenshots name their element, and navigation re
     BrowserDisplay.describe({ type: "screenshot", tabID, ref: ref("e3") }, { tab: tab("", ""), files: [] }, labels),
   ).toEqual({ target: 'button "Place order"' })
   expect(BrowserDisplay.describe({ type: "back", tabID }, tab("https://shop.test/cart", "Cart"), labels)).toEqual({
+    page: "Cart",
     url: "https://shop.test/cart",
     title: "Cart",
   })
@@ -85,5 +86,66 @@ test("find counts its matches, screenshots name their element, and navigation re
       { mime: "image/jpeg", path: "/tmp/opencode-browser-1/0/screenshot.jpeg" },
     ]),
   ).toEqual({ image: "/tmp/opencode-browser-1/0/screenshot.jpeg" })
-  expect(BrowserDisplay.describe({ type: "tabs.list" }, { tabs: [], focusedTabID: null }, labels)).toEqual({})
+  expect(BrowserDisplay.describe({ type: "tabs.list" }, { tabs: [], focusedTabID: null }, labels)).toEqual({ tabs: 0 })
+})
+
+test("tab calls name their tab, even once it is closed, and listings count what they returned", () => {
+  const labels: BrowserDisplay.Labels = new Map()
+  const other = Browser.TabID.make(`tab_${crypto.randomUUID()}`)
+
+  expect(
+    BrowserDisplay.describe(
+      { type: "tabs.list" },
+      {
+        tabs: [tab("https://shop.test/", "Shop"), { ...tab("https://docs.test/", ""), id: other }],
+        focusedTabID: null,
+      },
+      labels,
+    ),
+  ).toEqual({ tabs: 2 })
+  expect(
+    BrowserDisplay.describe(
+      { type: "tabs.focus", tabID: other },
+      { ...tab("https://docs.test/", ""), id: other },
+      labels,
+    ),
+  ).toEqual({
+    page: "https://docs.test/",
+  })
+  expect(
+    BrowserDisplay.describe(
+      { type: "tabs.close", tabID },
+      { tabs: [{ ...tab("https://docs.test/", ""), id: other }], focusedTabID: other },
+      labels,
+    ),
+  ).toEqual({ page: "Shop", tabs: 1 })
+  expect(
+    BrowserDisplay.describe(
+      { type: "console", tabID: other },
+      { tab: { ...tab("https://docs.test/", "Docs"), id: other }, messages: [], truncated: false, dropped: 0 },
+      labels,
+    ),
+  ).toEqual({ page: "Docs", messages: 0 })
+  expect(
+    BrowserDisplay.describe(
+      { type: "network.get", tabID: other, id: "r1" },
+      {
+        tab: { ...tab("https://docs.test/", "Docs"), id: other },
+        request: {
+          id: "r1",
+          url: "https://docs.test/api",
+          method: "GET",
+          resourceType: "fetch",
+          timestampMs: 0,
+          state: "pending",
+        },
+        requestHeaders: [],
+        responseHeaders: [],
+        headersTruncated: false,
+        requestBody: { state: "notRequested" },
+        responseBody: { state: "notRequested" },
+      },
+      labels,
+    ),
+  ).toEqual({ page: "Docs", request: "GET https://docs.test/api" })
 })

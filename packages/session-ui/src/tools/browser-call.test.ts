@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { dict } from "@opencode/ui/i18n/en"
 import type { ExecuteToolCall } from "../message/current-tool-state"
-import { browserCallImage, browserCallSummary } from "./browser-call"
+import { browserCallImage, browserCallSummary, browserPermissionSummary } from "./browser-call"
 
 const strings = new Map(Object.entries(dict))
 
@@ -54,8 +54,37 @@ describe("browserCallSummary", () => {
     expect(browserCallImage({ tool: "browser.click", status: "completed", display: { image: path } })).toBeUndefined()
   })
 
+  test("names the tab a tab call worked on and counts what a listing returned", () => {
+    expect(summary("browser.tabs.focus", { tabID: "tab_1" }, { page: "Shop" })).toBe("Shop")
+    expect(summary("browser.tabs.close", { tabID: "tab_1" }, { page: "Shop", tabs: 1 })).toBe("Shop")
+    expect(summary("browser.tabs.list", {}, { tabs: 2 })).toBe("2 tabs")
+    expect(summary("browser.console", { tabID: "tab_1" }, { page: "Shop", messages: 1 })).toBe("Shop · 1 message")
+    expect(summary("browser.network.get", { tabID: "tab_1", id: "r1" }, { page: "Shop", request: "GET /api" })).toBe(
+      "GET /api",
+    )
+    expect(summary("browser.files.upload", { tabID: "tab_1", ref: "e2", paths: ["/tmp/a.png", "b.txt"] })).toBe(
+      "e2 · a.png, b.txt",
+    )
+    expect(summary("browser.preview", { path: "out/chart.svg" })).toBe("out/chart.svg")
+    expect(summary("browser.lighthouse", { tabID: "tab_1" }, { page: "Shop" })).toBe("Shop")
+  })
+
+  test("words a browser permission request like its timeline row", () => {
+    expect(
+      browserPermissionSummary(
+        "click",
+        { input: { type: "click", tabID: "tab_1", ref: "e3" }, display: { target: 'button "Place order"' } },
+        i18n,
+      ),
+    ).toBe('button "Place order"')
+    expect(browserPermissionSummary("navigate", { input: { url: "https://shop.test/" } }, i18n)).toBe(
+      "https://shop.test/",
+    )
+    expect(browserPermissionSummary("click", { input: "not a record" }, i18n)).toBeUndefined()
+  })
+
   test("leaves other calls to their argument list", () => {
-    expect(summary("browser.tabs.list", {})).toBeUndefined()
+    expect(summary("browser.tabs.focus", { tabID: "tab_1" })).toBeUndefined()
     expect(summary("github.get_file_contents", { owner: "a" })).toBeUndefined()
   })
 })
