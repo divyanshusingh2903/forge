@@ -1,34 +1,23 @@
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit generated client files directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk` composes Client, Core, and Server.
 - This repository does not use Changesets. Do not add `.changeset` files; follow the existing release workflow instead.
-- The default branch is `dev`. Base branches and worktrees on `origin/dev`, target PRs at `dev`, and diff against `origin/dev` unless told otherwise.
+- This is Forge, a fork of OpenCode V2. The default branch is `main`: base branches and worktrees on `origin/main`, target PRs at `main`, and diff against `origin/main`. While the V2 port is in progress, V2 work lives on `v2-port` instead (issue #60).
+- `origin/dev` is leftover upstream OpenCode history with no Forge work; do not target it or diff against it. Upstream text that says the default branch is `dev` is about upstream, not Forge.
+- Releases never run on merge. The `forge-release` workflow is started by hand, so merging to `main` does not tag or bump a version. See `MAINTAINING.md` for releases and upstream syncs.
 
-## Live TUI Testing
+## Forge Layout
 
-- Run `bun run dev:live` from a development worktree to test its TUI against the currently elected `opencode` background server and live sessions.
-- Pass a directory after the script when needed, for example `bun run dev:live /path/to/project`.
-- The script discovers the server with `opencode service status`, injects its private local credential from `opencode service get password`, and uses the `dev` TUI storage channel so tabs and other client-local state match the installed client.
-- Prefer `dev:live` over plain `bun run dev` for this workflow. An implicit managed-service connection may replace the live server when the worktree client version differs; explicit `--server` warns and continues without replacing it.
+- Forge runs on the V2 stack: `packages/core` and `packages/server` behind the public API in `packages/protocol`, the web UI in `packages/app`, `packages/session-ui` and `packages/ui`, and the Electron shell in `packages/desktop`. The desktop app is the product; run it with `bun run dev:desktop`.
+- Build Forge features where their domain lives, preferably as internal plugins registered in `packages/core/src/plugin/internal.ts` (for example `forge.plan` and `forge.memory`), so upstream merges touch as few shared files as possible.
+- `packages/tui` is kept only as an internal library for the files `packages/cli` imports. The full-screen TUI and its default command are removed: do not add features, stories or tests there.
+- A new config key must also be added to the `nativeAtomic` list in `packages/core/src/config/normalize.ts`, or normalization drops it.
+- Use the Forge name in user-facing strings. OpenCode's own services (Go, Console, Free) keep their names.
 
 ## Live Desktop Diagnostics
 
 - When attaching Playwright to a running desktop app, use `chromium.connectOverCDP(endpoint, { noDefaults: true })`.
 - Without `noDefaults`, Playwright applies light-mode media emulation during attachment. An app following the system theme then flashes light until the connection closes. The option also preserves the existing focus and other media preferences.
 - Do not emulate a color scheme or reduced-motion preference on the user's live window unless explicitly requested; use an isolated test context for those scenarios.
-
-## TUI Stories
-
-- When a user asks for a TUI story, add a fixture-driven story under `packages/tui/src/feature-plugins/system/storybook` and register it in `index.tsx`.
-- Render the real production component rather than a visual copy. Keep submissions and other side effects local to the story so it is safe to explore repeatedly.
-- Expose the meaningful state dimensions through story keybindings and list them in `StoryFooter`; include a reset command when combinations can leave the fixture in a confusing state.
-- Run a specific story with `OPENCODE_STORY=<story-id> bun run dev:live` from the development worktree, and exercise narrow and wide terminal sizes when layout is relevant.
-
-## TUI Theme Tokens
-
-- Choose theme tokens by semantic role, not by their current color. Do not use raw `theme.hue` values or borrow an unrelated semantic token to achieve a preferred appearance.
-- Use `text.feedback` and `background.feedback` only for outcome or status feedback such as errors, warnings, success messages, and informational messages. Use `formfield` states for form-control text, ordinals, and selection markers, and `action` states for actions.
-- If the theme does not expose a token for the required semantic role, extend the theme schema, defaults, resolution, and types with that role before using it in a component. Do not repurpose the nearest-looking existing token.
-- When changing the public theme token surface, verify the built-in light and dark defaults and the custom-theme fallback path in addition to the affected TUI component.
 
 ## Branch Names
 
@@ -40,9 +29,9 @@ Examples: `session-recovery`, `fix-scroll-state`, `regenerate-sdk`.
 
 Use conventional commit-style messages and PR titles: `type(scope): summary`.
 
-Valid types are `feat`, `fix`, `docs`, `chore`, `refactor`, and `test`. Scopes are optional; use the affected package or area when helpful, e.g. `core`, `opencode`, `tui`, `app`, `desktop`, `sdk`, or `plugin`.
+Valid types are `feat`, `fix`, `docs`, `chore`, `refactor`, and `test`. Scopes are optional; use the affected package or area when helpful, e.g. `core`, `server`, `app`, `desktop`, `sdk`, or `plugin`.
 
-Examples: `fix(tui): simplify thinking toggle styling`, `docs: update contributing guide`, `chore(sdk): regenerate types`.
+Examples: `fix(app): simplify thinking toggle styling`, `docs: update contributing guide`, `chore(sdk): regenerate types`.
 
 For user-facing `feat`, `fix` and `perf` PRs, add a small looping animated SVG of the change under `### Visual` in the PR body (a `svg` code block, 240×72, for example a dock growing out of the composer or spinners turning in step). Draw with `currentColor` and opacity so it works in light and dark, make the unanimated state a good still (it is shown under reduced motion), animate with CSS or SMIL only, and keep it under 8 KB with no scripts or external references. The desktop beta's "What's new" dialog shows it.
 
