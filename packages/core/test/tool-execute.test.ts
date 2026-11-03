@@ -237,6 +237,50 @@ test("execute supports callable namespace tools", async () => {
   expect(result.content).toEqual([{ type: "text", text: '[\n  "admin",\n  "created"\n]' }])
 })
 
+test("a tool's metadata display reaches its call row", async () => {
+  const click: Info = {
+    name: "click",
+    description: "Click an element",
+    input: Schema.Struct({ ref: Schema.String }),
+    output: Schema.String,
+    options: { namespace: "browser" },
+    execute: ({ ref }) =>
+      Effect.succeed({
+        output: "clicked",
+        metadata: { display: { target: `button "${ref}"` }, internal: { large: true } },
+      }),
+  }
+  const plain: Info = {
+    name: "plain",
+    description: "No display",
+    input: Schema.Struct({}),
+    output: Schema.String,
+    execute: () => Effect.succeed({ output: "ok", metadata: { display: "not a record" } }),
+  }
+  const codeMode = createCodeMode(
+    new Map([
+      ["browser_click", click],
+      ["plain", plain],
+    ]),
+  )
+  const result = await Effect.runPromise(
+    codeMode.execute(
+      {
+        code: 'await Promise.all([tools.browser.click({ ref: "Save" }), tools.browser.click({ ref: "Send" })]); return await tools.plain({})',
+      },
+      context,
+    ),
+  )
+
+  expect(result.metadata).toEqual({
+    toolCalls: [
+      { tool: "browser.click", status: "completed", input: { ref: "Save" }, display: { target: 'button "Save"' } },
+      { tool: "browser.click", status: "completed", input: { ref: "Send" }, display: { target: 'button "Send"' } },
+      { tool: "plain", status: "completed" },
+    ],
+  })
+})
+
 test("executions share the prepared runtime of an inventory while keeping per-call state", async () => {
   let conversions = 0
   const echo: Info = {

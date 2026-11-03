@@ -11,7 +11,7 @@ import type {
   Namespace as ToolNamespace,
   Result,
 } from "@opencode/schema/tool"
-import { Clock, Context, Effect, Ref, Schema, Semaphore } from "effect"
+import { Clock, Context, Effect, Option, Ref, Schema, Semaphore } from "effect"
 import { toSessionError } from "../session/to-session-error.js"
 import { definition, normalizedName } from "../tool/runtime.js"
 import { Permission } from "../permission.js"
@@ -25,10 +25,14 @@ const ExecuteFile = Schema.Struct({
   name: Schema.optionalKey(Schema.String),
 })
 
+const Display = Schema.Record(Schema.String, Schema.Json)
+
 const ExecuteCall = Schema.Struct({
   tool: Schema.String,
   status: Schema.Literals(["running", "completed", "error"]),
   input: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+  // What the call's row shows beyond its input, from the tool's `metadata.display`.
+  display: Schema.optionalKey(Display),
 })
 
 type ExecuteCall = typeof ExecuteCall.Type
@@ -96,6 +100,8 @@ export const create = (
         const callIndex = yield* Ref.make(0)
         const files = yield* Ref.make<Array<CollectedFiles>>([])
         const calls = yield* Ref.make<Array<ExecuteCall>>([])
+        // A call's `before`, run and `after` share a fiber, so its display waits here under the fiber's ID.
+        const displays = new Map<number, typeof Display.Type>()
         const lock = Semaphore.makeUnsafe(1)
         // Each update replaces the last, so send at most one per 100 ms; a trailing one carries the latest rows.
         // A success drops a pending one when the scope closes, since the result carries the final rows.
@@ -133,13 +139,15 @@ export const create = (
                   }).pipe(
                     Effect.mapError((error) => new ToolFailure({ message: toSessionError(error).message, error })),
                   )
+                  const display = decodeDisplay(executed.metadata?.display)
+                  if (Option.isSome(display)) displays.set(yield* Effect.fiberId, display.value)
                   const content = resultContent(executed)
                   const outputFileParts = outputFiles(content)
                   if (outputFileParts.length > 0)
                     yield* Ref.update(files, (items) => [...items, { index, files: outputFileParts }])
                   return resultValue(executed)
                 }),
-              hooks: progressHooks(record),
+              hooks: progressHooks(record, displays),
             }),
             // A failed or interrupted call keeps its last progress, so send pending rows before it settles.
             Effect.onError(() =>
@@ -182,22 +190,33 @@ export const create = (
 }
 
 // Rows appear in start order; the same call object arrives at both hooks, so a call finds its row again.
-function progressHooks(record: (update: (items: Array<ExecuteCall>) => Array<ExecuteCall>) => Effect.Effect<unknown>) {
+function progressHooks(
+  record: (update: (items: Array<ExecuteCall>) => Array<ExecuteCall>) => Effect.Effect<unknown>,
+  displays: Map<number, typeof Display.Type>,
+) {
   const rows = new WeakMap<object, number>()
   const start = (call: object, entry: ExecuteCall) =>
     record((items) => {
       rows.set(call, items.length)
       return [...items, entry]
     })
-  const settle = (call: object, result: CodeMode.CallResult) => {
-    const index = rows.get(call)
-    if (index === undefined) return Effect.void
-    return record((items) => {
-      const next = [...items]
-      next[index] = { ...items[index], status: result.status === "success" ? "completed" : "error" }
-      return next
+  const settle = (call: object, result: CodeMode.CallResult) =>
+    Effect.gen(function* () {
+      const fiber = yield* Effect.fiberId
+      const display = displays.get(fiber)
+      displays.delete(fiber)
+      const index = rows.get(call)
+      if (index === undefined) return
+      yield* record((items) => {
+        const next = [...items]
+        next[index] = {
+          ...items[index],
+          status: result.status === "success" ? "completed" : "error",
+          ...(display === undefined ? {} : { display }),
+        }
+        return next
+      })
     })
-  }
   return {
     "tool.before": (call) => {
       const shown = displayInput(call.input)
@@ -394,6 +413,8 @@ export function qualifiedName(registration: Info) {
 }
 
 // Tool inputs arrive as parsed JSON, so the JSON value cast is a boundary fact.
+const decodeDisplay = Schema.decodeUnknownOption(Display)
+
 function displayInput(input: unknown): Record<string, typeof Schema.Json.Type> | undefined {
   if (input === null || input === undefined) return
   if (typeof input !== "object" || Array.isArray(input)) return { input: input as typeof Schema.Json.Type }
