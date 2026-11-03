@@ -41,6 +41,9 @@ import { SessionOptionsContent } from "@/session/session-options"
 import { SessionHeaderGap } from "@/session/header/drag-area"
 import { SessionWorkingIndicator } from "@/session/header/session-working-indicator"
 
+/** Header slot contributions ordered below this render before the panel launchers, such as context usage at 10. */
+const SESSION_HEADER_LAUNCHERS = 11
+
 type BlockingTask = { type: "shell" | "subagent"; partID: string; id?: string; label?: string }
 
 type SessionBackground = {
@@ -552,32 +555,35 @@ function MessageTimelineView(
               }
               actions={(fit) => (
                 <Show when={sessionID()} keyed>
-                  {(_id) => (
-                    <>
-                      {props.search}
-                      <Show when={!fit.compact}>
-                        <SessionLaunchers />
-                      </Show>
-                      <PluginSlot
-                        at="session.header"
-                        input={{
-                          get session() {
-                            return props.view
-                          },
-                          get screen() {
-                            return props.screen
-                          },
-                          get active() {
-                            return props.active !== false
-                          },
-                          get compact() {
-                            return fit.compact
-                          },
-                        }}
-                      />
-                      <SessionHeaderSpacer visible={props.reserveReviewToggle} />
-                    </>
-                  )}
+                  {(_id) => {
+                    const header = {
+                      get session() {
+                        return props.view
+                      },
+                      get screen() {
+                        return props.screen
+                      },
+                      get active() {
+                        return props.active !== false
+                      },
+                      get compact() {
+                        return fit.compact
+                      },
+                    }
+
+                    return (
+                      <>
+                        {props.search}
+                        {/* Context usage leads the row; the panel launchers and the other plugins' buttons follow. */}
+                        <PluginSlot below={SESSION_HEADER_LAUNCHERS} at="session.header" input={header} />
+                        <Show when={!fit.compact}>
+                          <SessionLaunchers />
+                        </Show>
+                        <PluginSlot from={SESSION_HEADER_LAUNCHERS} at="session.header" input={header} />
+                        <SessionHeaderSpacer visible={props.reserveReviewToggle} />
+                      </>
+                    )
+                  }}
                 </Show>
               )}
             >

@@ -39,6 +39,9 @@ export function PluginSlot<At extends keyof BuiltinSlotMap>(props: {
   at: At
   input: BuiltinSlotMap[At]
   fallback?: JSX.Element
+  /** Only contributions whose order falls in `[from, below)`, for a slot the host splits around its own items. */
+  from?: number
+  below?: number
 }) {
   const host = usePluginHost()
 
@@ -46,6 +49,8 @@ export function PluginSlot<At extends keyof BuiltinSlotMap>(props: {
     host
       .items(BuiltinSlot)
       .filter((item) => item.value.at === props.at)
+      .filter((item) => (item.value.order ?? 0) >= (props.from ?? -Infinity))
+      .filter((item) => (item.value.order ?? 0) < (props.below ?? Infinity))
       .toSorted((a, b) => (a.value.order ?? 0) - (b.value.order ?? 0)),
   )
 

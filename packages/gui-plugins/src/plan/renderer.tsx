@@ -108,7 +108,8 @@ const setup: Plugin.Setup<typeof PlanDefinition> = (ctx) => {
   // While a plan is being written or waits for review, the title row says so and opens it. Decided plans drop out.
   ctx.add(Slot, {
     at: "session.header",
-    order: 5,
+    // After the context usage and the panel launchers.
+    order: 12,
     render: (input) => (
       <Show when={ForgePlan.open(plan(input.session)) ? plan(input.session) : undefined}>
         {(info) => {
