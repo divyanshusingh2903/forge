@@ -27,6 +27,7 @@ import { Instructions } from "@opencode/core/instructions/index"
 import { InstructionBuiltIns } from "@opencode/core/instructions/builtins"
 import { Location } from "@opencode/core/location"
 import { McpInstructions } from "@opencode/core/mcp/instructions"
+import { MemoryInstructions } from "@opencode/core/memory/instructions"
 import { ID } from "@opencode/core/model"
 import { Project } from "@opencode/core/project"
 import { Provider } from "@opencode/core/provider"
@@ -118,6 +119,8 @@ const discovery = Layer.mock(InstructionDiscovery.Service, {
 const skills = Layer.mock(SkillInstructions.Service, { load: () => Effect.succeed(Instructions.empty) })
 const references = Layer.mock(ReferenceInstructions.Service, { load: () => Effect.succeed(Instructions.empty) })
 const mcp = Layer.mock(McpInstructions.Service, { load: () => Effect.succeed(Instructions.empty) })
+// Forge's memory guidance is not part of what these tests assert about the prompt.
+const memoryInstructions = Layer.mock(MemoryInstructions.Service, { load: () => Effect.succeed(Instructions.empty) })
 const tools = Layer.mock(Tool.Service, {
   snapshot: () =>
     Effect.succeed({
@@ -160,6 +163,7 @@ const it = testEffect(
       SkillInstructions.node.replace(skills),
       ReferenceInstructions.node.replace(references),
       McpInstructions.node.replace(mcp),
+      MemoryInstructions.node.replace(memoryInstructions),
       PluginSupervisor.node.replace(Layer.empty),
       Tool.node.replace(tools),
       Location.node.replace(Location.boundNode({ directory: AbsolutePath.make("/project") })),

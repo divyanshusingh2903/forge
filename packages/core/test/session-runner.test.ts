@@ -73,6 +73,7 @@ import { InstructionDiscovery } from "@opencode/core/instruction-discovery"
 import { SkillInstructions } from "@opencode/core/skill/instructions"
 import { ReferenceInstructions } from "@opencode/core/reference/instructions"
 import { McpInstructions } from "@opencode/core/mcp/instructions"
+import { MemoryInstructions } from "@opencode/core/memory/instructions"
 import { SessionSystemPrompt } from "@opencode/core/session/system-prompt"
 import { ID, Model } from "@opencode/core/model"
 import { Location } from "@opencode/core/location"
@@ -403,6 +404,8 @@ const layer = Layer.unwrap(
       load: () => Effect.succeed(Instructions.empty),
     })
     const mcpInstructions = Layer.mock(McpInstructions.Service, { load: () => Effect.succeed(Instructions.empty) })
+    // Forge's memory guidance is not part of what these tests assert about the prompt.
+    const memoryInstructions = Layer.mock(MemoryInstructions.Service, { load: () => Effect.succeed(Instructions.empty) })
     const config = Config.testLayer([
       new Document({
         type: "document",
@@ -430,6 +433,7 @@ const layer = Layer.unwrap(
       Location.node.replace(Location.boundNode({ directory: AbsolutePath.make("/project") })),
       SkillInstructions.node.replace(skillInstructions),
       ReferenceInstructions.node.replace(referenceInstructions),
+      MemoryInstructions.node.replace(memoryInstructions),
       Permission.node.replace(permission),
       Config.node.replace(config),
       PluginSupervisor.node.replace(Layer.empty),
