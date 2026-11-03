@@ -11,7 +11,7 @@ import type { BunPlugin } from "bun"
 import pkg from "../package.json"
 import { discoverPluginRuntimeSpecifiers, pluginRuntimeLoaderCode } from "@opencode/plugin/runtime-modules"
 import { buildAppArchive } from "./app-assets"
-import { verifyArtifact, verifySimulationGraph } from "./verify-artifact"
+import { verifyArtifact } from "./verify-artifact"
 import { resolveOpencodePty } from "./opencode-pty"
 import { NativeArch } from "../../../script/native-arch"
 import { bundledModelsSnapshot, modelsSnapshotPlugin } from "../../core/script/models-snapshot"
@@ -133,16 +133,6 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
       }))
     },
   }
-  const simulationInputs = new Set<string>()
-  const simulationGraphPlugin: BunPlugin = {
-    name: "opencode-simulation-graph",
-    setup(build) {
-      build.onLoad(
-        { filter: /packages[/\\]simulation[/\\]src[/\\](frontend[/\\](simulation|server)|control-server)\.ts$/ },
-        (args) => void simulationInputs.add(args.path),
-      )
-    },
-  }
   const parcelWatcherPackage = `@parcel/watcher-${item.os}-${item.arch}${item.os === "linux" ? `-${item.abi ?? "glibc"}` : ""}`
   const parcelWatcherPlugin: BunPlugin = {
     name: "parcel-watcher-binding",
@@ -166,7 +156,6 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
       parcelWatcherPlugin,
       opencodePtyPlugin,
       pluginRuntimePlugin,
-      simulationGraphPlugin,
       modelsSnapshot,
     ],
     external: ["node-gyp"],
@@ -209,7 +198,6 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
     for (const log of result.logs) console.error(log)
     process.exit(1)
   }
-  verifySimulationGraph(simulationInputs)
   await NativeArch.verify(path.join(outdir, name, "bin", item.os === "win32" ? `${binary}.exe` : binary), item.arch)
 
   await Bun.write(

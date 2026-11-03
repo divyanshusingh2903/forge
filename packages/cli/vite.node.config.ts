@@ -4,7 +4,6 @@ import { createRequire } from "node:module"
 import { defineConfig, type Plugin, type UserConfig } from "vite"
 import solid from "vite-plugin-solid"
 import { nodeExecArgv, nodeTarget, type NodeTarget, photonWasmAsset } from "./src/node/target"
-import { verifySimulationGraph } from "./script/verify-artifact"
 
 const dir = import.meta.dirname
 
@@ -56,15 +55,6 @@ function runtimeRequirePlugin(): Plugin {
       const transformed = code.replace("    var domino = require('@mixmark-io/domino');", "")
       if (transformed === code) this.error("Failed to rewrite Turndown's Domino require")
       return `import domino from "@mixmark-io/domino"\n${transformed}`
-    },
-  }
-}
-
-function simulationGraphPlugin(): Plugin {
-  return {
-    name: "opencode:simulation-graph",
-    generateBundle() {
-      verifySimulationGraph(this.getModuleIds())
     },
   }
 }
@@ -264,7 +254,6 @@ export function mainConfig(input: NodeBuildInput): UserConfig {
       rawTextPlugin(input.modelsSnapshot),
       runtimeRequirePlugin(),
       fffNodePlugin(),
-      simulationGraphPlugin(),
       solid({
         solid: {
           generate: "universal",

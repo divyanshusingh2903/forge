@@ -338,7 +338,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [linux, windows]
+        os: [linux, windows, macos]
     runs-on: ubuntu-24.04
     steps:
       - name: Check browser test results
@@ -347,8 +347,8 @@ jobs:
           SUITES: ${{ needs.e2e-suite.result }}
           EXPECTED: ${{ needs.affected.outputs.e2e == 'true' && 'success' || 'skipped' }}
         run: |
-          if [ "${{ matrix.os }}" = windows ] && [ "${{ github.base_ref }}" = beta ]; then
-            echo "Windows browser tests run on beta pushes and nightly, not on beta pull requests"
+          if [ "${{ matrix.os }}" != linux ] && [ "${{ github.base_ref }}" = beta ]; then
+            echo "Windows and macOS browser tests run on beta pushes and nightly, not on beta pull requests"
             exit 0
           fi
           echo "affected packages: $AFFECTED, browser test legs: $SUITES (expected $EXPECTED)"
