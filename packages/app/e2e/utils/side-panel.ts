@@ -14,7 +14,7 @@ export async function browseFiles(page: Page) {
 
 /** Opens the Review tab from the launcher an empty side panel lists. */
 export async function openReviewLauncher(panel: Locator) {
-  await panel.getByRole("button", { name: /^Review/ }).click()
+  await panel.getByRole("button", { name: /^Review(?! plan)/ }).click()
 }
 
 /** Storage that restores the Review tab, selected, in each session's side strip, as the app writes it. */

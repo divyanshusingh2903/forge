@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test"
 import { sessionHref } from "../utils/app"
 import { trackPageErrors } from "../utils/errors"
 import { fixture, installTimelineSettings, mockStressTimeline } from "../utils/session-fixture"
+import { installCompactTimeline } from "../utils/timeline-detail"
 import {
   assistantMessage,
   historyMessages,
@@ -339,6 +340,7 @@ test.describe("timeline history", () => {
       }))
 
       const requests: (string | undefined)[] = []
+      await installCompactTimeline(page)
       await page.setViewportSize({ width: 1440, height: 900 })
       await mockStressTimeline(page, {
         sessions: [session],

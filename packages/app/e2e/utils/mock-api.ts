@@ -239,6 +239,7 @@ const Group = HttpApiGroup.make("mock")
   .add(HttpApiEndpoint.get("vcs", "/api/vcs", { success: Json }))
   .add(HttpApiEndpoint.post("vcsInit", "/api/vcs/init", { success: NoContent, error: Unsupported }))
   .add(HttpApiEndpoint.get("vcsStatus", "/api/vcs/status", { success: Json }))
+  .add(HttpApiEndpoint.get("gitState", "/api/git/state", { success: Json }))
   .add(HttpApiEndpoint.get("vcsBranches", "/api/vcs/branch", { success: Json }))
   .add(HttpApiEndpoint.get("vcsDiff", "/api/vcs/diff", { query: Query, success: Json }))
   .add(HttpApiEndpoint.get("fsList", "/api/fs/list", { query: Query, success: Json }))
@@ -339,6 +340,7 @@ const Group = HttpApiGroup.make("mock")
       error: Unsupported,
     }),
   )
+  .add(HttpApiEndpoint.get("sessionUsage", "/api/session/:sessionID/usage", { params: SessionParams, success: Json }))
   .add(
     HttpApiEndpoint.get("sessionGet", "/api/session/:sessionID", {
       params: SessionParams,

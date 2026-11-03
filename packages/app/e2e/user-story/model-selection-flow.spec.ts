@@ -3,6 +3,7 @@ import { project, provider, sessionHref } from "../utils/app"
 import { mockOpenCodeServer } from "../utils/mock-server"
 import { expectAppVisible } from "../utils/waits"
 import { openSession } from "../utils/workspace"
+import { newSessionButton } from "../utils/new-session"
 
 const directory = "C:/OpenCode/NewProject"
 
@@ -155,7 +156,7 @@ test("restores each existing session's model and variant when switching tabs", a
   await expect(variant).toHaveText("high")
 
   // A new draft starts from the current session's non-default model and chosen variant.
-  await page.getByRole("button", { name: "New session", exact: true }).click()
+  await newSessionButton(page).click()
   await expect(page).toHaveURL(/\/new-session\?draftId=/)
   await expect(modelControl).toHaveText("Model B")
   await expect(variant).toHaveText("high")

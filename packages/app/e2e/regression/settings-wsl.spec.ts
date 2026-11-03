@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test"
 import { NO_PROVIDER, REMOTE_SERVER, SERVER, project, provider, session } from "../utils/app"
 import { mockOpenCodeServer, mockServers } from "../utils/mock-server"
 import { expectSessionTitle } from "../utils/waits"
+import { newSessionButton } from "../utils/new-session"
 
 test.use({ viewport: { width: 1280, height: 900 } })
 
@@ -113,7 +114,7 @@ test("WSL session and draft tabs outlive the plugin going away until the server 
     `/e2e/utils/settings-wsl.html?${new URLSearchParams({ server: SERVER, mode: "ready", wsl: REMOTE_SERVER, path: href })}`,
   )
   await expectSessionTitle(page, wsl.title)
-  await page.getByRole("button", { name: "New session", exact: true }).click()
+  await newSessionButton(page).click()
   await expect(page.getByRole("heading", { name: wsl.title })).toHaveCount(0)
   const editor = page.locator('[data-component="composer-editor"]')
   await editor.fill("keep this draft")
@@ -183,7 +184,7 @@ test("an SSH host that asks for sign-in again opens the dialog once per selected
 
   // Another tab selected and this one selected again is a new selection, even while the host was ready.
   const tabs = page.locator("a[data-titlebar-tab-link]")
-  await page.getByRole("button", { name: "New session", exact: true }).click()
+  await newSessionButton(page).click()
   await expect(tabs).toHaveCount(2)
   await expect(tabs.nth(1)).toHaveAttribute("href", /^\/new-session\?draftId=/)
   await expect(page.getByRole("heading", { name: box.title })).toHaveCount(0)

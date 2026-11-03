@@ -4,6 +4,7 @@ import { base64Encode } from "@opencode/util/encode"
 import { createTwoFilesPatch } from "diff"
 import { SERVER, pageMessagesFrom } from "./app"
 import { mockOpenCodeServer, type MockServerConfig } from "./mock-server"
+import { legacyTimelineDetail } from "./timeline-detail"
 
 // A long stress transcript: source (12 turns, links a child), target (72 mixed turns), and child (4 turns).
 
@@ -418,17 +419,14 @@ export const fixture = {
 export const pageMessages = pageMessagesFrom(fixture.messages)
 
 export async function installTimelineSettings(page: Page) {
-  await page.addInitScript(() => {
-    localStorage.setItem(
-      "settings.v3",
-      JSON.stringify({
-        general: {
-          editToolPartsExpanded: true,
-          shellToolPartsExpanded: true,
-          showReasoningSummaries: true,
-        },
-      }),
-    )
+  await page.addInitScript((general) => {
+    localStorage.setItem("settings.v3", JSON.stringify({ general }))
+  }, {
+    editToolPartsExpanded: true,
+    shellToolPartsExpanded: true,
+    showReasoningSummaries: true,
+    timelineDetail: legacyTimelineDetail({ shell: true, edit: true, thinking: true }),
+    timelineExpanded: true,
   })
 }
 

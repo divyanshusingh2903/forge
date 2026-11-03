@@ -17,6 +17,7 @@ import { SERVER, seed, sessionHref } from "./app"
 import { mockOpenCodeServer, type MockServerConfig } from "./mock-server"
 import { installSseTransport } from "./sse-transport"
 import { expectSessionReady } from "./waits"
+import { legacyTimelineDetail } from "./timeline-detail"
 
 export const directory = "C:/OpenCode/TimelineStability"
 
@@ -260,20 +261,27 @@ export async function setupTimeline(
   })
 
   if (input.tabs) await seed(page, { tabs: input.tabs })
-  await page.addInitScript((settings) => {
-    localStorage.setItem(
-      "settings.v3",
-      JSON.stringify({
-        general: {
-          editToolPartsExpanded: false,
-          shellToolPartsExpanded: false,
-          showReasoningSummaries: false,
-          showSessionProgressBar: true,
-          ...settings,
-        },
-      }),
-    )
-  }, input.settings ?? {})
+  const general = {
+    editToolPartsExpanded: false,
+    shellToolPartsExpanded: false,
+    showReasoningSummaries: false,
+    showSessionProgressBar: true,
+    // Forge reads a saved Compact timeline as never chosen, until this marks the seed as a choice.
+    timelineExpanded: true,
+    ...input.settings,
+  }
+
+  const timelineDetail =
+    general.timelineDetail ??
+    legacyTimelineDetail({
+      shell: general.shellToolPartsExpanded,
+      edit: general.editToolPartsExpanded,
+      thinking: general.showReasoningSummaries,
+    })
+
+  await page.addInitScript((general) => {
+    localStorage.setItem("settings.v3", JSON.stringify({ general }))
+  }, { ...general, timelineDetail })
 
   if (input.locale) {
     await page.addInitScript((locale) => {

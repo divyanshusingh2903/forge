@@ -6,6 +6,7 @@ import { SessionMessage } from "@opencode/schema/session-message"
 import { Schema } from "effect"
 import { holdRoute, provider } from "../utils/app"
 import type { MockServerConfig } from "../utils/mock-server"
+import { installCompactTimeline } from "../utils/timeline-detail"
 import { openSession } from "../utils/workspace"
 
 const sessionID = "ses_session_queue_regression"
@@ -1116,6 +1117,7 @@ for (const delivery of ["steer", "queue"] as const) {
       ],
     )
 
+    await installCompactTimeline(page)
     const view = await openQueue(page, mock, delivery)
     const transcript = page.locator("[data-timeline-virtual-content]")
     const thinking = transcript.locator('[data-timeline-row="Thinking"]')

@@ -405,7 +405,7 @@ test("context closes the side region only when its button opened it", async ({ p
   const newTab = panel.getByRole("tab", { name: "New tab", exact: true })
   await panel.getByRole("button", { name: "Add tab", exact: true }).click()
   await expect(newTab).toHaveAttribute("aria-selected", "true")
-  await panel.getByRole("button", { name: /^Review/ }).click()
+  await panel.getByRole("button", { name: /^Review(?! plan)/ }).click()
   await expect(newTab).toHaveCount(0)
   await expect(panel.locator("#session-side-panel-review-tab")).toHaveAttribute("aria-selected", "true")
   // Closing Review returns to Context, the tab the view opened over, without bringing the replaced view back.
@@ -418,7 +418,7 @@ test("context closes the side region only when its button opened it", async ({ p
   // "Recently closed" lists only files, so the closed Review is offered again by its launcher alone.
   await panel.getByRole("button", { name: "Add tab", exact: true }).click()
   await expect(panel.getByRole("region", { name: "Recently closed", exact: true })).toHaveCount(0)
-  await panel.getByRole("button", { name: /^Review/ }).click()
+  await panel.getByRole("button", { name: /^Review(?! plan)/ }).click()
   await expect(panel.locator("#session-side-panel-review-tab")).toHaveAttribute("aria-selected", "true")
   await context.click()
   await contextButton.click()
@@ -1726,7 +1726,7 @@ test("names a single change source and keeps the review header rows at 48px", as
   await panel.getByRole("button", { name: "Add tab", exact: true }).click()
   await expect(panel.getByRole("tab", { name: "New tab", exact: true })).toHaveCount(2)
   // Only its launchers: "Recently closed" lists files, not the closed Review.
-  await expect(panel.getByRole("button", { name: /^Review/ })).toBeVisible()
+  await expect(panel.getByRole("button", { name: /^Review(?! plan)/ })).toBeVisible()
   await expect(panel.getByRole("region", { name: "Recently closed", exact: true })).toHaveCount(0)
 })
 
@@ -1748,7 +1748,7 @@ test("Review from a new tab keeps the file browser and preview open", async ({ p
   await expect(tab("Open file")).toHaveAttribute("aria-selected", "true")
   await panel.getByRole("button", { name: "Add tab", exact: true }).click()
   await expect(tab("New tab")).toHaveAttribute("aria-selected", "true")
-  await panel.getByRole("button", { name: /^Review/ }).click()
+  await panel.getByRole("button", { name: /^Review(?! plan)/ }).click()
   await expect(tab("Review")).toHaveAttribute("aria-selected", "true")
   await expect(tab("Open file")).toHaveAttribute("aria-selected", "false")
   await tab("Review").hover()
@@ -1763,7 +1763,7 @@ test("Review from a new tab keeps the file browser and preview open", async ({ p
   // Choosing Review also leaves a single-click file preview open beside it.
   await panel.getByRole("button", { name: "Add tab", exact: true }).click()
   await expect(tab("New tab")).toHaveAttribute("aria-selected", "true")
-  await panel.getByRole("button", { name: /^Review/ }).click()
+  await panel.getByRole("button", { name: /^Review(?! plan)/ }).click()
   await expect(panel.locator("#session-side-panel-review-tab")).toHaveAttribute("aria-selected", "true")
   await expect(tab("README.md")).toHaveCount(1)
 })

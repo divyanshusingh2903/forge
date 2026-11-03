@@ -525,6 +525,8 @@ for (const grouped of [true, false]) {
               ...timelinePresets[2].value,
               shell: { placement: grouped ? "grouped" : "separate", details: "collapsed" },
             },
+            // Without this, Forge reads the grouped case's Compact timeline as never chosen.
+            timelineExpanded: true,
           },
         },
       },

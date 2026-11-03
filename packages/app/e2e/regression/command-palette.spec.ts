@@ -7,6 +7,7 @@ import {
   paletteSession,
 } from "../utils/command-palette"
 import { mockWorkspace } from "../utils/workspace"
+import { newSessionButton } from "../utils/new-session"
 
 test.use({ serviceWorkers: "block", permissions: ["clipboard-read", "clipboard-write"] })
 
@@ -497,7 +498,7 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
   await expect(page.getByRole("heading", { name: paletteSession.title, exact: true })).toBeVisible()
 
   for (const count of [3, 4]) {
-    await page.getByRole("button", { name: "New session", exact: true }).click()
+    await newSessionButton(page).click()
     await expect(tabs).toHaveCount(count)
     await expect(editor).toBeEditable()
   }

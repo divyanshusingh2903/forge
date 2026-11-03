@@ -19,6 +19,7 @@ import { mockServers } from "../utils/mock-server"
 import { fixture, mockStressTimeline } from "../utils/session-fixture"
 import { fileNode, mockWorkspace, openSession } from "../utils/workspace"
 import { expectSessionTitle } from "../utils/waits"
+import { newSessionButton } from "../utils/new-session"
 
 const a = { id: "ses_tab_a", title: "Tab A session" }
 
@@ -51,7 +52,7 @@ test("recently closed shows ten sessions and searches older closures in close or
   })
   await page.goto(sessionHref(sessions[0]!.id))
   await expect(page.locator("[data-titlebar-tab-title]")).toHaveText("Closed session 0")
-  const trigger = page.getByRole("button", { name: "New session", exact: true })
+  const trigger = newSessionButton(page)
   await trigger.click({ button: "right" })
   const menu = page.getByRole("menu")
   const items = menu.getByRole("menuitem")
@@ -110,7 +111,7 @@ test("recently closed fills remaining slots in Home order without open or duplic
   })
   await page.goto(sessionHref(sessions[0]!.id))
   await expect(page.locator("[data-titlebar-tab-title]")).toHaveText(["Other session 0", "Other session 2"])
-  const trigger = page.getByRole("button", { name: "New session", exact: true })
+  const trigger = newSessionButton(page)
   await trigger.click({ button: "right" })
   const menu = page.getByRole("menu")
   const items = menu.getByRole("menuitem")

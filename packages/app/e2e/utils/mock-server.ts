@@ -941,6 +941,16 @@ function mockHandlers(
           }).pipe(Effect.andThen(noContent))
         },
         vcsStatus: () => Effect.succeed({ location: location(config), data: [] }),
+        // A repository on its default branch with nothing changed and no remote.
+        gitState: () =>
+          Effect.succeed({
+            location: location(config),
+            data: {
+              branch: "main",
+              changes: [],
+              remote: { upstream: false, ahead: 0, behind: 0, remotes: false },
+            },
+          }),
         vcsBranches: (ctx) => {
           const query = new URL(ctx.request.url, "http://localhost").searchParams
           const search = query.get("search") ?? ""
@@ -1161,6 +1171,15 @@ function mockHandlers(
             ),
           })
         },
+        // An empty context: nothing measured yet, so the Context tab renders without a breakdown.
+        sessionUsage: () =>
+          Effect.succeed({
+            model: { providerID: "mock", id: "mock" },
+            total: 0,
+            measured: false,
+            categories: [],
+            prompt: [],
+          }),
         sessionGet: (ctx) =>
           Effect.suspend(() => {
             config.onSession?.(ctx.params.sessionID)

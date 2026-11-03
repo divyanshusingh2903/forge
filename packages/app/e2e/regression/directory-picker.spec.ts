@@ -20,7 +20,7 @@ test("the folder picker's tree scrolls with the mouse wheel inside the modal", a
   })
   await page.getByTestId("settings-screen").getByRole("tab", { name: "Projects", exact: true }).click()
   listing = true
-  await page.getByRole("button", { name: "Add project", exact: true }).click()
+  await page.getByTestId("settings-screen").getByRole("button", { name: "Add project", exact: true }).click()
   const picker = page.getByRole("dialog", { name: "Open project", exact: true })
 
   const scrollTop = () =>
