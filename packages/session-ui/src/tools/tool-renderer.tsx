@@ -66,6 +66,7 @@ import { AssistantReasoningContent, writeClipboard } from "../message/message-co
 import { stripAnsi } from "./ansi"
 import { followShellOutput } from "./shell-output"
 import { parseWebSearchResults, type WebSearchResult } from "./web-search-results"
+import { browserCallImage, browserCallSummary } from "./browser-call"
 import { LinkedText } from "../components/linked-text"
 
 function ShellSubmessage(props: { text: string; animate?: boolean }) {
@@ -2057,7 +2058,7 @@ ToolRegistry.register({
     const dialog = useDialog()
     const pending = () => props.status === "streaming" || props.status === "running"
     const calls = createMemo(() => executeToolCalls(props.metadata))
-    const subtitle = createMemo(() => executeToolSubtitle(calls()))
+    const subtitle = createMemo(() => executeToolSubtitle(calls(), (call) => browserCallSummary(call, i18n)))
     const code = createMemo(() => (toolInput(props.input).code ?? "").trimEnd())
 
     // A runtime failure shows its output on the failing row; a successful script shows its result below the calls.
@@ -2299,9 +2300,33 @@ function ExecuteOutputRow(props: { output: string }) {
   )
 }
 
+// A screenshot's capture is saved on the server; tool results reach the app without their image data.
+function ExecuteCallImage(props: { path: string }) {
+  const markdown = useMarkdown()
+  const previewImages = createImagePreview()
+  let root!: HTMLDivElement
+  createEffect(() => {
+    previewImages(root)
+
+    if (!markdown?.readImage) return
+    const images = createMarkdownImages(markdown.readImage)
+    images.update(root)
+    onCleanup(() => images.dispose())
+  })
+
+  return (
+    <div ref={root} data-slot="execute-tool-images">
+      <img data-local-image={props.path} alt={getFilename(props.path)} />
+    </div>
+  )
+}
+
 function ExecuteCallRow(props: { call?: ExecuteToolCall; error?: string }) {
+  const i18n = useI18n()
   const [open, setOpen] = createSignal(false)
   const args = createMemo(() => (props.call ? executeToolCallArgs(props.call) : []))
+  // Browser calls read as words; the raw input stays one click away.
+  const described = createMemo(() => (props.call ? browserCallSummary(props.call, i18n) : undefined))
   const input = createMemo(() => Object.entries(props.call?.input ?? {}))
   const failed = () => !props.call || props.call.status === "error"
   const expandable = () => input().length > 0 || !!props.error
@@ -2341,10 +2366,21 @@ function ExecuteCallRow(props: { call?: ExecuteToolCall; error?: string }) {
             </span>
           )}
         </Show>
-        <Show when={!open() && summary()}>
+        <Show
+          when={described()}
+          fallback={
+            <Show when={!open() && summary()}>
+              {(text) => (
+                <span data-slot="execute-tool-call-args" title={text()}>
+                  {props.call ? `[${text()}]` : text()}
+                </span>
+              )}
+            </Show>
+          }
+        >
           {(text) => (
-            <span data-slot="execute-tool-call-args" title={text()}>
-              {props.call ? `[${text()}]` : text()}
+            <span data-slot="execute-tool-call-args" data-kind="described" title={text()}>
+              {text()}
             </span>
           )}
         </Show>
@@ -2352,6 +2388,9 @@ function ExecuteCallRow(props: { call?: ExecuteToolCall; error?: string }) {
           <span data-slot="execute-tool-call-arrow">›</span>
         </Show>
       </div>
+      <Show when={props.call ? browserCallImage(props.call) : undefined}>
+        {(path) => <ExecuteCallImage path={path()} />}
+      </Show>
       <Show when={open()}>
         <Show when={input().length > 0}>
           <dl data-slot="execute-tool-call-input" dir="ltr">

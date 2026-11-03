@@ -59,6 +59,7 @@ const decodeExecuteCall = Schema.decodeUnknownOption(
     tool: Schema.String,
     status: Schema.Literals(["running", "completed", "error"]),
     input: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+    display: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
   }),
 )
 
@@ -79,11 +80,17 @@ export function executeToolCallArgs(call: ExecuteToolCall) {
     .map(([key, value]) => `${key}=${String(value).replace(/\s+/g, " ")}`)
 }
 
-// Collapsed rows name the failed call, or else the latest one.
-export function executeToolSubtitle(calls: readonly ExecuteToolCall[]) {
+// Collapsed rows name the failed call, or else the latest one. `describe` words a call that has a readable summary.
+export function executeToolSubtitle(
+  calls: readonly ExecuteToolCall[],
+  describe: (call: ExecuteToolCall) => string | undefined = () => undefined,
+) {
   const call = calls.find((item) => item.status === "error") ?? calls.at(-1)
 
   if (!call) return undefined
+  const described = describe(call)
+
+  if (described) return `${call.tool} ${described}`
   const args = executeToolCallArgs(call)
 
   return args.length ? `${call.tool} [${args.join(", ")}]` : call.tool

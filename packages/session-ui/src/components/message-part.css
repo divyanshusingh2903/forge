@@ -973,6 +973,25 @@
     padding-inline-start: 20px;
   }
 
+  [data-slot="execute-tool-images"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 6px;
+    padding-inline-start: 20px;
+
+    img {
+      max-width: min(100%, 360px);
+      max-height: 240px;
+      object-fit: contain;
+      object-position: left top;
+      border: 1px solid var(--v2-border-border-base);
+      border-radius: 6px;
+      background: var(--v2-background-bg-layer-01);
+      cursor: zoom-in;
+    }
+  }
+
   [data-slot="execute-tool-error"] {
     margin-top: 4px;
     max-height: 240px;
