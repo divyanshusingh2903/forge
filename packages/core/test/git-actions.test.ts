@@ -21,6 +21,8 @@ import { tmpdir } from "./fixture/tmpdir"
 import { it } from "./lib/effect"
 
 const watcher = Watcher.testLayer
+// Git on Windows checks files out with CRLF unless the user turned autocrlf off.
+const lf = (text: string) => text.replaceAll("\r\n", "\n")
 
 const provide = (directory: string, written = "feat(core): add greetings\n\n- greet in English") =>
   Effect.provide(
@@ -138,7 +140,7 @@ describe("GitActions", () => {
         yield* git.stage({ files: ["a.txt"] })
         yield* Effect.promise(() => fs.writeFile(file, "unstaged\n"))
         yield* git.discard({ file: "a.txt" })
-        expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("staged\n")
+        expect(yield* Effect.promise(() => fs.readFile(file, "utf8").then(lf))).toBe("staged\n")
         expect(yield* git.discard({ file: "../outside" }).pipe(Effect.flip)).toMatchObject({
           message: "Invalid file path",
         })
@@ -256,7 +258,7 @@ describe("GitActions", () => {
         })
 
         yield* git.stashApply(list[1])
-        expect(yield* Effect.promise(() => fs.readFile(file, "utf8"))).toBe("first\n")
+        expect(yield* Effect.promise(() => fs.readFile(file, "utf8").then(lf))).toBe("first\n")
         yield* git.stage({})
         yield* git.commit({ message: "first" })
         yield* git.stashDrop((yield* git.stashes())[1])
