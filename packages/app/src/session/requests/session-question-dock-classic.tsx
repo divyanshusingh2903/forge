@@ -17,7 +17,7 @@ import { makeEventListener } from "@solid-primitives/event-listener"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
 import { useServerSDK } from "@/runtime/server/client"
 import { ScopedKey } from "@/runtime/server/scope"
-import { useCommand } from "@/shell/commands/command"
+import { formatKeybind, useCommand } from "@/shell/commands/command"
 import { questionCache } from "./question-state"
 
 const IS_MAC = /(Mac|iPod|iPhone|iPad)/.test(navigator.platform)
@@ -690,8 +690,16 @@ export const SessionQuestionDockClassic: Component<{ request: FormInfo; onSubmit
         }
         footer={
           <>
-            <Button variant="ghost" size="large" disabled={sending()} onClick={reject} aria-keyshortcuts="Escape">
+            <Button
+              variant="ghost"
+              size="large"
+              class="gap-2"
+              disabled={sending()}
+              onClick={reject}
+              aria-keyshortcuts="Escape"
+            >
               {language.t("ui.common.dismiss")}
+              <Keybind keys={[formatKeybind("esc", language.t)]} variant="neutral" aria-hidden="true" />
             </Button>
             <div data-slot="question-footer-actions">
               <Show when={store.tab > 0}>
@@ -727,6 +735,7 @@ export const SessionQuestionDockClassic: Component<{ request: FormInfo; onSubmit
                 <Button
                   variant={last() ? "contrast" : "neutral"}
                   size="large"
+                  class="gap-2"
                   disabled={sending()}
                   onClick={next}
                   aria-label={language.t(last() ? "ui.common.submit" : "ui.common.next")}
@@ -740,6 +749,21 @@ export const SessionQuestionDockClassic: Component<{ request: FormInfo; onSubmit
                       {language.t("ui.common.submit")}
                     </span>
                   </span>
+                  {/* Like the plan dock's hints: on the light submit button the theme's fill vanishes, so the badge is a
+                      shade of the button's own text color there. */}
+                  <Keybind
+                    keys={[submitShortcut()]}
+                    variant="neutral"
+                    aria-hidden="true"
+                    style={
+                      last()
+                        ? {
+                            "--v2-background-bg-layer-03": "color-mix(in srgb, currentColor 14%, transparent)",
+                            "--v2-text-text-muted": "color-mix(in srgb, currentColor 70%, transparent)",
+                          }
+                        : undefined
+                    }
+                  />
                 </Button>
               </Tooltip>
             </div>
