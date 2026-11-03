@@ -212,6 +212,7 @@ export function normalize(input: unknown): Result {
     username: Info.fields.username,
     timezone: Info.fields.timezone,
     snapshots: Info.fields.snapshots,
+    memory: Info.fields.memory,
     media: Info.fields.media,
     tool_output: Info.fields.tool_output,
     websearch: Info.fields.websearch,

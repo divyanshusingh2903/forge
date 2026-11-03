@@ -2424,6 +2424,7 @@ export type ConfigEntry =
           }
         }
         snapshots?: boolean
+        memory?: boolean
         watcher?: { ignore?: Array<string> }
         formatter?:
           | boolean

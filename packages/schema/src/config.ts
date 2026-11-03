@@ -67,6 +67,9 @@ export class Info extends Schema.Class<Info>("Config.Info")({
   snapshots: Schema.Boolean.pipe(optional).annotate({
     description: "Enable snapshots used for undo and revert behavior",
   }),
+  memory: Schema.Boolean.pipe(optional).annotate({
+    description: "Enable local memory loaded across sessions; false keeps existing notes but stops loading them",
+  }),
   watcher: ConfigWatcher.Info.pipe(optional).annotate({
     description: "Filesystem watcher configuration",
   }),

@@ -12,6 +12,7 @@ import { Instructions } from "../instructions/index.js"
 import { InstructionBuiltIns } from "../instructions/builtins.js"
 import { Location } from "../location.js"
 import { McpInstructions } from "../mcp/instructions.js"
+import { MemoryInstructions } from "../memory/instructions.js"
 import { McpTool } from "../tool/mcp.js"
 import { ReferenceInstructions } from "../reference/instructions.js"
 import { SkillInstructions } from "../skill/instructions.js"
@@ -81,6 +82,7 @@ const layer = Layer.effect(
     const entries = yield* InstructionEntry.Service
     const location = yield* Location.Service
     const mcpInstructions = yield* McpInstructions.Service
+    const memoryInstructions = yield* MemoryInstructions.Service
     const mcpTools = yield* McpTool.Service
     const models = yield* SessionRunnerModel.Service
     const request = yield* SessionModelRequest.Service
@@ -142,6 +144,7 @@ const layer = Layer.effect(
           skills: skillInstructions.load(permissions),
           references: referenceInstructions.load(),
           mcp: mcpInstructions.load(permissions),
+          memory: memoryInstructions.load(session.parentID !== undefined),
           entries: entries.load(sessionID),
         },
         { concurrency: "unbounded" },
@@ -151,7 +154,8 @@ const layer = Layer.effect(
         agent: { ...agent, info: agent.info },
         // Ordered from most to least shared across sessions so the baseline stays a reusable
         // prompt-cache prefix: user-level catalog and guidance, then project instructions, then
-        // the date and environment, which vary by day and directory.
+        // the date and environment, which vary by day and directory. Memory follows them, since saving a note
+        // changes it mid-session.
         instructions: Instructions.combine([
           CodeModeInstructions.make(loaded.tools.codeModeCatalog),
           loaded.mcp,
@@ -159,6 +163,7 @@ const layer = Layer.effect(
           loaded.skills,
           loaded.discovery,
           loaded.builtins,
+          loaded.memory,
           loaded.entries,
         ]),
         tools: loaded.tools,
@@ -214,6 +219,7 @@ export const node = makeLocationNode({
     InstructionEntry.node,
     Location.node,
     McpInstructions.node,
+    MemoryInstructions.node,
     McpTool.node,
     ReferenceInstructions.node,
     SessionRunnerModel.node,

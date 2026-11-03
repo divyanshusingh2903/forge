@@ -52,6 +52,7 @@ import { Integration } from "../integration.js"
 import { Job } from "../job.js"
 import { KV } from "../kv.js"
 import { Location } from "../location.js"
+import { Memory } from "../memory.js"
 import { ModelsDev } from "../models-dev.js"
 import { Mcp } from "../mcp/index.js"
 import { Npm } from "@opencode/util/npm"
@@ -98,6 +99,7 @@ import { CommandPlugin } from "./command.js"
 import { IdentityPlugin } from "./identity.js"
 import { ForgeModePlugin } from "./forge-mode.js"
 import { ForgeMcpPlugin } from "./forge-mcp.js"
+import { ForgeMemoryPlugin } from "./forge-memory.js"
 import { ForgePlanPlugin } from "./forge-plan.js"
 import { GoalPlugin } from "./goal.js"
 import { ModelsDevPlugin } from "./models-dev.js"
@@ -142,6 +144,7 @@ const services = [
   KV.Service,
   LLMClient.Service,
   Location.Service,
+  Memory.Service,
   ModelsDev.Service,
   Mcp.Service,
   Npm.Service,
@@ -198,6 +201,7 @@ export const requirements = LayerNode.group([
   KV.node,
   llmClient,
   Location.node,
+  Memory.node,
   ModelsDev.node,
   Mcp.node,
   Npm.node,
@@ -275,6 +279,8 @@ const post = [
   ConfigInstructionPlugin.Plugin,
   ConfigReferencePlugin.Plugin,
   ConfigAgentPlugin.Plugin,
+  // After config agents, so custom subagents also get the memory rules.
+  ForgeMemoryPlugin.Plugin,
   BrowserPlugin,
   ConfigCommandPlugin.Plugin,
   ConfigCompactionPlugin.Plugin,

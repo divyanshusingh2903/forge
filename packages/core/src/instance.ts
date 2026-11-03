@@ -50,6 +50,8 @@ import { SkillInstructions } from "./skill/instructions.js"
 import { Snapshot } from "./snapshot.js"
 import { InstructionDiscovery } from "./instruction-discovery.js"
 import { InstructionBuiltIns } from "./instructions/builtins.js"
+import { Memory } from "./memory.js"
+import { MemoryInstructions } from "./memory/instructions.js"
 import { SessionInstructions } from "./session/instructions.js"
 import { McpTool } from "./tool/mcp.js"
 import { ReadToolFileSystem } from "./tool/read-filesystem.js"
@@ -101,6 +103,8 @@ const nodes = [
   Image.node,
   SkillInstructions.node,
   ReferenceInstructions.node,
+  Memory.node,
+  MemoryInstructions.node,
   Form.node,
   Generate.node,
   Voice.node,
