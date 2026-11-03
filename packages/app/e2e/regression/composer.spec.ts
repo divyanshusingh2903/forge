@@ -1106,6 +1106,7 @@ test("lists slash commands in their built-in order", async ({ page }) => {
     "/model",
     "/connect",
     "/reload",
+    "/agent",
     "/btw",
   ])
 })
@@ -1251,7 +1252,7 @@ test("marks a Console provider with its workspace only when it is also connected
   await expect(menu.getByText(/Anomaly \//)).toHaveCount(0)
 })
 
-test("shows thinking on hover or a non-default selection while preserving keyboard access", async ({ page }) => {
+test("keeps the thinking picker visible for every selection and reachable by keyboard", async ({ page }) => {
   const { editor: input } = await openSession(page, {
     name: "ComposerThinking",
     provider: provider({ id: "thinking-model", name: "Thinking Model", variants: { high: {} } }),
@@ -1263,13 +1264,10 @@ test("shows thinking on hover or a non-default selection while preserving keyboa
 
   await page.mouse.move(0, 0)
   await expect(control).toHaveText("default")
-  await expect(control).toHaveCSS("opacity", "0")
-  await expect(control).toHaveCSS("pointer-events", "none")
-
-  await input.hover()
   await expect(control).toHaveCSS("opacity", "1")
+  await expect(control).toHaveCSS("pointer-events", "auto")
 
-  // The menu keeps the control visible after the pointer leaves.
+  // The control stays visible while its menu is open and the pointer is elsewhere.
   await control.click()
   await expect(option("high")).toBeVisible()
   await page.mouse.move(0, 0)
@@ -1287,14 +1285,13 @@ test("shows thinking on hover or a non-default selection while preserving keyboa
   await input.click()
   await page.mouse.move(0, 0)
   await expect(control).toHaveText("default")
-  await expect(control).toHaveCSS("opacity", "0")
+  await expect(control).toHaveCSS("opacity", "1")
 
-  // The single-agent fixture has only Add and Model before the thinking trigger.
-  await page.keyboard.press("Tab")
-  await expect(composer.getByRole("button", { name: "Add images and files" })).toBeFocused()
-  await page.keyboard.press("Tab")
-  await expect(composer.getByRole("button", { name: "Thinking Model" })).toBeFocused()
-  await page.keyboard.press("Tab")
+  // Tab past the controls before the thinking trigger (Add, Forge's mode control, Model) to reach it.
+  await expect(async () => {
+    await page.keyboard.press("Tab")
+    await expect(control).toBeFocused({ timeout: 500 })
+  }).toPass({ timeout: 10_000 })
   await expect(control).toBeFocused()
   await expect(control).toHaveCSS("opacity", "1")
   await page.keyboard.press("Enter")
@@ -1303,7 +1300,8 @@ test("shows thinking on hover or a non-default selection while preserving keyboa
   await page.keyboard.press("Escape")
   await expect(control).toBeFocused()
   await page.keyboard.press("Tab")
-  await expect(control).toHaveCSS("opacity", "0")
+  await expect(control).not.toBeFocused()
+  await expect(control).toHaveCSS("opacity", "1")
 })
 
 test("pastes into the composer from the session view but not into other inputs", async ({ page }) => {
