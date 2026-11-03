@@ -16,6 +16,8 @@ const packageDir = path.dirname(fileURLToPath(import.meta.url))
 // fpm only accepts flags before the first src=dest mapping, so keep this first.
 const rpmNoBuildIdLinksFpm = "--rpm-rpmbuild-define=_build_id_links none"
 
+const appVersion = process.env.FORGE_VERSION ?? process.env.OPENCODE_VERSION
+
 const metainfoFpm = (appId: string) =>
   `${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`
 
@@ -67,10 +69,10 @@ const getBase = (appId: string): Configuration => {
     // "io.github.divyanshusingh2903.forge.desktop".
     // https://developer.gnome.org/documentation/guidelines/maintainer/integrating.html
     // https://www.electron.build/docs/linux/
-    // Release builds take their version from OPENCODE_VERSION instead of rewriting package.json.
-    extraMetadata: process.env.OPENCODE_VERSION
-      ? { desktopName, version: process.env.OPENCODE_VERSION }
-      : { desktopName },
+    // Release builds take their version from the environment instead of rewriting package.json. The app carries the
+    // full Forge version (2.2.5-v0.7.0), which the update manifests also carry, while the bundled server keeps the plain
+    // OpenCode one.
+    extraMetadata: appVersion ? { desktopName, version: appVersion } : { desktopName },
     files: [
       "out/**/*",
       "resources/**/*",
