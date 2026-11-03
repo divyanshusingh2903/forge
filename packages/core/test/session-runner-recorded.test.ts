@@ -8,6 +8,7 @@ import { LayerNodePlatform } from "@opencode/core/effect/app-node-platform"
 import { LayerNode } from "@opencode/util/effect/layer-node"
 import { Bus } from "@opencode/core/bus"
 import { EventTable } from "@opencode/core/event/sql"
+import { MemoryInstructions } from "@opencode/core/memory/instructions"
 import { Permission } from "@opencode/core/permission"
 import { Agent } from "@opencode/core/agent"
 import { Config } from "@opencode/core/config"
@@ -85,6 +86,8 @@ const referenceInstructions = Layer.mock(ReferenceInstructions.Service, {
   load: () => Effect.succeed(Instructions.empty),
 })
 const mcpInstructions = Layer.mock(McpInstructions.Service, { load: () => Effect.succeed(Instructions.empty) })
+// Memory guidance is part of Forge's system prompt, which the cassette's recorded request does not include.
+const memoryInstructions = Layer.mock(MemoryInstructions.Service, { load: () => Effect.succeed(Instructions.empty) })
 const config = Config.testLayer()
 const promptModels = Layer.mock(Model.Service, {
   get: () => Effect.undefined,
@@ -160,6 +163,7 @@ const testLayer = (llmClient: Layer.Layer<LLMClientService>) =>
       Location.node.replace(Location.boundNode({ directory: AbsolutePath.make("/project") })),
       SkillInstructions.node.replace(skillInstructions),
       ReferenceInstructions.node.replace(referenceInstructions),
+      MemoryInstructions.node.replace(memoryInstructions),
       Config.node.replace(config),
       Snapshot.node.replace(Snapshot.noopLayer),
       PluginSupervisor.node.replace(Layer.empty),
