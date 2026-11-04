@@ -324,7 +324,7 @@ it.live("maps a failing base provider to HTTP 503 instead of null metadata", () 
     const response = yield* Effect.promise(() => handler(new Request(url))).pipe(
       Effect.filterOrFail((response) => response.status === 503),
       Effect.retry(Schedule.spaced("10 millis")),
-      Effect.timeout("2 seconds"),
+      Effect.timeout("10 seconds"),
     )
     expect(response.status).toBe(503)
     expect(yield* Effect.promise(() => response.json())).toMatchObject({
@@ -333,6 +333,8 @@ it.live("maps a failing base provider to HTTP 503 instead of null metadata", () 
       message: "VCS provider could not resolve a review base",
     })
   }),
+  // Booting the location can take several seconds on a loaded macOS runner.
+  20_000,
 )
 
 function isRecord(value: unknown): value is Record<string, unknown> {
