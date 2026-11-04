@@ -78,31 +78,37 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - host: macos-15
+          - host: macos-26
             target: aarch64-apple-darwin
             cli_target: darwin-arm64
+            server_target: darwin-arm64
             platform_flag: --mac --arm64
             bun_install_flags: --os=darwin --cpu=arm64
-          - host: macos-15-intel
+          - host: macos-26-intel
             target: x86_64-apple-darwin
             cli_target: darwin-x64
+            server_target: darwin-x64-baseline
             platform_flag: --mac --x64
             bun_install_flags: --os=darwin --cpu=x64
           - host: windows-2025
             target: x86_64-pc-windows-msvc
             cli_target: windows-x64
+            server_target: windows-x64-baseline
             platform_flag: --win --x64
           - host: windows-2025
             target: aarch64-pc-windows-msvc
             cli_target: windows-arm64
+            server_target: windows-arm64
             platform_flag: --win --arm64
           - host: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             cli_target: linux-x64
+            server_target: linux-x64-baseline
             platform_flag: --linux --x64
           - host: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             cli_target: linux-arm64
+            server_target: linux-arm64
             platform_flag: --linux --arm64
     runs-on: ${{ matrix.settings.host }}
     env:
@@ -137,18 +143,21 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # The desktop build bundles the server from packages/cli/dist and fails for prod when it is missing.
+      # The desktop build bundles the server from packages/cli/dist and fails for prod when it is missing. The
+      # desktop bundles the baseline x64 server, so server_target names that variant where it differs from cli_target.
       - name: Build server
         run: bun run build --skip-web-ui
         working-directory: packages/cli
         env:
-          OPENCODE_TARGET: ${{ matrix.settings.cli_target }}
+          OPENCODE_TARGET: ${{ matrix.settings.server_target }}
 
+      # cli_target tells the desktop which server to bundle when the host is not the target (Windows arm64).
       - name: Build
         run: bun run build
         working-directory: packages/desktop
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+          OPENCODE_TARGET: ${{ matrix.settings.cli_target }}
 
       - name: Package
         working-directory: packages/desktop
