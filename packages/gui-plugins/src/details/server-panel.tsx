@@ -3,6 +3,7 @@ import { Button } from "@opencode/ui/button"
 import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
 import { ErrorDetails } from "@opencode/ui/error-details"
 import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
 import { McpIcon, mcpDisplayName } from "@opencode/ui/mcp-icon"
 import { Switch } from "@opencode/ui/switch"
 import { showToast } from "@opencode/ui/toast"
@@ -620,7 +621,30 @@ export function useMcp(props: ServiceProps, close: () => void): ServiceSource {
             }
 
             const signIn = () => server().status.status === "needs_auth" && !!server().integrationID
+            const attention = () => server().status.status === "failed" || server().status.status === "needs_auth"
             const busy = () => toggle.isPending && toggle.variables?.name === server().name
+
+            // A server without an integration (OAuth off, a static header) has no sign-in to open: only its error helps.
+            const recoveryLabel = () =>
+              ctx.t(failure() && !server().integrationID ? "mcp.error.actionLabel" : "mcp.signIn.open", {
+                name: server().name,
+              })
+
+            const recover = () => {
+              if (pending()) return
+
+              if (server().integrationID && manualSignIn.has(server().name)) {
+                close()
+
+                return builtinContext(ctx).layout.command("mcp.github.signIn")
+              }
+
+              if (server().integrationID) return toggle.mutate({ name: server().name, enabled: true, signIn: true })
+
+              if (server().status.status === "failed") return showError(server().name)
+
+              change(true)
+            }
 
             // The dot shows the status; the words stay for assistive technology.
             const label = () => {
@@ -671,33 +695,31 @@ export function useMcp(props: ServiceProps, close: () => void): ServiceSource {
                   <TruncatedText text={mcpDisplayName(server().name)} class="session-summary-label" />
                 </span>
                 <span class="session-mcp-trailing" onClick={(event) => event.stopPropagation()}>
-                  <Show
-                    when={signIn()}
-                    fallback={
-                      <Switch
-                        checked={enabled()}
-                        readOnly={pending()}
-                        aria-disabled={pending()}
+                  <Show when={attention()}>
+                    <Tooltip value={recoveryLabel()}>
+                      <IconButton
+                        size="small"
+                        variant="ghost-muted"
+                        icon={<Icon name="settings-gear" />}
+                        disabled={pending()}
                         aria-busy={busy()}
-                        description={label()}
-                        class="[&_[data-slot=switch-description]]:sr-only"
-                        onChange={change}
-                      >
-                        <span class="sr-only">{server().name}</span>
-                      </Switch>
-                    }
-                  >
-                    <Button
-                      size="small"
-                      variant="ghost-muted"
-                      class="session-mcp-sign-in"
-                      disabled={pending()}
+                        aria-label={recoveryLabel()}
+                        onClick={recover}
+                      />
+                    </Tooltip>
+                  </Show>
+                  <Show when={!signIn()}>
+                    <Switch
+                      checked={enabled()}
+                      readOnly={pending()}
+                      aria-disabled={pending()}
                       aria-busy={busy()}
-                      aria-label={ctx.t("mcp.signIn.open", { name: server().name })}
-                      onClick={follow}
+                      description={label()}
+                      class="[&_[data-slot=switch-description]]:sr-only"
+                      onChange={change}
                     >
-                      {ctx.t(busy() ? "mcp.signingIn" : "mcp.signIn")}
-                    </Button>
+                      <span class="sr-only">{server().name}</span>
+                    </Switch>
                   </Show>
                 </span>
               </div>
@@ -1095,7 +1117,7 @@ function useMcpToggle(session: MountedSession, directory: () => string) {
   const data = () => session.server.data
 
   return useMutation(() => ({
-    mutationFn: async (input: { name: string; enabled: boolean }) => {
+    mutationFn: async (input: { name: string; enabled: boolean; signIn?: boolean }) => {
       const client = session.server.client
       const source = data()
       const ref = { directory: directory() }
@@ -1103,11 +1125,11 @@ function useMcpToggle(session: MountedSession, directory: () => string) {
 
       if (!server) return
 
-      if (!input.enabled) {
+      if (!input.enabled && !input.signIn) {
         await client.experimental.mcp.disconnect({ server: input.name, location: ref })
       }
 
-      if (input.enabled && server.status.status !== "needs_auth") {
+      if (input.enabled && !input.signIn && server.status.status !== "needs_auth") {
         await client.experimental.mcp.connect({ server: input.name, location: ref })
       }
 
@@ -1117,8 +1139,8 @@ function useMcpToggle(session: MountedSession, directory: () => string) {
 
       if (
         input.enabled &&
-        current?.status.status === "needs_auth" &&
-        current.integrationID &&
+        (input.signIn || current?.status.status === "needs_auth") &&
+        current?.integrationID &&
         !manualSignIn.has(input.name)
       ) {
         const integration = await client.integration.get({ integrationID: current.integrationID, location: ref })
@@ -1140,7 +1162,8 @@ function useMcpToggle(session: MountedSession, directory: () => string) {
       // A successful HTTP response can still leave the MCP connection in a failed state.
       const status = current?.status
 
-      if (status?.status === "failed") throw new Error(`${input.name}: ${status.error}`)
+      // An explicit sign-in has only opened the browser; the old failure lasts until OAuth completes.
+      if (!input.signIn && status?.status === "failed") throw new Error(`${input.name}: ${status.error}`)
     },
     onError: (error) =>
       showToast({

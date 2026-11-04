@@ -154,9 +154,14 @@ test("the MCP popover shows a failed server and reconnects it from its details",
   })
 
   const row = view.panel.locator(".session-mcp-row").filter({ hasText: "figma-desktop" })
-  // The red dot is the status, and opens the error.
+  // Non-auth failures keep their error dot and gain a gear for the same recovery details.
   await expect(view.toggle).toHaveAccessibleDescription("Failed")
-  const failed = row.getByRole("button", { name: "Details for figma-desktop", exact: true })
+  await expect(row.locator("button.session-service-dot")).toHaveAccessibleName("Details for figma-desktop")
+
+  const failed = row
+    .getByRole("button", { name: "Details for figma-desktop", exact: true })
+    .and(row.locator('[data-component="icon-button-v2"]'))
+
   view.requests.length = 0
   await failed.click()
   const details = page.getByRole("dialog", { name: "figma-desktop", exact: true })
@@ -356,11 +361,14 @@ for (const surface of ["popover", "dialog"] as const) {
       method: "POST",
     })
 
-    await expect(signIn).toHaveAttribute("data-component", "button-v2")
+    await expect(signIn).toHaveAttribute("data-component", surface === "popover" ? "icon-button-v2" : "button-v2")
     await expect(signIn).toHaveAttribute("data-variant", "ghost-muted")
-    await expect(signIn.locator("svg")).toHaveCount(0)
+    await expect(signIn.locator("svg")).toHaveCount(surface === "popover" ? 1 : 0)
     await signIn.click()
-    await expect(signIn).toHaveText("Signing in…")
+
+    if (surface === "dialog") await expect(signIn).toHaveText("Signing in…")
+
+    if (surface === "popover") await expect(signIn).toHaveAttribute("aria-busy", "true")
     await expect(signIn).toBeDisabled()
     await authorization.arrived
     authorization.release()
@@ -387,6 +395,124 @@ for (const surface of ["popover", "dialog"] as const) {
         "Connected",
       )
     await expect(view.panel.getByRole("button", { name: "Sign in to figma-desktop", exact: true })).toHaveCount(0)
+  })
+}
+
+test("the MCP popover signs in again from a failed connection without toggling or deleting credentials", async ({
+  page,
+  context,
+}) => {
+  const state = { signedIn: false }
+  const attempts: Parameters<NonNullable<MockServerConfig["onIntegrationOAuth"]>>[0][] = []
+  const writes: string[] = []
+  await context.route("https://auth.example.test/**", (route) => route.fulfill({ body: "Sign in" }))
+  page.on("request", (request) => {
+    const path = new URL(request.url()).pathname
+
+    if (path.startsWith("/api/integration/") && request.method() !== "GET" && request.method() !== "OPTIONS")
+      writes.push(path)
+  })
+
+  const view = await open(page, {
+    surface: "popover",
+    mcp: () => [
+      {
+        name: "figma-desktop",
+        integrationID: "figma-oauth",
+        status: state.signedIn ? { status: "connected" } : { status: "failed", error: "Expired credentials" },
+      },
+    ],
+    integrations: [
+      {
+        id: "figma-oauth",
+        name: "Figma",
+        methods: [{ id: "oauth", type: "oauth" }],
+        connections: [{ type: "credential", id: "cred_previous", label: "Previous account", method: "oauth" }],
+      },
+    ],
+    onIntegrationOAuth: (input) => {
+      attempts.push(input)
+
+      return { url: "https://auth.example.test/authorize" }
+    },
+  })
+
+  const gear = view.panel.getByRole("button", { name: "Sign in to figma-desktop", exact: true })
+  await expect(gear).toHaveText("")
+  await expect(gear).toHaveAttribute("data-component", "icon-button-v2")
+
+  const authorization = await holdRoute(page, /\/api\/integration\/figma-oauth\/connect\/oauth(?:\?|$)/, {
+    method: "POST",
+  })
+
+  const popup = page.waitForEvent("popup")
+  view.requests.length = 0
+  await gear.click()
+  await authorization.arrived
+  await expect(gear).toBeDisabled()
+  await expect(gear).toHaveAttribute("aria-busy", "true")
+  expect(authorization.requests).toHaveLength(1)
+  authorization.release()
+  const browser = await popup
+  await expect(browser).toHaveURL("https://auth.example.test/authorize")
+  await expect(gear).toBeEnabled()
+  await expect(view.panel).toBeVisible()
+  expect(attempts).toEqual([{ integrationID: "figma-oauth", directory: workspace, body: { methodID: "oauth" } }])
+  expect(writes).toEqual(["/api/integration/figma-oauth/connect/oauth"])
+  expect(view.requests.every((request) => request.path === "/api/mcp" || request.path === "/api/mcp/resource")).toBe(true)
+  await expect(page.getByText("figma-desktop: Expired credentials", { exact: true })).toHaveCount(0)
+
+  state.signedIn = true
+  await view.push([
+    {
+      id: "evt_mcp_signed_in_again",
+      created: 1,
+      type: "mcp.status.changed",
+      location: { directory: workspace },
+      data: { server: "figma-desktop" },
+    },
+  ])
+  await expect(gear).toHaveCount(0)
+  await expect(view.toggle).toHaveAccessibleDescription("Connected")
+  await browser.close()
+})
+
+for (const failure of ["rejected", "interactive"] as const) {
+  test(`the MCP recovery gear handles ${failure} OAuth and becomes usable again`, async ({ page }) => {
+    const popups: Page[] = []
+    page.on("popup", (popup) => popups.push(popup))
+
+    if (failure === "rejected")
+      await page.route(/\/api\/integration\/figma-oauth\/connect\/oauth(?:\?|$)/, (route) => route.abort("failed"))
+
+    const view = await open(page, {
+      surface: "popover",
+      mcp: [{ name: "figma-desktop", integrationID: "figma-oauth", status: { status: "failed", error: "Unauthorized" } }],
+      integrations: [
+        {
+          id: "figma-oauth",
+          name: "Figma",
+          methods: [
+            {
+              id: "oauth",
+              type: "oauth",
+              form: failure === "interactive" ? [{ key: "client_id", type: "string", title: "Client ID" }] : [],
+            },
+          ],
+          connections: [],
+        },
+      ],
+    })
+
+    const gear = view.panel.getByRole("button", { name: "Sign in to figma-desktop", exact: true })
+    await gear.click()
+    const toast = page.getByRole("listitem", { includeHidden: true }).filter({ hasText: "Request failed" })
+    await expect(toast).toBeVisible()
+
+    if (failure === "interactive")
+      await expect(toast).toContainText("MCP server figma-desktop requires an interactive authentication form")
+    await expect(gear).toBeEnabled()
+    expect(popups).toEqual([])
   })
 }
 
@@ -418,9 +544,11 @@ for (const surface of ["popover", "dialog"] as const) {
 
       // The dot is the status, so the control beside the name must stay whole.
       const status =
-        index === 3
+        index === 3 && surface === "dialog"
           ? row.getByText(["Connected", "Disabled", "Failed", "Sign in"][index], { exact: true })
-          : row.locator('[data-slot="switch-control"]')
+          : index === 3
+            ? row.getByRole("button", { name: `Sign in to ${name}`, exact: true })
+            : row.locator('[data-slot="switch-control"]')
 
       await expect(status).toBeVisible()
       await expect
