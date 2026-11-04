@@ -1,3 +1,5 @@
+import { FileSystem, Option } from "effect"
+
 export function parseCliVersion(output: string) {
   const marker = output.lastIndexOf(" v")
   const version = marker === -1 ? output : output.slice(marker + 2)
@@ -40,4 +42,15 @@ export function keptStages(bundledVersion: string, runningVersion?: string, arch
   if (runningVersion && runningVersion !== bundledVersion) stages.push(stageName(runningVersion, arch))
 
   return stages
+}
+
+type Stat = Pick<FileSystem.File.Info, "size" | "mtime">
+
+// A rebuilt CLI can keep its version, so a staged copy is reused only when it matches the bundled
+// executable's size and mtime (the staging copy carries the mtime over).
+export function sameStage(source: Stat, staged: Stat) {
+  return (
+    source.size === staged.size &&
+    Option.getOrUndefined(source.mtime)?.getTime() === Option.getOrUndefined(staged.mtime)?.getTime()
+  )
 }

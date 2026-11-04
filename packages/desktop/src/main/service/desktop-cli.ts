@@ -9,7 +9,7 @@ import installer from "../../../../../install?raw"
 import { DesktopPaths } from "../paths"
 import { BUNDLED_CLI_VERSION_KEY } from "../storage/keys"
 import { getStore } from "../storage/store"
-import { parseCliVersion, stageName } from "./cli-version"
+import { parseCliVersion, sameStage, stageName } from "./cli-version"
 
 const execFileAsync = promisify(execFile)
 
@@ -144,7 +144,13 @@ const installCli = Effect.fn("DesktopCli.install")(function* (source: string, ve
   const directory = path.join(app.getPath("userData"), "cli", stage)
   const destination = path.join(directory, executableName())
 
-  if (existsSync(destination)) {
+  // A rebuilt CLI can keep its version, so the stage is also matched on the source's size and mtime,
+  // which the copy below carries over.
+  const sourceStat = yield* fs.stat(source)
+  const sourceMtime = Option.getOrUndefined(sourceStat.mtime)
+  const staged = existsSync(destination) ? yield* fs.stat(destination) : undefined
+
+  if (staged && sameStage(sourceStat, staged)) {
     yield* Effect.logInfo("v2 CLI staged executable reused", { path: destination, version })
 
     return destination
@@ -155,6 +161,8 @@ const installCli = Effect.fn("DesktopCli.install")(function* (source: string, ve
   yield* fs.copyFile(source, temp)
 
   if (process.platform !== "win32") yield* fs.chmod(temp, 0o755)
+
+  if (sourceMtime) yield* fs.utimes(temp, sourceMtime, sourceMtime)
   yield* fs
     .rename(temp, destination)
     .pipe(Effect.catch((error) => fs.remove(temp, { force: true }).pipe(Effect.andThen(Effect.fail(error)))))
