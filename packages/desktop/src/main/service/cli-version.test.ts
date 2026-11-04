@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
+import { Option } from "effect"
+import { keptStages, sameStage, serviceVersion, shouldRetryEnsure } from "./cli-version"
 
 describe("cli-version", () => {
   test.each([
@@ -29,5 +30,17 @@ describe("cli-version", () => {
     { version: "2.0.32", message: "Background service failed to start", expected: false },
   ])("shouldRetryEnsure($version, $message) -> $expected", (input) => {
     expect(shouldRetryEnsure(input.version, input.message)).toBe(input.expected)
+  })
+
+  test("sameStage reuses only a copy of the same executable", () => {
+    const stat = (size: number, mtime?: number) => ({
+      size: BigInt(size),
+      mtime: Option.fromNullishOr(mtime === undefined ? undefined : new Date(mtime)),
+    })
+
+    expect(sameStage(stat(10, 1000), stat(10, 1000))).toBe(true)
+    expect(sameStage(stat(10, 1000), stat(11, 1000))).toBe(false)
+    expect(sameStage(stat(10, 2000), stat(10, 1000))).toBe(false)
+    expect(sameStage(stat(10), stat(10, 1000))).toBe(false)
   })
 })
