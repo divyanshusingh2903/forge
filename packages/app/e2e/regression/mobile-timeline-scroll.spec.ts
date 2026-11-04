@@ -12,7 +12,7 @@ import {
   userMessage,
 } from "../utils/timeline"
 import { capturePromptMotion, markPrompt, promptMotionIssues, readPromptPositions } from "../utils/prompt-motion"
-import { documentKey } from "../utils/platform"
+import { documentKey, onMac } from "../utils/platform"
 
 // The thumb's track is the part of the timeline above the composer region, which the timeline scrolls on under.
 const thumbSelector = '[data-slot="session-timeline-visible"] [data-orientation="vertical"]'
@@ -588,7 +588,8 @@ for (const device of ["Pixel 7", "iPhone 13"]) {
         if (handoff.key !== "latest" && !usesScrollbar)
           await scroller.press(handoff.key === "Control+Home" ? await documentKey(page, "start", "scroller") : handoff.key)
 
-        if (handoff.key.startsWith("Control+"))
+        // macOS has no Ctrl+Home; the plain Home row covers its scroll key, which the timeline prevents itself.
+        if (handoff.key.startsWith("Control+") && !(await onMac(page)))
           await expect(scroller).toHaveAttribute("data-native-scroll-prevented", "false")
 
         if (usesScrollbar) {

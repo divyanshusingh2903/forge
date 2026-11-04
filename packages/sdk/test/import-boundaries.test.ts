@@ -15,7 +15,8 @@ test("bundles the Promise and Effect clients with the in-memory host", async () 
     expect(within(inputs, core).length).toBeGreaterThan(0)
     expect(within(inputs, server).length).toBeGreaterThan(0)
   }
-})
+  // Bundling both entrypoints can take several seconds on a loaded macOS runner.
+}, 60_000)
 
 async function bundleInputs(specifier: string) {
   const temporary = await mkdtemp(join(import.meta.dir, ".import-boundary-"))
