@@ -137,7 +137,7 @@ test("the New terminal shortcut creates the next numbered terminal", async ({ pa
   await openSide(page)
   await expect(side(page).getByRole("tab", { name: "Terminal 1", exact: true })).toBeVisible()
   await editor.click()
-  await page.keyboard.press("ControlOrMeta+Alt+T")
+  await page.keyboard.press("Control+Alt+T")
 
   await expect(side(page).getByRole("tab", { name: "Terminal 2", exact: true })).toHaveAttribute(
     "aria-selected",

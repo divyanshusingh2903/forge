@@ -1190,7 +1190,7 @@ test("tab shortcuts cycle side-panel tabs when the side panel is focused with mu
 
   // Focus outside the side panel still cycles session tabs even when multiple side-panel tabs are open.
   await composer.click()
-  await page.keyboard.press("ControlOrMeta+Tab")
+  await page.keyboard.press("Control+Tab")
   await expectPath(page, sessionHref(beta.id))
   await page.keyboard.press("ControlOrMeta+Alt+ArrowLeft")
   await expectPath(page, sessionHref(alpha.id))
@@ -1198,15 +1198,15 @@ test("tab shortcuts cycle side-panel tabs when the side panel is focused with mu
 
   // Focus inside the side panel cycles the drawn side-panel tabs and keeps focus inside the side panel.
   await panel.getByText("contents:README.md", { exact: true }).click()
-  await page.keyboard.press("ControlOrMeta+Tab")
+  await page.keyboard.press("Control+Tab")
   await expect(reviewTab).toHaveAttribute("aria-selected", "true")
   await expectPath(page, sessionHref(alpha.id))
 
-  await page.keyboard.press("ControlOrMeta+Tab")
+  await page.keyboard.press("Control+Tab")
   await expect(fileTab).toHaveAttribute("aria-selected", "true")
   await expectPath(page, sessionHref(alpha.id))
 
-  await page.keyboard.press("ControlOrMeta+Shift+Tab")
+  await page.keyboard.press("Control+Shift+Tab")
   await expect(reviewTab).toHaveAttribute("aria-selected", "true")
   await expectPath(page, sessionHref(alpha.id))
 
@@ -1219,13 +1219,13 @@ test("tab shortcuts cycle side-panel tabs when the side panel is focused with mu
   await expectPath(page, sessionHref(alpha.id))
 
   // Once only one side-panel tab remains, the shortcut returns to cycling session tabs.
-  await page.keyboard.press("ControlOrMeta+Tab")
+  await page.keyboard.press("Control+Tab")
   await expect(fileTab).toHaveAttribute("aria-selected", "true")
   await page.keyboard.press("ControlOrMeta+w")
   await expect(fileTab).toHaveCount(0)
   await expect(reviewTab).toHaveAttribute("aria-selected", "true")
   await reviewTab.click()
-  await page.keyboard.press("ControlOrMeta+Tab")
+  await page.keyboard.press("Control+Tab")
   await expectPath(page, sessionHref(beta.id))
 })
 
