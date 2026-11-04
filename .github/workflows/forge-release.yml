@@ -164,6 +164,8 @@ jobs:
         shell: bash
         timeout-minutes: 60
         env:
+          # electron-builder checks that the bundled server matches the arch it packages, which Windows arm64 cross-builds.
+          OPENCODE_TARGET: ${{ matrix.settings.cli_target }}
           CSC_LINK: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE || '' }}
           CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
           APPLE_API_KEY_CONTENT: ${{ runner.os == 'macOS' && secrets.APPLE_API_KEY_PATH || '' }}
