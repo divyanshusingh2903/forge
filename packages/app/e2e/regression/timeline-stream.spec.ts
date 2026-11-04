@@ -3373,7 +3373,7 @@ async function expectBackgroundRequest(page: Page) {
       request.method() === "POST" && new URL(request.url()).pathname === `/api/session/${sessionID}/background`,
   )
 
-  await page.keyboard.press("ControlOrMeta+b")
+  await page.keyboard.press("Control+b")
   await request
 }
 

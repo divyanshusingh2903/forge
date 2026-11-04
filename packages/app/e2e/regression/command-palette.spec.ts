@@ -483,7 +483,7 @@ test("navigation replaces commands without retaining disposed owners", async ({ 
   await expect(page).toHaveURL(/\/new-session\?/)
   await expect(editor).toBeEditable()
   await editor.blur()
-  await page.keyboard.press("ControlOrMeta+l")
+  await page.keyboard.press("Control+l")
   await expect(editor).toBeFocused()
   await page.keyboard.press("ControlOrMeta+Shift+P")
   const dialog = page.getByRole("dialog")

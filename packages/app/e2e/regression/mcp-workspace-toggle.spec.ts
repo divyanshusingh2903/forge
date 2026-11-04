@@ -36,7 +36,7 @@ async function open(
     project: { sandboxes: [workspace] },
     provider: NO_PROVIDER,
     sessions: [{ id: sessionID, title, directory: workspace }],
-    seed: { settings: { keybinds: { "mcp.toggle": "ctrl+;" } } },
+    seed: { settings: { keybinds: { "mcp.toggle": "mod+;" } } },
     mcp: input.mcp,
     onMcpAction: input.onMcpAction,
     integrations: input.integrations,
