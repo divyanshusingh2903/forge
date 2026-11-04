@@ -12,6 +12,7 @@ import { createDesktopStorage } from "./storage"
 export type DesktopWindowState = {
   id: string
   version: string
+  forgeVersion?: string
 }
 
 export function createDesktopPlatform(api: ElectronAPI, windowState: DesktopWindowState): Platform {
@@ -21,6 +22,7 @@ export function createDesktopPlatform(api: ElectronAPI, windowState: DesktopWind
     platform: "desktop",
     os,
     version: windowState.version,
+    forgeVersion: windowState.forgeVersion,
     windowID: windowState.id,
     ...createDesktopFiles(api, os),
     ...createDesktopStorage(api),

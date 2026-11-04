@@ -31,7 +31,12 @@ import { DesktopMemoryRouter } from "./window/router"
 const MigrationStatus = lazy(() => import("./migration-status").then((module) => ({ default: module.MigrationStatus })))
 
 export function DesktopApp(props: { api: ElectronAPI; version: string }) {
-  const windowState = { id: props.api.getWindowID(), version: props.version }
+  const windowState = {
+    id: props.api.getWindowID(),
+    version: props.version,
+    forgeVersion: import.meta.env.FORGE_VERSION,
+  }
+
   const initialUrl = getLastActiveUrl(windowState.id)
   const url = new URL(initialUrl, "http://localhost")
   const route = currentRoute(url.pathname, url.search)

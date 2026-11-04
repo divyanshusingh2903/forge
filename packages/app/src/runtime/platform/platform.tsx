@@ -38,6 +38,8 @@ type PlatformBase = {
   setVoiceCallActive?(active: boolean): Promise<void>
   /** App version */
   version?: string
+  /** Forge's own release number, without the OpenCode version it is built on */
+  forgeVersion?: string
 
   /** Open a web or mail URL in the default system application */
   openExternal(url: string): void

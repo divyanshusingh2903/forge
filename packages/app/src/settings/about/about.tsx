@@ -37,8 +37,11 @@ export function SettingsAbout(props: { active: boolean }) {
   const platform = usePlatform()
   const dialog = useDialog()
   const [copy, setCopy] = createStore({ pending: false, copied: false, forceCopied: false })
-  const version = () => platform.version ?? language.t("settings.about.devVersion")
-  const versionLabel = () => language.t("settings.about.version", { version: version() })
+  const forgeVersion = () => platform.forgeVersion ?? language.t("settings.about.devVersion")
+  const openCodeVersion = () => platform.version ?? language.t("settings.about.devVersion")
+
+  const versionLabel = () =>
+    `${language.t("settings.about.version", { version: forgeVersion() })} (${language.t("settings.about.openCodeVersion", { version: openCodeVersion() })})`
 
   const [otherContributors] = createResource(
     () => props.active || undefined,
@@ -74,14 +77,14 @@ export function SettingsAbout(props: { active: boolean }) {
       .finally(() => setCopy("pending", false))
   }
 
-  const credit = (name: string) => (
+  const credit = (name: string, label = name) => (
     <bdi dir="ltr">
-      <ExternalLink href={profile(name)}>{name}</ExternalLink>
+      <ExternalLink href={profile(name)}>{label}</ExternalLink>
     </bdi>
   )
 
   const writerCredits = () => [
-    ...writers.map(credit),
+    ...writers.map((name) => credit(name)),
     <ExternalLink href="https://github.com/anomalyco/opencode/graphs/contributors">
       {language.plural("settings.about.otherContributor", otherContributors.latest, {
         count: otherContributors.latest,
@@ -120,7 +123,7 @@ export function SettingsAbout(props: { active: boolean }) {
             >
               <span>
                 {language.rich("settings.about.version", {
-                  version: <bdi dir="ltr">{version()}</bdi>,
+                  version: <bdi dir="ltr">{forgeVersion()}</bdi>,
                 })}
               </span>
             </button>
@@ -132,10 +135,20 @@ export function SettingsAbout(props: { active: boolean }) {
       <AnimatedWordmark active={props.active} />
 
       <div class="settings-about-credits">
+        <p>{language.rich("settings.about.forgeCredit", { name: credit("divyanshusingh2903", "Divyanshu Singh") })}</p>
+      </div>
+
+      <div class="settings-about-credits">
+        <p>{language.t("settings.about.openCodeThanks")}</p>
+        <p>
+          {language.rich("settings.about.openCodeVersion", {
+            version: <bdi dir="ltr">{openCodeVersion()}</bdi>,
+          })}
+        </p>
         <p>{language.rich("settings.about.writtenByNames", { names: language.list(writerCredits()) })}</p>
         <p>
           {language.rich("settings.about.illustratedByNames", {
-            names: language.list(illustrators.map(credit)),
+            names: language.list(illustrators.map((name) => credit(name))),
           })}
         </p>
       </div>
