@@ -69,6 +69,8 @@ it.live("returns LocationNotFoundError for a missing folder and recovers once it
     )
     expect(recovered.status).toBe(200)
   }),
+  // Booting the location graph can take several seconds on a loaded macOS runner.
+  { timeout: 30_000 },
 )
 
 it.live("manages a session whose directory was deleted", () =>
@@ -447,6 +449,8 @@ it.live("falls back to port 1457 when OpenAI OAuth port 1455 remains busy", () =
     const body = (yield* Effect.promise(() => response.json())) as { data: { url: string } }
     expect(new URL(body.data.url).searchParams.get("redirect_uri")).toBe("http://localhost:1457/auth/callback")
   }),
+  // Real retries wait 18 * 200 ms before the fallback port is used, which leaves little of the default deadline.
+  { timeout: 20_000 },
 )
 
 it.live(
