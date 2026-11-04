@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from "@playwright/test"
 import { NO_PROVIDER, SERVER, T0, expectPath, holdRoute, provider, sessionHref } from "../utils/app"
 import { mockWorkspace, openDraft, openSession } from "../utils/workspace"
 import { mockPluginsActivating, type MockServerConfig } from "../utils/mock-server"
+import { documentKey } from "../utils/platform"
 
 test.use({ permissions: ["clipboard-read", "clipboard-write"] })
 
@@ -894,7 +895,7 @@ for (const [width, direction] of [
     await page.evaluate((direction) => (document.documentElement.dir = direction), direction)
     const suffix = "\nExisting trailing content".repeat(100)
     await input.fill("Before " + suffix)
-    await input.press("ControlOrMeta+Home")
+    await input.press(await documentKey(page, "start"))
     await input.press("ArrowRight")
     const text = "Pasted line /tmp/example.ts 123 \u0645\u0631\u062d\u0628\u0627\n".repeat(100) + "End of paste"
     await page.evaluate((text) => navigator.clipboard.writeText(text), text)

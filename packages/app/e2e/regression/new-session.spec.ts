@@ -10,6 +10,7 @@ import {
   openWorktreeDraft,
   type WorkspaceInput,
 } from "../utils/workspace"
+import { documentKey } from "../utils/platform"
 
 const directory = "C:/OpenCode/WorkspacePending"
 
@@ -706,7 +707,7 @@ test("the title and message stay stable through worktree creation", async ({ pag
   const mock = await openWorktreeDraft(page, pendingDraft)
   const pending = await submitPending(page, mock)
   await draftFollowUp(page)
-  await editor(page).press("ControlOrMeta+Home")
+  await editor(page).press(await documentKey(page, "start"))
   const title = page.locator("[data-session-title]").getByRole("heading", { level: 1 })
   const before = await title.boundingBox()
   const messageBefore = await pending.message.boundingBox()

@@ -1154,10 +1154,11 @@ test("image gestures anchor zoom, pan, and reset independently of the pane", asy
   const second = (await panel.getByRole("img", { name: "second.svg", exact: true }).boundingBox())!
   expect(second.width).toBeGreaterThan(0)
   expect(second.height).toBeGreaterThan(0)
-  await page.keyboard.down("ControlOrMeta")
+  // Ctrl+wheel is the pinch gesture on every platform, including macOS where Cmd+wheel is not.
+  await page.keyboard.down("Control")
   await page.mouse.wheel(0, -50)
   await expect(stage).toHaveAttribute("data-zoom", "actual")
-  await page.keyboard.up("ControlOrMeta")
+  await page.keyboard.up("Control")
   await fit.click()
   await page.setViewportSize({ width: 1200, height: 700 })
   await expect

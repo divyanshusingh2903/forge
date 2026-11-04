@@ -57,6 +57,8 @@ test("after a reload, the close shortcut closes the restored terminal", async ({
 
   await openSide(page)
   await showTerminal(page, "Shell", "pty_shell")
+  // Reloading before the first connection lands would leave one socket to count, not two.
+  await expect.poll(() => persistentPty.sockets.map((socket) => socket.id)).toEqual(["pty_shell"])
 
   // The restored tab is selected before the server lists the session's terminals.
   const list = await holdRoute(page, /\/api\/experimental\/session\/ses_terminals\/terminal(\?|$)/, { method: "GET" })
@@ -214,7 +216,7 @@ test("a dropped connection says the terminal disconnected and keeps its tab", as
   await expect(side(page).getByText("Terminal disconnected", { exact: true })).toBeVisible()
   await expect(side(page).getByRole("tab", { name: "Build", exact: true })).toHaveAttribute("aria-selected", "true")
   expect(persistentPty.sockets).toHaveLength(1)
-  expect(await terminalText(page, screen)).toBe("still-here")
+  await expect.poll(() => terminalText(page, screen)).toBe("still-here")
 })
 
 test("after a server restart, showing the terminal again restores it from a new snapshot", async ({ page }) => {

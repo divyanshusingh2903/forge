@@ -12,6 +12,7 @@ import {
   userMessage,
 } from "../utils/timeline"
 import { capturePromptMotion, markPrompt, promptMotionIssues, readPromptPositions } from "../utils/prompt-motion"
+import { documentKey } from "../utils/platform"
 
 // The thumb's track is the part of the timeline above the composer region, which the timeline scrolls on under.
 const thumbSelector = '[data-slot="session-timeline-visible"] [data-orientation="vertical"]'
@@ -271,9 +272,9 @@ for (const device of ["Pixel 7", "iPhone 13"]) {
               element.removeEventListener("scrollend", settled)
             })
           })
-          await nested.press("Control+End")
+          await nested.press(await documentKey(page, "end"))
           await expect(nested).toHaveAttribute("data-end-settled")
-          await nested.press("Control+Home")
+          await nested.press(await documentKey(page, "start"))
           await expect(nested).toHaveJSProperty("scrollTop", 0)
           expect(await tail.evaluate((element) => element.getBoundingClientRect().top)).toBeCloseTo(position, 0)
         }
@@ -511,7 +512,9 @@ for (const device of ["Pixel 7", "iPhone 13"]) {
         if (handoff.key.startsWith("Control+"))
           await scroller.evaluate((element) => {
             document.addEventListener("keydown", function observe(event) {
-              if (!event.ctrlKey || !["Home", "End"].includes(event.key)) return
+              const documentEdge = event.ctrlKey ? ["Home", "End"] : event.metaKey ? ["ArrowUp", "ArrowDown"] : []
+
+              if (!documentEdge.includes(event.key)) return
               element.dataset.nativeScrollPrevented = String(event.defaultPrevented)
               document.removeEventListener("keydown", observe)
             })
@@ -584,7 +587,8 @@ for (const device of ["Pixel 7", "iPhone 13"]) {
           await page.mouse.move(0, 0)
         }
 
-        if (handoff.key !== "latest" && !usesScrollbar) await scroller.press(handoff.key)
+        if (handoff.key !== "latest" && !usesScrollbar)
+          await scroller.press(handoff.key === "Control+Home" ? await documentKey(page, "start") : handoff.key)
 
         if (handoff.key.startsWith("Control+"))
           await expect(scroller).toHaveAttribute("data-native-scroll-prevented", "false")

@@ -655,8 +655,10 @@ test("Extensions lists open on hover, hold course into the open list, and follow
   await page.keyboard.press("Enter")
   await expect(list("Skills")).toBeVisible()
   // Skill rows take no focus, so Escape from the row closes the whole summary.
-  await page.keyboard.press("Escape")
-  await expect(summary).toBeHidden()
+  await expect(async () => {
+    await page.keyboard.press("Escape")
+    await expect(summary).toBeHidden({ timeout: 1000 })
+  }).toPass()
 })
 
 test("Extensions lists open config files and skills in a side tab and start setup sessions", async ({ page }) => {

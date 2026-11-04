@@ -5,6 +5,7 @@ import { fixture, mockStressTimeline } from "../utils/session-fixture"
 import { reviewTabs } from "../utils/side-panel"
 import { expectSessionTitle } from "../utils/waits"
 import { mockRemoteServer, mockWorkspace, openSession } from "../utils/workspace"
+import { onMac } from "../utils/platform"
 
 const tabs = (page: Page) => page.locator('[data-slot="titlebar-tabs"] a')
 
@@ -607,7 +608,11 @@ test.describe("rename", () => {
     await page.keyboard.press("Escape")
     await expect(page.getByRole("menuitem", { name: "Rename", exact: true })).toBeHidden()
     await expect(tab).toBeFocused()
-    await tab.press("Shift+F10")
+
+    // Shift+F10 opens the context menu from the keyboard everywhere except macOS, which has no such key.
+    if (await onMac(page)) await tab.dispatchEvent("contextmenu")
+    else await tab.press("Shift+F10")
+
     await page.getByRole("menuitem", { name: "Rename", exact: true }).click()
     const input = page.locator('[data-slot="tab-title"][contenteditable="plaintext-only"]')
     await expect(input).toBeFocused()
