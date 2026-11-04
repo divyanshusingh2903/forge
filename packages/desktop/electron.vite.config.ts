@@ -117,6 +117,8 @@ export default defineConfig(async ({ command }) => {
       },
       define: {
         "import.meta.env.OPENCODE_VERSION": JSON.stringify(process.env.OPENCODE_VERSION),
+        // FORGE_VERSION is `<opencode>-v<forge>`; the About page shows the Forge half first.
+        "import.meta.env.FORGE_VERSION": JSON.stringify(process.env.FORGE_VERSION?.split("-v")[1]),
         "import.meta.env.VITE_OPENCODE_CHANNEL": JSON.stringify(channel),
         "import.meta.env.OPENCODE_COMMIT": betaNotes ? JSON.stringify(betaNotes.sha) : "undefined",
         "import.meta.env.OPENCODE_BETA_NOTES": betaNotes ? JSON.stringify(JSON.stringify(betaNotes)) : "undefined",
