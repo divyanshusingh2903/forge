@@ -1,4 +1,5 @@
-import { type ComponentProps } from "solid-js"
+import { For, type ComponentProps } from "solid-js"
+import { FORGE_HEIGHT, FORGE_LETTERS, FORGE_PITCH, FORGE_WIDTH } from "./forge-letters"
 
 // Abstract mark: three flat bars, single tone, gaps only between rows.
 export const Mark = (props: { class?: string }) => {
@@ -34,88 +35,23 @@ export const Splash = (props: Pick<ComponentProps<"svg">, "ref" | "class">) => {
   )
 }
 
-// Pixel-block wordmark reading "FORGE", matching the mark's grid geometry.
+// Wordmark reading "FORGE", drawn in the OpenCode pixel face.
 export const Logo = (props: { class?: string }) => {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 144 42"
+      viewBox={`0 0 ${FORGE_WIDTH} ${FORGE_HEIGHT}`}
       fill="none"
       classList={{ [props.class ?? ""]: !!props.class }}
     >
-      <g fill="var(--icon-base)">
-        <rect x="0" y="3" width="6" height="6" />
-        <rect x="6" y="3" width="6" height="6" />
-        <rect x="12" y="3" width="6" height="6" />
-        <rect x="18" y="3" width="6" height="6" />
-        <rect x="0" y="9" width="6" height="6" />
-        <rect x="0" y="15" width="6" height="6" />
-        <rect x="6" y="15" width="6" height="6" />
-        <rect x="12" y="15" width="6" height="6" />
-        <rect x="0" y="21" width="6" height="6" />
-        <rect x="0" y="27" width="6" height="6" />
-        <rect x="0" y="33" width="6" height="6" />
-        <rect x="30" y="3" width="6" height="6" />
-        <rect x="36" y="3" width="6" height="6" />
-        <rect x="42" y="3" width="6" height="6" />
-        <rect x="48" y="3" width="6" height="6" />
-        <rect x="30" y="9" width="6" height="6" />
-        <rect x="48" y="9" width="6" height="6" />
-        <rect x="30" y="15" width="6" height="6" />
-        <rect x="48" y="15" width="6" height="6" />
-        <rect x="30" y="21" width="6" height="6" />
-        <rect x="48" y="21" width="6" height="6" />
-        <rect x="30" y="27" width="6" height="6" />
-        <rect x="48" y="27" width="6" height="6" />
-        <rect x="30" y="33" width="6" height="6" />
-        <rect x="36" y="33" width="6" height="6" />
-        <rect x="42" y="33" width="6" height="6" />
-        <rect x="48" y="33" width="6" height="6" />
-        <rect x="60" y="3" width="6" height="6" />
-        <rect x="66" y="3" width="6" height="6" />
-        <rect x="72" y="3" width="6" height="6" />
-        <rect x="60" y="9" width="6" height="6" />
-        <rect x="78" y="9" width="6" height="6" />
-        <rect x="60" y="15" width="6" height="6" />
-        <rect x="66" y="15" width="6" height="6" />
-        <rect x="72" y="15" width="6" height="6" />
-        <rect x="60" y="21" width="6" height="6" />
-        <rect x="72" y="21" width="6" height="6" />
-        <rect x="60" y="27" width="6" height="6" />
-        <rect x="78" y="27" width="6" height="6" />
-        <rect x="60" y="33" width="6" height="6" />
-        <rect x="78" y="33" width="6" height="6" />
-        <rect x="90" y="3" width="6" height="6" />
-        <rect x="96" y="3" width="6" height="6" />
-        <rect x="102" y="3" width="6" height="6" />
-        <rect x="108" y="3" width="6" height="6" />
-        <rect x="90" y="9" width="6" height="6" />
-        <rect x="90" y="15" width="6" height="6" />
-        <rect x="102" y="15" width="6" height="6" />
-        <rect x="108" y="15" width="6" height="6" />
-        <rect x="90" y="21" width="6" height="6" />
-        <rect x="108" y="21" width="6" height="6" />
-        <rect x="90" y="27" width="6" height="6" />
-        <rect x="108" y="27" width="6" height="6" />
-        <rect x="90" y="33" width="6" height="6" />
-        <rect x="96" y="33" width="6" height="6" />
-        <rect x="102" y="33" width="6" height="6" />
-        <rect x="108" y="33" width="6" height="6" />
-        <rect x="120" y="3" width="6" height="6" />
-        <rect x="126" y="3" width="6" height="6" />
-        <rect x="132" y="3" width="6" height="6" />
-        <rect x="138" y="3" width="6" height="6" />
-        <rect x="120" y="9" width="6" height="6" />
-        <rect x="120" y="15" width="6" height="6" />
-        <rect x="126" y="15" width="6" height="6" />
-        <rect x="132" y="15" width="6" height="6" />
-        <rect x="120" y="21" width="6" height="6" />
-        <rect x="120" y="27" width="6" height="6" />
-        <rect x="120" y="33" width="6" height="6" />
-        <rect x="126" y="33" width="6" height="6" />
-        <rect x="132" y="33" width="6" height="6" />
-        <rect x="138" y="33" width="6" height="6" />
-      </g>
+      <For each={FORGE_LETTERS}>
+        {(letter, index) => (
+          <g transform={`translate(${index() * FORGE_PITCH} 0)`}>
+            {letter.shadow && <path d={letter.shadow} fill="var(--icon-weak-base)" />}
+            <path d={letter.outline} fill={index() < 3 ? "var(--icon-base)" : "var(--icon-strong-base)"} />
+          </g>
+        )}
+      </For>
     </svg>
   )
 }

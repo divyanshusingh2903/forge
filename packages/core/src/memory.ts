@@ -1,13 +1,14 @@
-export * as Memory from "./memory"
+export * as Memory from "./memory.js"
 
 import path from "path"
 import { Context, Effect, Layer } from "effect"
-import { AbsolutePath } from "./schema"
-import { FSUtil } from "./fs-util"
-import { Git } from "./git"
-import { Global } from "./global"
-import { makeGlobalNode } from "./effect/app-node"
-import { Hash } from "./util/hash"
+import { makeLocationNode } from "@opencode/util/effect/app-node"
+import { FSUtil } from "@opencode/util/fs-util"
+import { Global } from "@opencode/util/global"
+import { Hash } from "@opencode/util/hash"
+import { Config } from "./config.js"
+import { Location } from "./location.js"
+import { AbsolutePath } from "./schema.js"
 
 export const INDEX_FILE = "MEMORY.md"
 export const MAX_LINES = 100
@@ -19,8 +20,11 @@ export type Index =
   | { readonly status: "ok"; readonly text: string; readonly truncated: boolean }
 
 export interface Interface {
-  /** Memory directory for a location: keyed by the Git common directory, or the directory itself outside Git. */
-  readonly directory: (input: AbsolutePath) => Effect.Effect<AbsolutePath>
+  /**
+   * This Location's memory directory, keyed by the Git common directory so every worktree of a repository shares it,
+   * or by the directory itself outside Git. Undefined when config sets `memory: false`.
+   */
+  readonly directory: () => Effect.Effect<AbsolutePath | undefined>
   /** Bounded read of the index file. Never creates or modifies anything. */
   readonly index: (directory: AbsolutePath) => Effect.Effect<Index>
 }
@@ -30,24 +34,30 @@ export class Service extends Context.Service<Service, Interface>()("@opencode/Me
 const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
+    const config = yield* Config.Service
     const fs = yield* FSUtil.Service
-    const git = yield* Git.Service
     const global = yield* Global.Service
+    const location = yield* Location.Service
 
-    const directory = Effect.fn("Memory.directory")(function* (input: AbsolutePath) {
-      const repo = yield* git.repo.discover(input)
-      const key = yield* fs.resolve(repo?.commonDirectory ?? input)
+    const key = yield* Effect.cached(fs.resolve(location.vcs?.store ?? location.directory))
+
+    const directory = Effect.fn("Memory.directory")(function* () {
+      if (Config.latest(yield* config.entries(), "memory") === false) return
+      const resolved = yield* key
       // `<repo>/.git` reads better as `<repo>` in the folder name; the hash still covers the full key.
-      const label = path.basename(key) === ".git" ? path.dirname(key) : key
+      const label = path.basename(resolved) === ".git" ? path.dirname(resolved) : resolved
       const slug = label.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
-      return AbsolutePath.make(path.join(global.data, "memory", `${slug}-${Hash.sha256(key).slice(0, 6)}`))
+      return AbsolutePath.make(path.join(global.data, "memory", `${slug}-${Hash.sha256(resolved).slice(0, 6)}`))
     })
 
     const index = Effect.fn("Memory.index")(function* (directory: AbsolutePath) {
       return yield* fs.readFileString(path.join(directory, INDEX_FILE)).pipe(
         Effect.map((text): Index => ({ status: "ok", ...bound(text) })),
-        Effect.catchReason("PlatformError", "NotFound", () => Effect.succeed<Index>({ status: "missing" })),
-        Effect.catch(() => Effect.succeed<Index>({ status: "unreadable" })),
+        Effect.catchIf(
+          (error) => error.reason._tag === "NotFound",
+          () => Effect.succeed<Index>({ status: "missing" }),
+        ),
+        Effect.orElseSucceed((): Index => ({ status: "unreadable" })),
       )
     })
 
@@ -55,10 +65,10 @@ const layer = Layer.effect(
   }),
 )
 
-export const node = makeGlobalNode({
+export const node = makeLocationNode({
   service: Service,
-  layer: layer,
-  deps: [FSUtil.node, Git.node, Global.node],
+  layer,
+  deps: [Config.node, FSUtil.node, Global.node, Location.node],
 })
 
 /** Keep whole lines within MAX_LINES and MAX_BYTES; never split a character. */

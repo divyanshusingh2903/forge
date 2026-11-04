@@ -230,7 +230,7 @@ Manage todo lists during coding sessions.
 Creates and updates task lists to track progress during complex operations. The LLM uses this to organize multi-step tasks.
 
 :::note
-This tool is disabled for subagents by default, but you can enable it manually. [Learn more](/docs/agents/#permissions)
+This tool is disabled for the General subagent by default, but you can enable it manually. [Learn more](/docs/agents/#permissions)
 :::
 
 ---
@@ -285,14 +285,6 @@ No API key is required — the tool connects directly to the backend's hosted MC
 :::tip
 Use `websearch` when you need to find information (discovery), and `webfetch` when you need to retrieve content from a specific URL (retrieval).
 :::
-
----
-
-### browser
-
-`browser_navigate`, `browser_read`, `browser_screenshot` and `browser_act` let the agent drive the Browser panel in the desktop app. Reading and navigating use the `browser` permission, and interaction uses `browser_act`. Both default to `ask`.
-
-See [Browser](/docs/browser) for availability, platforms and the security model.
 
 ---
 

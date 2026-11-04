@@ -1,7 +1,26 @@
 import { app } from "electron"
 
-type Channel = "dev" | "beta" | "prod"
-const raw = import.meta.env.OPENCODE_CHANNEL
-export const CHANNEL: Channel = raw === "dev" || raw === "beta" || raw === "prod" ? raw : "dev"
+type Channel = "local" | "dev" | "beta" | "prod"
 
-export const UPDATER_ENABLED = app.isPackaged && CHANNEL !== "dev"
+const raw = import.meta.env.OPENCODE_CHANNEL
+
+export const CHANNEL: Channel = raw === "local" || raw === "dev" || raw === "beta" || raw === "prod" ? raw : "dev"
+
+export const VERSION = app.isPackaged ? app.getVersion() : (process.env.OPENCODE_VERSION ?? app.getVersion())
+
+const appNames: Partial<Record<Channel, string>> = {
+  dev: "Forge Dev",
+  beta: "Forge Beta",
+  prod: "Forge",
+}
+
+const appIDs: Partial<Record<Channel, string>> = {
+  dev: "io.github.divyanshusingh2903.forge.dev",
+  beta: "io.github.divyanshusingh2903.forge.beta",
+  prod: "io.github.divyanshusingh2903.forge",
+}
+
+// Local renderer/server mode keeps the dev application identity.
+export const APP_NAME = app.isPackaged ? (appNames[CHANNEL] ?? "Forge Dev") : "Forge Dev"
+
+export const APP_ID = app.isPackaged ? (appIDs[CHANNEL] ?? "io.github.divyanshusingh2903.forge.dev") : "io.github.divyanshusingh2903.forge.dev"

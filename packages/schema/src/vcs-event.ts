@@ -1,16 +1,14 @@
-export * as VcsEvent from "./vcs-event"
+export * as VcsEvent from "./vcs-event.js"
 
 import { Schema } from "effect"
-import { optional } from "./schema"
-import { Event } from "./event"
+import { optional } from "./schema.js"
+import { Event } from "./event.js"
 
-export const BranchUpdated = Event.define({
+export const BranchUpdated = Event.ephemeral({
   type: "vcs.branch.updated",
   schema: {
     branch: optional(Schema.String),
   },
 })
 
-export const Changed = Event.define({ type: "vcs.changed", schema: {} })
-export const CurrentDefinitions = Event.inventory(Changed)
-export const Definitions = Event.inventory(BranchUpdated, Changed)
+export const Definitions = Event.inventory(BranchUpdated)

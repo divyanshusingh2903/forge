@@ -7,7 +7,7 @@
   border-radius: 10px;
   background: var(--v2-background-bg-base);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
-  color: var(--v2-text-text-strong);
+  color: var(--v2-text-text-base);
   font-size: var(--font-size-small);
   line-height: 1.4;
   pointer-events: none;
@@ -154,7 +154,7 @@
   }
 
   [data-slot="reference-card-author"] {
-    color: var(--v2-text-text-strong);
+    color: var(--v2-text-text-base);
     font-weight: 500;
   }
 
@@ -193,7 +193,7 @@
     }
 
     &[data-priority] {
-      color: var(--v2-text-text-strong);
+      color: var(--v2-text-text-base);
       font-weight: 500;
     }
   }

@@ -8,10 +8,6 @@ The power of OpenCode, with the transparency and human-in-the-loop feel of Claud
 
 [![Latest release](https://img.shields.io/github/v/release/divyanshusingh2903/forge?style=flat-square)](https://github.com/divyanshusingh2903/forge/releases/latest) [![MIT License](https://img.shields.io/github/license/divyanshusingh2903/forge?style=flat-square)](LICENSE) [![Website](https://img.shields.io/badge/website-forge-black?style=flat-square)](https://divyanshusingh.site/forge)
 
-[![Forge presenting a finished plan and asking whether to deny, revise, or accept it](.github/assets/plan-review.jpg)](https://divyanshusingh.site/forge-demo.mp4)
-
-<sub>The plan agent presents its plan for review before any code changes. ▶ <a href="https://divyanshusingh.site/forge-demo.mp4">Watch the full demo</a> · <a href="https://divyanshusingh.site/forge">Forge website</a></sub>
-
 </div>
 
 > Forge is a fork of [OpenCode](https://github.com/anomalyco/opencode) (MIT licensed). See [NOTICE.md](NOTICE.md) for attribution.
@@ -22,7 +18,13 @@ The power of OpenCode, with the transparency and human-in-the-loop feel of Claud
 
 Forge is a personal fork of [OpenCode](https://github.com/anomalyco/opencode), steering it closer to how [Claude Code](https://claude.com/claude-code) feels to use: more human-in-the-loop, more transparent about what the agent is about to do before it does it, and less inclined to act autonomously without asking first.
 
-This is a real GitHub fork of `anomalyco/opencode` (not a one-off copy), so it shares upstream's history and can pull in new OpenCode releases normally. It's a personal project, not a supported product — there's no install script or separate community channels.
+This is a real GitHub fork of `anomalyco/opencode` (not a one-off copy), so it shares upstream's history and can pull in new OpenCode releases normally. It's a personal project, not a supported product. There's no install script or separate community channels.
+
+### Status
+
+Forge is being moved from the OpenCode v1 line onto OpenCode v2 (tracked in [#60](https://github.com/divyanshusingh2903/forge/issues/60)). This branch has the Forge branding on top of v2. Forge's own features come back one at a time, so they are not here yet: the plan agent and plan tab, the browser tools and pane, the Git review panel, local memory, and the edit-mode picker. The v1 releases (`forge-v1-final`) have all of them.
+
+There is no full-screen terminal interface. The desktop app is the interface, and the `opencode` binary hosts its server. `opencode mini` and `opencode run <message>` still work from a terminal.
 
 ### Download
 
@@ -38,48 +40,20 @@ cd forge
 bun install
 
 bun dev             # CLI, equivalent to the built `opencode` command
-bun dev web         # headless server + web UI
 bun dev serve       # headless API server only
 ```
 
 To run the desktop app (Electron) in development:
 
 ```bash
-bun run --cwd packages/desktop dev
+bun run dev:desktop
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full package breakdown, dev commands, and debugging notes.
-
-### Agents
-
-Two primary agents, switchable with `Tab` (`Shift+Tab` to cycle back):
-
-- **build** - The default agent for development work. It asks before every file edit and bash command, and when a request looks like it needs design work first, it offers to switch to plan mode instead of diving in.
-- **plan** - Research and design without touching your code. File edits are denied except for the plan file it writes under `.opencode/plans/`, and bash still asks first. When the plan is ready it presents it for review: approve it and hand off to **build** (approving each edit yourself, or letting it run in [Auto mode](#edit-modes)), send it back for revisions, or stop there.
-
-Two subagents the primary agents can delegate to, or you can invoke with `@` in a message:
-
-- **general** - Researches complex questions and runs multi-step tasks, including several units of work in parallel.
-- **explore** - A fast, read-only agent for finding files, searching code, and answering questions about the codebase.
-
-#### Edit modes
-
-In the desktop and web app, the mode picker next to the prompt controls how much the agent can do without asking:
-
-- **Manual** - The default. Every file edit and bash command waits for your approval.
-- **Accept Edits** - File edits are approved automatically; bash commands and other permission requests still ask.
-- **Auto** - Every permission request is approved automatically. Toggle it with `Cmd/Ctrl+Shift+A`.
-- **Plan** - Switches to the **plan** agent. Picking any other mode switches back to **build**.
-
-Modes apply to the current session, or to the project when you set one before starting a session. In the app, approving a plan with **Accept (Auto)** switches the session to **Auto** mode. Anything your config sets to `deny` stays denied in every mode.
-
-#### Permission defaults
-
-By default, agents also ask before touching directories outside the project, and build, plan, and general ask before reading `.env` files. All of these defaults can be overridden with `permission` in your config.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the package breakdown and dev commands.
 
 ### Documentation
 
-Forge shares most of its functionality with OpenCode, so [OpenCode's docs](https://opencode.ai/docs) are the best reference for configuration, providers, and agent behavior — nearly all of it applies here too.
+Forge shares most of its functionality with OpenCode, so [OpenCode's docs](https://opencode.ai/docs) are the best reference for configuration, providers, and agent behavior. Nearly all of it applies here too.
 
 ### Contributing
 

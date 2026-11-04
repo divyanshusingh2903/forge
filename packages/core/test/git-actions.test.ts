@@ -1,216 +1,308 @@
-import { describe, expect } from "bun:test"
 import { $ } from "bun"
-import path from "path"
+import { describe, expect, test } from "bun:test"
 import fs from "fs/promises"
-import { Effect } from "effect"
-import { Git } from "@opencode-ai/core/git"
-import { LayerNode } from "@opencode-ai/core/effect/layer-node"
-import { AbsolutePath } from "@opencode-ai/core/schema"
-import { gitRemote, git, commit } from "./fixture/git"
+import path from "path"
+import { pathToFileURL } from "url"
+import { Effect, Fiber, Layer, Stream } from "effect"
+import { LayerNode } from "@opencode/util/effect/layer-node"
+import { AppProcess } from "@opencode/util/process"
+import { FSUtil } from "@opencode/util/fs-util"
+import { Bus } from "@opencode/core/bus"
+import { Watcher } from "@opencode/core/filesystem/watcher"
+import { Generate } from "@opencode/core/generate"
+import { Git } from "@opencode/core/git"
+import { GitActions } from "@opencode/core/git-actions"
+import { Location } from "@opencode/core/location"
+import { AbsolutePath } from "@opencode/core/schema"
+import { Git as GitSchema } from "@opencode/schema/git"
+import { initGit } from "./fixture/git"
+import { location } from "./fixture/location"
 import { tmpdir } from "./fixture/tmpdir"
-import { testEffect } from "./lib/effect"
+import { it } from "./lib/effect"
 
-const it = testEffect(LayerNode.compile(Git.node))
+const watcher = Watcher.testLayer
+// Git on Windows checks files out with CRLF unless the user turned autocrlf off.
+const lf = (text: string) => text.replaceAll("\r\n", "\n")
 
-// Windows CI checks files out with core.autocrlf=true, so compare contents with normalized line endings.
-const read = (file: string) =>
-  Effect.promise(() => Bun.file(file).text()).pipe(Effect.map((text) => text.replaceAll("\r\n", "\n")))
+const provide = (directory: string, written = "feat(core): add greetings\n\n- greet in English") =>
+  Effect.provide(
+    Layer.mergeAll(
+      LayerNode.compile(
+        LayerNode.group([GitActions.node, Bus.node, Location.node, AppProcess.node, FSUtil.node, Git.node, Watcher.node]),
+        {
+          replacements: [
+            Location.node.replace(
+              Layer.succeed(
+                Location.Service,
+                Location.Service.of(
+                  location(
+                    { directory: AbsolutePath.make(directory) },
+                    { vcs: { type: "git", store: AbsolutePath.make(path.join(directory, ".git")) } },
+                  ),
+                ),
+              ),
+            ),
+            Watcher.node.replace(watcher),
+            Generate.node.replace(
+              Layer.succeed(
+                Generate.Service,
+                Generate.Service.of({
+                  text: (input) =>
+                    input.prompt.includes("Changed files:") ? Effect.succeed(written) : Effect.die("no diff in prompt"),
+                  image: () => Effect.die("unused"),
+                  decisions: () => Effect.die("unused"),
+                }),
+              ),
+            ),
+          ],
+        },
+      ),
+      watcher,
+    ),
+  )
 
-function fixture<A, E, R>(
-  body: (input: Awaited<ReturnType<typeof gitRemote>>, repository: Git.Repository) => Effect.Effect<A, E, R>,
-) {
-  return Effect.gen(function* () {
-    const root = yield* Effect.acquireRelease(
+const withRepo = <A, E, R>(f: (directory: string) => Effect.Effect<A, E, R>) =>
+  Effect.acquireRelease(
+    Effect.promise(() => tmpdir()),
+    (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
+  ).pipe(
+    Effect.tap((tmp) =>
+      Effect.promise(async () => {
+        await initGit(tmp.path, "-b", "main")
+        await fs.writeFile(path.join(tmp.path, "a.txt"), "one\n")
+        await $`git add -A`.cwd(tmp.path).quiet()
+        await $`git commit -m initial`.cwd(tmp.path).quiet()
+      }),
+    ),
+    Effect.flatMap((tmp) => f(tmp.path)),
+  )
+
+const changes = (state: GitSchema.State) =>
+  Object.fromEntries(state.changes.map((change) => [change.file, change]))
+
+describe("GitActions", () => {
+  it.live("stages, unstages and commits files", () =>
+    withRepo((directory) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(async () => {
+          await fs.writeFile(path.join(directory, "a.txt"), "two\n")
+          await fs.writeFile(path.join(directory, "b [1].txt"), "new\n")
+          await fs.mkdir(path.join(directory, ".opencode/plans"), { recursive: true })
+          await fs.writeFile(path.join(directory, ".opencode/plans/plan.md"), "# Plan\n")
+        })
+        const git = yield* GitActions.Service
+
+        const initial = yield* git.state()
+        expect(initial.branch).toBe("main")
+        expect(changes(initial)).toEqual({
+          "a.txt": { file: "a.txt", staged: false, unstaged: true, untracked: false },
+          "b [1].txt": { file: "b [1].txt", staged: false, unstaged: true, untracked: true },
+        })
+
+        yield* git.stage({ files: ["b [1].txt"] })
+        expect(changes(yield* git.state())["b [1].txt"]).toMatchObject({ staged: true, unstaged: false })
+
+        yield* git.stage({})
+        expect((yield* git.state()).changes.every((change) => change.staged && !change.unstaged)).toBe(true)
+
+        yield* git.unstage({ files: ["a.txt"] })
+        expect(changes(yield* git.state())["a.txt"]).toMatchObject({ staged: false, unstaged: true })
+
+        yield* git.commit({ message: "add b" })
+        const after = yield* git.state()
+        expect(after.changes.map((change) => change.file)).toEqual(["a.txt"])
+        expect(yield* Effect.promise(() => $`git log -1 --format=%s`.cwd(directory).text())).toBe("add b\n")
+        // The plan agent's notes were never staged.
+        expect(yield* Effect.promise(() => $`git ls-files .opencode`.cwd(directory).text())).toBe("")
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("commits everything at once and refuses an empty message", () =>
+    withRepo((directory) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => fs.writeFile(path.join(directory, "c.txt"), "c\n"))
+        const git = yield* GitActions.Service
+        const empty = yield* git.commit({ message: "  " }).pipe(Effect.flip)
+        expect(empty).toMatchObject({ operation: "commit" })
+        yield* git.commit({ message: "add c", all: true })
+        expect((yield* git.state()).changes).toEqual([])
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("discards only the unstaged part of a file", () =>
+    withRepo((directory) =>
+      Effect.gen(function* () {
+        const file = path.join(directory, "a.txt")
+        yield* Effect.promise(() => fs.writeFile(file, "staged\n"))
+        const git = yield* GitActions.Service
+        yield* git.stage({ files: ["a.txt"] })
+        yield* Effect.promise(() => fs.writeFile(file, "unstaged\n"))
+        yield* git.discard({ file: "a.txt" })
+        expect(yield* Effect.promise(() => fs.readFile(file, "utf8").then(lf))).toBe("staged\n")
+        expect(yield* git.discard({ file: "../outside" }).pipe(Effect.flip)).toMatchObject({
+          message: "Invalid file path",
+        })
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("writes a commit message from the staged diff", () =>
+    withRepo((directory) =>
+      Effect.gen(function* () {
+        yield* Effect.promise(() => fs.writeFile(path.join(directory, "a.txt"), "hello\n"))
+        const git = yield* GitActions.Service
+        expect(yield* git.message({}).pipe(Effect.flip)).toMatchObject({ operation: "message" })
+        expect(yield* git.message({ all: true })).toEqual({
+          message: "feat(core): add greetings\n\n- greet in English",
+        })
+      }).pipe(provide(directory)),
+    ),
+  )
+
+  it.live("pushes a new branch with upstream, then counts and pulls remote commits", () =>
+    Effect.acquireRelease(
       Effect.promise(() => tmpdir()),
       (tmp) => Effect.promise(() => tmp[Symbol.asyncDispose]()),
-    )
-    const input = yield* Effect.promise(() => gitRemote(root.path))
-    const service = yield* Git.Service
-    const repository = yield* service.repo.clone({
-      remote: input.remote,
-      directory: AbsolutePath.make(path.join(root.path, "checkout")),
-    })
-    yield* Effect.promise(async () => {
-      await git(repository.worktree, "config", "user.name", "Test")
-      await git(repository.worktree, "config", "user.email", "test@example.com")
-      await git(repository.worktree, "config", "commit.gpgsign", "false")
-    })
-    return yield* body(input, repository)
-  })
-}
+    ).pipe(
+      Effect.flatMap((tmp) => {
+        const origin = path.join(tmp.path, "origin.git")
+        const local = path.join(tmp.path, "local")
+        const other = path.join(tmp.path, "other")
+        return Effect.promise(async () => {
+          await $`git init --bare -b main ${origin}`.quiet()
+          await initGit(local, "-b", "main")
+          await fs.writeFile(path.join(local, "a.txt"), "one\n")
+          await $`git add -A`.cwd(local).quiet()
+          await $`git commit -m initial`.cwd(local).quiet()
+          await $`git remote add origin ${pathToFileURL(origin).href}`.cwd(local).quiet()
+        }).pipe(
+          Effect.andThen(
+            Effect.gen(function* () {
+              const git = yield* GitActions.Service
+              const before = yield* git.state()
+              expect(before.remote).toEqual({ upstream: false, ahead: 1, behind: 0, remotes: true })
 
-describe("Git review actions", () => {
-  it.live("prunes ignored directories without excluding force-added tracked files", () =>
-    fixture((_, repository) =>
-      Effect.gen(function* () {
-        const service = yield* Git.Service
-        yield* Effect.promise(async () => {
-          await Bun.write(path.join(repository.worktree, ".gitignore"), "generated/\n")
-          await fs.mkdir(path.join(repository.worktree, "generated"))
-          await Bun.write(path.join(repository.worktree, "generated", "file.txt"), "generated\n")
-        })
-        expect(yield* service.index.watchIgnores(repository)).toContain("generated")
-        yield* Effect.promise(() => git(repository.worktree, "add", "-f", "generated/file.txt"))
-        expect(yield* service.index.watchIgnores(repository)).not.toContain("generated")
-      }),
-    ),
-  )
-  it.live("publishes a slash-named branch with upstream and rejects arbitrary remotes", () =>
-    fixture((input, repository) =>
-      Effect.gen(function* () {
-        const service = yield* Git.Service
-        yield* Effect.promise(() => git(repository.worktree, "checkout", "-b", "feature/publish"))
-        yield* service.sync.push(repository, { setUpstream: true })
-        expect(
-          yield* Effect.promise(() =>
-            $`git config --get branch.feature/publish.remote`.cwd(repository.worktree).quiet().text(),
+              yield* git.push({ remote: "origin", setUpstream: true })
+              expect((yield* git.state()).remote).toEqual({
+                upstream: true,
+                ahead: 0,
+                behind: 0,
+                remotes: true,
+                target: { remote: "origin", branch: "main" },
+              })
+
+              yield* Effect.promise(async () => {
+                await $`git clone ${pathToFileURL(origin).href} ${other}`.quiet()
+                await fs.appendFile(path.join(other, ".git", "config"), "[user]\n\temail = t@t\n\tname = T\n")
+                await fs.writeFile(path.join(other, "b.txt"), "b\n")
+                await $`git add -A`.cwd(other).quiet()
+                await $`git commit -m remote`.cwd(other).quiet()
+                await $`git push`.cwd(other).quiet()
+              })
+              yield* git.fetch()
+              expect((yield* git.state()).remote).toMatchObject({ ahead: 0, behind: 1 })
+              expect(yield* git.targets()).toEqual({
+                remotes: ["origin"],
+                branches: [{ remote: "origin", branch: "main" }],
+                pull: "merge",
+              })
+              yield* git.pull({})
+              expect((yield* git.state()).remote).toMatchObject({ ahead: 0, behind: 0 })
+              expect(yield* git.push({ remote: "--upload-pack=evil" }).pipe(Effect.flip)).toMatchObject({
+                message: "Select a configured Git remote",
+              })
+
+              // A new branch off pushed history counts only its own commits as unpushed, and offers to set upstream.
+              yield* Effect.promise(async () => {
+                await $`git switch -c feature`.cwd(local).quiet()
+                await fs.writeFile(path.join(local, "c.txt"), "c\n")
+                await $`git add -A`.cwd(local).quiet()
+                await $`git commit -m feature`.cwd(local).quiet()
+              })
+              expect((yield* git.state()).remote).toEqual({ upstream: false, ahead: 1, behind: 0, remotes: true })
+              yield* git.push({ remote: "origin", setUpstream: true })
+              expect((yield* git.state()).remote).toEqual({
+                upstream: true,
+                ahead: 0,
+                behind: 0,
+                remotes: true,
+                target: { remote: "origin", branch: "feature" },
+              })
+            }).pipe(provide(local)),
           ),
-        ).toBe("origin\n")
-        expect(yield* service.remote.upstream(repository)).toEqual({ remote: "origin", branch: "feature/publish" })
-        yield* service.sync.fetchBranch(repository, { branch: "feature/publish", force: false })
-        expect((yield* service.remote.targets(repository)).branches).toContainEqual({
-          remote: "origin",
-          branch: "feature/publish",
-        })
-        const failure = yield* service.sync.push(repository, { remote: input.remote }).pipe(Effect.flip)
-        expect(failure.message).toContain("configured Git remote")
-      }),
-    ),
-  )
-
-  for (const strategy of ["merge", "rebase"] as const) {
-    it.live(`pulls using explicit ${strategy} despite repository defaults`, () =>
-      fixture((input, repository) =>
-        Effect.gen(function* () {
-          const service = yield* Git.Service
-          yield* Effect.promise(async () => {
-            await git(repository.worktree, "config", "pull.rebase", strategy === "merge" ? "true" : "false")
-            await git(repository.worktree, "config", "pull.ff", "only")
-            await Bun.write(path.join(repository.worktree, "local.txt"), "local\n")
-            await git(repository.worktree, "add", "local.txt")
-            await git(repository.worktree, "commit", "-m", "local")
-            await commit(input.source, "remote\n", "remote")
-          })
-          yield* service.sync.pull(repository, { remote: "origin", branch: "main", strategy })
-          expect(yield* read(path.join(repository.worktree, "README.md"))).toBe("remote\n")
-          expect(yield* read(path.join(repository.worktree, "local.txt"))).toBe("local\n")
-          expect(yield* service.history.branch(repository)).toBe("main")
-          expect(yield* service.remote.upstream(repository)).toEqual({ remote: "origin", branch: "main" })
-        }),
-      ),
-    )
-    it.live(`preserves ${strategy} conflict state for the caller to resolve`, () =>
-      fixture((input, repository) =>
-        Effect.gen(function* () {
-          const service = yield* Git.Service
-          yield* Effect.promise(async () => {
-            await Bun.write(path.join(repository.worktree, "README.md"), "local conflict\n")
-            await git(repository.worktree, "add", "README.md")
-            await git(repository.worktree, "commit", "-m", "local conflict")
-            await commit(input.source, "remote conflict\n", "remote conflict")
-          })
-          yield* service.sync.pull(repository, { remote: "origin", branch: "main", strategy }).pipe(Effect.flip)
-          expect(
-            yield* Effect.promise(() => $`git status --porcelain`.cwd(repository.worktree).quiet().text()),
-          ).toContain("UU README.md")
-          expect(yield* read(path.join(repository.worktree, "README.md"))).toContain("<<<<<<<")
-        }),
-      ),
-    )
-  }
-
-  it.live("pulls with the configured strategy when none is given", () =>
-    fixture((input, repository) =>
-      Effect.gen(function* () {
-        const service = yield* Git.Service
-        expect((yield* service.remote.targets(repository)).pull).toBe("merge")
-        yield* Effect.promise(async () => {
-          await git(repository.worktree, "config", "pull.rebase", "true")
-          await Bun.write(path.join(repository.worktree, "local.txt"), "local\n")
-          await git(repository.worktree, "add", "local.txt")
-          await git(repository.worktree, "commit", "-m", "local")
-          await commit(input.source, "remote\n", "remote")
-        })
-        expect((yield* service.remote.targets(repository)).pull).toBe("rebase")
-        yield* service.sync.pull(repository)
-        // A rebase leaves the local commit on top of the remote one, with no merge commit.
-        expect(
-          yield* Effect.promise(() => $`git log --format=%P%x09%s -2`.cwd(repository.worktree).quiet().text()),
-        ).toMatch(/^[0-9a-f]+\tlocal\n[0-9a-f]+\tremote\n$/)
-      }),
-    ),
-  )
-
-  it.live("shares stash identity across linked worktrees while preserving the main working tree", () =>
-    fixture((input, repository) =>
-      Effect.gen(function* () {
-        const service = yield* Git.Service
-        const linked = yield* service.worktree.create({
-          repository,
-          directory: AbsolutePath.make(path.join(input.root, "linked")),
-        })
-        yield* Effect.promise(() => Bun.write(path.join(linked.worktree, "README.md"), "linked change\n"))
-        yield* service.stash.create(linked, { message: "linked stash" })
-        const saved = (yield* service.stash.list(repository))[0]
-        if (!saved) return yield* Effect.die(new Error("Missing shared stash"))
-        yield* service.stash.apply(linked, saved)
-        expect(yield* read(path.join(repository.worktree, "README.md"))).toBe("one\n")
-        expect(yield* read(path.join(linked.worktree, "README.md"))).toBe("linked change\n")
-      }),
-    ),
-  )
-
-  it.live("creates, applies, pops, and drops stashes with stale-selection protection", () =>
-    fixture((_, repository) =>
-      Effect.gen(function* () {
-        const service = yield* Git.Service
-        yield* Effect.promise(() => Bun.write(path.join(repository.worktree, "README.md"), "first\n"))
-        yield* service.stash.create(repository, { message: "first stash" })
-        const first = (yield* service.stash.list(repository))[0]
-        if (!first) return yield* Effect.die(new Error("Missing stash"))
-        expect(first.message).toContain("first stash")
-        yield* service.stash.apply(repository, first)
-        expect(yield* read(path.join(repository.worktree, "README.md"))).toBe("first\n")
-        expect(yield* service.stash.list(repository)).toHaveLength(1)
-        yield* Effect.promise(() => git(repository.worktree, "restore", "README.md"))
-        yield* Effect.promise(() => Bun.write(path.join(repository.worktree, "untracked.txt"), "untracked\n"))
-        yield* service.stash.create(repository, { includeUntracked: true })
-        expect(yield* Effect.promise(() => Bun.file(path.join(repository.worktree, "untracked.txt")).exists())).toBe(
-          false,
         )
-        expect((yield* service.stash.drop(repository, first).pipe(Effect.flip)).message).toContain(
-          "selected stash has changed",
-        )
-        const second = (yield* service.stash.list(repository))[0]
-        if (!second) return yield* Effect.die(new Error("Missing second stash"))
-        yield* service.stash.pop(repository, second)
-        expect(yield* read(path.join(repository.worktree, "untracked.txt"))).toBe("untracked\n")
-        const remaining = (yield* service.stash.list(repository))[0]
-        if (!remaining) return yield* Effect.die(new Error("Missing remaining stash"))
-        yield* service.stash.drop(repository, remaining)
-        expect(yield* service.stash.list(repository)).toEqual([])
       }),
     ),
   )
 
-  it.live("keeps a conflicting pop in the stash list and exposes unmerged files", () =>
-    fixture((_, repository) =>
+  it.live("creates, applies, pops and drops stashes by position and object", () =>
+    withRepo((directory) =>
       Effect.gen(function* () {
-        const service = yield* Git.Service
-        yield* Effect.promise(() => Bun.write(path.join(repository.worktree, "README.md"), "stashed\n"))
-        yield* service.stash.create(repository, {})
-        const saved = (yield* service.stash.list(repository))[0]
-        if (!saved) return yield* Effect.die(new Error("Missing stash"))
-        yield* Effect.promise(async () => {
-          await Bun.write(path.join(repository.worktree, "README.md"), "committed\n")
-          await git(repository.worktree, "add", "README.md")
-          await git(repository.worktree, "commit", "-m", "conflicting change")
+        const file = path.join(directory, "a.txt")
+        const git = yield* GitActions.Service
+        yield* Effect.promise(() => fs.writeFile(file, "first\n"))
+        yield* git.stashCreate({ message: "first" })
+        yield* Effect.promise(() => fs.writeFile(path.join(directory, "new.txt"), "new\n"))
+        yield* git.stashCreate({ message: "second", includeUntracked: true })
+        expect((yield* git.state()).changes).toEqual([])
+
+        const list = yield* git.stashes()
+        expect(list.map((stash) => [stash.ref, stash.message])).toEqual([
+          ["stash@{0}", "On main: second"],
+          ["stash@{1}", "On main: first"],
+        ])
+        expect(yield* git.stashDrop({ ref: "stash@{0}", oid: list[1].oid }).pipe(Effect.flip)).toMatchObject({
+          operation: "stash-drop",
         })
-        yield* service.stash.pop(repository, saved).pipe(Effect.flip)
-        expect(yield* service.stash.list(repository)).toHaveLength(1)
-        const status = yield* Effect.promise(() => $`git status --porcelain`.cwd(repository.worktree).quiet().text())
-        expect(status).toContain("UU README.md")
-      }),
+
+        yield* git.stashApply(list[1])
+        expect(yield* Effect.promise(() => fs.readFile(file, "utf8").then(lf))).toBe("first\n")
+        yield* git.stage({})
+        yield* git.commit({ message: "first" })
+        yield* git.stashDrop((yield* git.stashes())[1])
+        yield* git.stashPop((yield* git.stashes())[0])
+        expect(yield* git.stashes()).toEqual([])
+        expect(changes(yield* git.state())["new.txt"]).toMatchObject({ untracked: true })
+      }).pipe(provide(directory)),
     ),
   )
+
+  it.live("announces changes to the index and working tree once the state is read", () =>
+    withRepo((directory) =>
+      Effect.gen(function* () {
+        const bus = yield* Bus.Service
+        const test = yield* Watcher.Test
+        const git = yield* GitActions.Service
+        const changed = yield* bus.subscribe(GitSchema.Changed).pipe(Stream.take(1), Stream.runCollect, Effect.forkScoped)
+        yield* git.state()
+        // Subscriptions start asynchronously; let them register before emitting.
+        yield* Effect.sleep("50 millis")
+        expect((yield* test.subscriptions()).map((item) => item.type)).toEqual([
+          "entries",
+          "entries",
+          "directory",
+          "directory",
+        ])
+        yield* test.emit({ path: path.join(directory, ".git", "index"), type: "update" })
+        expect(Array.from(yield* Fiber.join(changed))).toHaveLength(1)
+      }).pipe(provide(directory)),
+    ),
+  )
+})
+
+describe("conventionalCommit", () => {
+  test("keeps a conforming subject and its bullets, dropping attribution", () => {
+    expect(
+      GitActions.conventionalCommit(
+        "```\nFeature(App): Add panel.\n\n- stage files\n- Co-authored-by: Bot <b@b>\n- generated by Model\n```",
+      ),
+    ).toBe("feat(app): Add panel\n\n- stage files")
+  })
+
+  test("coerces a bare summary into chore", () => {
+    expect(GitActions.conventionalCommit("Update the readme.")).toBe("chore: update the readme")
+    expect(GitActions.conventionalCommit("  ")).toBeUndefined()
+  })
 })

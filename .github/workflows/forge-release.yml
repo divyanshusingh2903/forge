@@ -80,23 +80,29 @@ jobs:
         settings:
           - host: macos-15
             target: aarch64-apple-darwin
+            cli_target: darwin-arm64
             platform_flag: --mac --arm64
             bun_install_flags: --os=darwin --cpu=arm64
           - host: macos-15-intel
             target: x86_64-apple-darwin
+            cli_target: darwin-x64
             platform_flag: --mac --x64
             bun_install_flags: --os=darwin --cpu=x64
           - host: windows-2025
             target: x86_64-pc-windows-msvc
+            cli_target: windows-x64
             platform_flag: --win --x64
           - host: windows-2025
             target: aarch64-pc-windows-msvc
+            cli_target: windows-arm64
             platform_flag: --win --arm64
           - host: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
+            cli_target: linux-x64
             platform_flag: --linux --x64
           - host: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
+            cli_target: linux-arm64
             platform_flag: --linux --arm64
     runs-on: ${{ matrix.settings.host }}
     env:
@@ -131,11 +137,12 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Prepare
-        run: bun ./scripts/prepare.ts
-        working-directory: packages/desktop
+      # The desktop build bundles the server from packages/cli/dist and fails for prod when it is missing.
+      - name: Build server
+        run: bun run build --skip-web-ui
+        working-directory: packages/cli
         env:
-          RUST_TARGET: ${{ matrix.settings.target }}
+          OPENCODE_TARGET: ${{ matrix.settings.cli_target }}
 
       - name: Build
         run: bun run build
@@ -210,7 +217,7 @@ jobs:
 
       # Merges the per-arch auto-update manifests (latest.yml, latest-mac.yml, ...) and uploads them.
       - name: Upload update manifests
-        run: bun ./packages/desktop/scripts/finalize-latest-yml.ts
+        run: bun ./packages/desktop/script/finalize-latest-yml.ts
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}

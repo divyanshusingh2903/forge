@@ -1,7 +1,7 @@
-import type { LinkPreviewResult } from "@opencode-ai/sdk/v2"
-import { useI18n } from "@opencode-ai/ui/context/i18n"
+import type { LinkPreviewResult } from "@opencode/client/promise"
+import { useI18n } from "@opencode/ui/context/i18n"
 import { createSignal, For, type JSXElement, Show } from "solid-js"
-import type { Reference } from "./reference"
+import { referenceLabel, type Reference } from "./reference"
 import { compactNumber, initials, relativeTime, stateTone, visiblePriority } from "./reference-view"
 
 const MAX_LABELS = 3
@@ -14,37 +14,62 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
 
   const state = () => {
     const value = props.result.state
+
     if (!value) return
+
     if (value === "open") return i18n.t("ui.reference.state.open")
+
     if (value === "closed") return i18n.t("ui.reference.state.closed")
+
     if (value === "merged") return i18n.t("ui.reference.state.merged")
+
     if (value === "draft") return i18n.t("ui.reference.state.draft")
+
     if (value === "not-planned") return i18n.t("ui.reference.state.notPlanned")
+
     if (value === "release") return i18n.t("ui.reference.state.release")
+
     if (value === "prerelease") return i18n.t("ui.reference.state.prerelease")
+
     // Linear workflow status names are shown as the workspace spells them.
     return value
   }
 
   const eyebrow = () => {
     const reference = props.reference
-    if ("tag" in reference) return `${reference.owner}/${reference.repo}`
-    if ("owner" in reference) return `${reference.owner}/${reference.repo} #${reference.number}`
+
+    // A Notion page is placed by where it sits in the workspace, after its emoji.
+    if (reference.kind === "notion-page")
+      return [props.result.icon, props.result.path ?? referenceLabel(reference)].filter(Boolean).join(" ")
+
+    if ("tag" in reference) return reference.repository
+
+    if ("number" in reference) return referenceLabel(reference)
     const identifier = props.result.identifier ?? reference.id
-    const owner = props.result.team ?? (reference.kind === "linear-project" ? i18n.t("ui.reference.project") : undefined)
+
+    const owner =
+      props.result.team ??
+      props.result.project ??
+      (reference.kind === "linear-project" ? i18n.t("ui.reference.project") : undefined)
+
     return owner ? `${identifier} · ${owner}` : identifier
   }
 
   // The timestamp that matters most for the item's current state.
   const timestamp = () => {
     const result = props.result
-    if (kind() === "github-pr" && result.state === "merged" && result.mergedAt)
+
+    if (result.state === "merged" && result.mergedAt)
       return i18n.t("ui.reference.merged", { when: when(result.mergedAt) ?? "" })
+
     if (kind() === "github-release" && result.publishedAt)
       return i18n.t("ui.reference.published", { when: when(result.publishedAt) ?? "" })
+
     if (result.closedAt && result.state !== "open" && result.state !== "draft")
       return i18n.t("ui.reference.closed", { when: when(result.closedAt) ?? "" })
+
     if (result.createdAt) return i18n.t("ui.reference.opened", { when: when(result.createdAt) ?? "" })
+
     if (result.updatedAt) return i18n.t("ui.reference.updated", { when: when(result.updatedAt) ?? "" })
   }
 
@@ -56,19 +81,23 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
       props.result.startDate && i18n.t("ui.reference.startsOn", { date: date(props.result.startDate) }),
       props.result.targetDate && i18n.t("ui.reference.targetOn", { date: date(props.result.targetDate) }),
     ]
+
     return parts.filter(Boolean).join(" → ")
   }
 
-  const stats = () => {
-    const result = props.result
-    const count = (value: number) => ({ count: compactNumber(value, i18n.locale()) })
-    return [
-      result.comments ? i18n.t("ui.reference.comments", count(result.comments)) : undefined,
-      result.changedFiles !== undefined ? i18n.t("ui.reference.files", count(result.changedFiles)) : undefined,
-      result.assets !== undefined ? i18n.t("ui.reference.assets", count(result.assets)) : undefined,
-      result.downloads ? i18n.t("ui.reference.downloads", count(result.downloads)) : undefined,
-    ].filter((item): item is string => item !== undefined)
-  }
+  const stats = () =>
+    [
+      props.result.comments !== undefined &&
+        props.result.comments > 0 &&
+        i18n.plural("ui.reference.comments", props.result.comments),
+      props.result.changedFiles !== undefined && i18n.plural("ui.reference.files", props.result.changedFiles),
+      props.result.assets !== undefined && i18n.plural("ui.reference.assets", props.result.assets),
+      props.result.downloads !== undefined &&
+        props.result.downloads > 0 &&
+        i18n.plural("ui.reference.downloads", props.result.downloads, {
+          count: compactNumber(props.result.downloads, i18n.locale()),
+        }),
+    ].filter((item): item is string => item !== false)
 
   return (
     <div data-component="reference-card" data-kind={kind()}>
@@ -123,6 +152,18 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
         </span>
       </Show>
 
+      <Show when={props.result.fields?.length}>
+        <span data-slot="reference-card-facts">
+          <For each={props.result.fields}>
+            {(field) => (
+              <span data-slot="reference-card-fact">
+                {field.name}: {field.value}
+              </span>
+            )}
+          </For>
+        </span>
+      </Show>
+
       <Show when={schedule()}>
         <span data-slot="reference-card-meta">{schedule()}</span>
       </Show>
@@ -143,17 +184,21 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
   )
 }
 
+// Linear and Jira facts. The project shows here only when the eyebrow names the team instead.
 function linearMeta(result: LinkPreviewResult) {
   const priority = visiblePriority(result.priority)
+
   return [
+    result.issueType ? { text: result.issueType } : undefined,
     priority ? { text: priority, priority: true } : undefined,
     result.assignee ? { text: result.assignee } : undefined,
-    result.project ? { text: result.project } : undefined,
+    result.project && result.team ? { text: result.project } : undefined,
   ].filter((item): item is { text: string; priority?: boolean } => !!item)
 }
 
 function Avatar(props: { name: string; url?: string }): JSXElement {
   const [failed, setFailed] = createSignal(false)
+
   return (
     <Show
       when={props.url && !failed()}

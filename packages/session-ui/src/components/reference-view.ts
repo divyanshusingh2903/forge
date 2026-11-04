@@ -1,4 +1,4 @@
-import type { LinkPreviewResult } from "@opencode-ai/sdk/v2"
+import type { LinkPreviewResult } from "@opencode/client/promise"
 import type { Reference } from "./reference"
 
 export type Tone = "success" | "warning" | "danger" | "done" | "accent" | "muted"
@@ -7,18 +7,33 @@ export type Tone = "success" | "warning" | "danger" | "done" | "accent" | "muted
 // request or a cancelled item, amber work in progress, grey anything not started or not final.
 export function stateTone(reference: Reference, result: LinkPreviewResult): Tone {
   const state = result.state
-  if (reference.kind === "github-issue")
-    return state === "open" ? "success" : state === "not-planned" ? "muted" : "done"
-  if (reference.kind === "github-pr") {
+
+  if (reference.kind === "github-issue" || reference.kind === "gitlab-issue") {
     if (state === "open") return "success"
+
+    return state === "not-planned" ? "muted" : "done"
+  }
+
+  if (reference.kind === "github-pr" || reference.kind === "gitlab-mr") {
+    if (state === "open") return "success"
+
     if (state === "merged") return "done"
+
     return state === "draft" ? "muted" : "danger"
   }
-  if (reference.kind === "github-release")
-    return state === "prerelease" ? "warning" : state === "draft" ? "muted" : "accent"
+
+  if (reference.kind === "github-release") {
+    if (state === "prerelease") return "warning"
+
+    return state === "draft" ? "muted" : "accent"
+  }
+
   if (result.stateType === "started") return "warning"
+
   if (result.stateType === "completed") return "done"
+
   if (result.stateType === "canceled") return "danger"
+
   return "muted"
 }
 
@@ -34,9 +49,11 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 // "3 days ago" style text in the UI locale; undefined for a missing or unparsable timestamp.
 export function relativeTime(iso: string | undefined, locale: string, now = Date.now()) {
   const time = iso ? Date.parse(iso) : NaN
+
   if (Number.isNaN(time)) return
   const seconds = Math.round((time - now) / 1000)
   const [unit, size] = UNITS.find(([, size]) => Math.abs(seconds) >= size) ?? ["second", 1]
+
   return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(Math.round(seconds / size), unit)
 }
 
@@ -50,5 +67,10 @@ export function visiblePriority(priority: string | undefined) {
 }
 
 export function initials(name: string) {
-  return name.replace(/\[bot\]$/i, "").slice(0, 1).toUpperCase() || "?"
+  return (
+    name
+      .replace(/\[bot\]$/i, "")
+      .slice(0, 1)
+      .toUpperCase() || "?"
+  )
 }

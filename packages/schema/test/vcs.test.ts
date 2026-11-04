@@ -1,17 +1,23 @@
 import { expect, test } from "bun:test"
 import { Schema } from "effect"
-import { Vcs } from "../src/vcs"
+import { Vcs } from "../src/vcs.js"
 
-test("optional VCS properties omit undefined on the wire", () => {
-  expect(Schema.encodeSync(Vcs.PushInput)({ remote: undefined, setUpstream: true })).toEqual({ setUpstream: true })
-  expect(Schema.encodeSync(Vcs.StashCreateInput)({ message: undefined, includeUntracked: false })).toEqual({
-    includeUntracked: false,
-  })
+test("review base preserves its stable identity and local provenance", () => {
+  expect(Vcs.Base.ast.annotations?.identifier).toBe("Vcs.Base")
+  const base = { name: "release", ref: "refs/heads/release" }
+  for (const source of ["reflog", "default"] as const) {
+    expect(Schema.encodeSync(Vcs.Base)(Schema.decodeUnknownSync(Vcs.Base)({ ...base, source }))).toEqual({
+      ...base,
+      source,
+    })
+  }
+  expect(() => Schema.decodeUnknownSync(Vcs.Base)({ ...base, source: "configured" })).toThrow()
+  expect(() => Schema.decodeUnknownSync(Vcs.Base)({ ...base, source: "worktree" })).toThrow()
 })
 
-test("stash actions require an explicit selector and immutable object ID", () => {
-  const decode = Schema.decodeUnknownSync(Vcs.StashInput)
-  expect(decode({ ref: "stash@{12}", oid: "a".repeat(40) })).toEqual({ ref: "stash@{12}", oid: "a".repeat(40) })
-  expect(() => decode({ ref: "HEAD", oid: "a".repeat(40) })).toThrow()
-  expect(() => decode({ ref: "stash@{0}", oid: "--help" })).toThrow()
+test("review modes preserve shipped working and combined branch names", () => {
+  for (const mode of ["working", "branch", "committed"] as const) {
+    expect(Schema.decodeUnknownSync(Vcs.Mode)(mode)).toBe(mode)
+  }
+  expect(() => Schema.decodeUnknownSync(Vcs.Mode)("unknown")).toThrow()
 })

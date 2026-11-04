@@ -1,0 +1,13 @@
+Show the plan file to the user and get their decision: accept it and start implementing (approving each edit themselves, or accepting edits automatically), revise it, or reject it.
+
+Call this tool:
+- Right after you first write the plan file
+- Right after every later edit to the plan file, once you're ready for feedback again
+- After you have settled any open questions with the user
+
+Do NOT call this tool:
+- Before you have written anything to the plan file
+- While you still have unanswered questions that would change the plan
+- Instead of the write or edit tool: always change the plan file with those tools, then call this one
+
+If the user asks for revisions, keep editing the plan file and call this tool again once the changes are made.

@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 
 // Forge versions combine the upstream OpenCode version the fork is synced to with Forge's own
-// version: `<opencode>-v<forge>`, e.g. 1.18.30-v0.1.0, released under the tag v1.18.30-v0.1.0.
+// version: `<opencode>-v<forge>`, e.g. 2.2.5-v0.7.0, released under the tag v2.2.5-v0.7.0.
 //
-// - The OpenCode half is read from packages/opencode/package.json, which moves on upstream merges.
+// - The OpenCode half is read from the root package.json, which moves on upstream merges.
 // - The Forge half lives in forge.json and is only changed by passing a bump to this script.
 //
 // Usage: script/forge-version.ts [major|minor|patch]
@@ -13,7 +13,7 @@ import path from "path"
 const root = path.resolve(import.meta.dir, "..")
 const forgeFile = Bun.file(path.join(root, "forge.json"))
 const forge = await forgeFile.json()
-const opencode = (await Bun.file(path.join(root, "packages/opencode/package.json")).json()).version
+const opencode = (await Bun.file(path.join(root, "package.json")).json()).version
 
 if (!/^\d+\.\d+\.\d+$/.test(opencode)) throw new Error(`Unexpected OpenCode version "${opencode}"`)
 if (!/^\d+\.\d+\.\d+$/.test(forge.version)) throw new Error(`Unexpected Forge version "${forge.version}"`)
