@@ -518,7 +518,7 @@ test("MCP rows in the header popover toggle once per action and keep sign-in, er
   await expect(disabled).toHaveAccessibleDescription("Disabled")
   await expect(submenu.getByRole("switch", { name: "playwright", exact: true })).toHaveAccessibleDescription("Failed")
   await expect(submenu.getByRole("button", { name: "Sign in to linear", exact: true })).toBeVisible()
-  await expect(row("linear").locator('[data-component="icon-button-v2"]')).toHaveText("")
+  await expect(row("Linear").locator('[data-component="icon-button-v2"]')).toHaveText("")
   await expect(row("playwright").locator('[data-component="icon-button-v2"]')).toHaveAccessibleName("Details for playwright")
 
   for (const name of ["figma", "off", "waiting"]) {
