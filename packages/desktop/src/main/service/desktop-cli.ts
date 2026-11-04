@@ -161,6 +161,7 @@ const installCli = Effect.fn("DesktopCli.install")(function* (source: string, ve
   yield* fs.copyFile(source, temp)
 
   if (process.platform !== "win32") yield* fs.chmod(temp, 0o755)
+
   if (sourceMtime) yield* fs.utimes(temp, sourceMtime, sourceMtime)
   yield* fs
     .rename(temp, destination)
