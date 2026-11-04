@@ -266,6 +266,7 @@ test("service filenames share release channels and identify preview channels", (
   expect(ServiceConfig.filename("dev")).toBe("service.json")
   expect(ServiceConfig.filename("beta")).toBe("service.json")
   expect(ServiceConfig.filename("next")).toBe("service.json")
+  expect(ServiceConfig.filename("prod")).toBe("service.json")
   expect(ServiceConfig.filename("local")).toBe("service-local.json")
   expect(ServiceConfig.filename("preview-a")).toBe("service-preview-a.json")
   expect(ServiceConfig.filename("preview/a")).toBe("service-preview-a.json")
