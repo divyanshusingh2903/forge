@@ -12,6 +12,13 @@ export function compareSessionTime(a: SessionInfo, b: SessionInfo) {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
+/** Orders by when a session last ran, so viewing, renaming or changing its model never moves it. */
+export function compareSessionEdited(a: SessionInfo, b: SessionInfo) {
+  const edited = (item: SessionInfo) => item.time.busy ?? item.time.created
+
+  return edited(b) - edited(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+}
+
 export function toggleHomeProjectSelection(
   current: HomeProjectSelection | undefined,
   server: ServerConnection.Key,

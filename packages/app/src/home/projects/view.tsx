@@ -12,6 +12,7 @@ import {
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Button } from "@opencode/ui/button"
+import { Keybind } from "@opencode/ui/keybind"
 import { Loader } from "@opencode/ui/loader"
 import { Menu } from "@opencode/ui/menu"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -536,27 +537,14 @@ type HomeProjectListProps = HomeProjectsViewProps &
   }
 
 function HomeProjectList(props: HomeProjectListProps) {
-  const [hover, setHover] = createStore({ active: false })
-
-  // The server orders projects by recent activity. While the pointer is over the list, rows keep their places so
-  // nothing moves under the cursor; new projects join at the end and the server order returns on leave.
-  const worktrees = createMemo<string[]>((previous) => {
-    const next = props.items.map((project) => project.worktree)
-
-    if (!hover.active) return next
-    const present = new Set(next)
-    const kept = previous.filter((worktree) => present.has(worktree))
-    const known = new Set(kept)
-
-    return [...kept, ...next.filter((worktree) => !known.has(worktree))]
-  }, [])
+  const worktrees = createMemo(() =>
+    props.items
+      .toSorted((a, b) => displayName(a).localeCompare(displayName(b)) || a.worktree.localeCompare(b.worktree))
+      .map((project) => project.worktree),
+  )
 
   return (
-    <div
-      class="flex min-w-0 flex-col gap-1"
-      onPointerEnter={() => setHover("active", true)}
-      onPointerLeave={() => setHover("active", false)}
-    >
+    <div class="flex min-w-0 flex-col gap-1">
       {/* Keyed on worktree strings: the project objects are recreated on every sync update, so iterating them
           directly would remount every row. */}
       <For each={worktrees()}>{(worktree) => <HomeProjectSlot {...props} worktree={worktree} />}</For>
@@ -698,20 +686,57 @@ function HomeProjectRow(
             aria-label={props.language.t("common.moreOptions")}
           />
           <Menu.Portal>
-            <Menu.Content>
-              <Menu.Item onSelect={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}>
+            <Menu.Content
+              onKeyDown={(event: KeyboardEvent) => {
+                if (event.altKey || event.ctrlKey || event.metaKey) return
+                const key = event.key.toLowerCase()
+                const run =
+                  key === "n"
+                    ? () => props.onOpenProjectNewSession(props.server, props.project.worktree)
+                    : key === "i" && props.canImportSession
+                      ? () => props.onImportSession(props.server, props.project)
+                      : key === "e"
+                        ? () => props.onEditProject(props.server, props.project)
+                        : key === "o" && props.canRevealProject(props.server)
+                          ? () => props.onRevealProject(props.server, props.project)
+                          : key === "l" && props.unread
+                            ? () => props.onClearNotifications(props.server, props.project)
+                            : key === "c"
+                              ? () => props.onHideProject(props.server, props.project)
+                              : undefined
+
+                if (!run) return
+                event.preventDefault()
+                event.stopPropagation()
+                props.onSetContextMenuOpen(contextMenuID(), false)
+                run()
+              }}
+            >
+              <Menu.Item
+                onSelect={() => props.onOpenProjectNewSession(props.server, props.project.worktree)}
+                shortcut={<Keybind keys={["N"]} variant="neutral" />}
+              >
                 {props.language.t("command.session.new")}
               </Menu.Item>
               <Show when={props.canImportSession}>
-                <Menu.Item onSelect={() => props.onImportSession(props.server, props.project)}>
+                <Menu.Item
+                  onSelect={() => props.onImportSession(props.server, props.project)}
+                  shortcut={<Keybind keys={["I"]} variant="neutral" />}
+                >
                   {props.language.t("command.session.import")}
                 </Menu.Item>
               </Show>
-              <Menu.Item onSelect={() => props.onEditProject(props.server, props.project)}>
+              <Menu.Item
+                onSelect={() => props.onEditProject(props.server, props.project)}
+                shortcut={<Keybind keys={["E"]} variant="neutral" />}
+              >
                 {props.language.t("dialog.project.edit.title")}
               </Menu.Item>
               <Show when={props.canRevealProject(props.server)}>
-                <Menu.Item onSelect={() => props.onRevealProject(props.server, props.project)}>
+                <Menu.Item
+                  onSelect={() => props.onRevealProject(props.server, props.project)}
+                  shortcut={<Keybind keys={["O"]} variant="neutral" />}
+                >
                   {props.language.t(
                     fileManagerApp(platform.platform === "desktop" ? (platform.os ?? "unknown") : "unknown")
                       .actionLabel,
@@ -721,11 +746,15 @@ function HomeProjectRow(
               <Menu.Item
                 disabled={!props.unread}
                 onSelect={() => props.onClearNotifications(props.server, props.project)}
+                shortcut={<Keybind keys={["L"]} variant="neutral" />}
               >
                 {props.language.t("sidebar.project.clearNotifications")}
               </Menu.Item>
               <Menu.Separator />
-              <Menu.Item onSelect={() => props.onHideProject(props.server, props.project)}>
+              <Menu.Item
+                onSelect={() => props.onHideProject(props.server, props.project)}
+                shortcut={<Keybind keys={["C"]} variant="neutral" />}
+              >
                 {props.language.t("common.close")}
               </Menu.Item>
             </Menu.Content>

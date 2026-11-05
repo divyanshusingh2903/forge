@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { SessionInfo } from "@opencode/client/promise"
-import { errorMessage, projectForSession, toggleHomeProjectSelection } from "./helpers"
+import { compareSessionEdited, errorMessage, projectForSession, toggleHomeProjectSelection } from "./helpers"
 import { ServerConnection } from "@/runtime/server/registry"
 
 const serverKey = ServerConnection.Key.make
@@ -72,5 +72,19 @@ describe("layout workspace helpers", () => {
     expect(errorMessage({ data: { message: "boom" } }, "fallback")).toBe("boom")
     expect(errorMessage(new Error("broken"), "fallback")).toBe("broken")
     expect(errorMessage("unknown", "fallback")).toBe("fallback")
+  })
+})
+
+describe("compareSessionEdited", () => {
+  test("orders by last run and ignores later activity", () => {
+    const ran = session({ id: "ran", directory: "/a", time: { created: 1, updated: 10, busy: 5 } as SessionInfo["time"] })
+    const touched = session({
+      id: "touched",
+      directory: "/a",
+      time: { created: 1, updated: 99, busy: 2 } as SessionInfo["time"],
+    })
+    const idle = session({ id: "idle", directory: "/a", time: { created: 3, updated: 50 } as SessionInfo["time"] })
+
+    expect([touched, idle, ran].toSorted(compareSessionEdited).map((item) => item.id)).toEqual(["ran", "idle", "touched"])
   })
 })
