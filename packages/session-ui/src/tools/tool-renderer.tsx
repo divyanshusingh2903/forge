@@ -1033,15 +1033,24 @@ export function CurrentFileToolGroup(props: {
   onFileOpenChange?: (path: string, open: boolean) => void
   onSizeChange?: () => void
 }) {
-  const files = createMemo((previous: { key: string; toolID: string; value: FileDiffInfo }[]) => {
+  const data = useData()
+  const files = createMemo((previous: { key: string; toolID: string; value: FileDiffInfo; preview?: boolean }[]) => {
     const next = props.tools.flatMap((tool) => {
-      const files = toolMetadata(currentToolMetadata(tool)).files ?? []
+      const permission = tool.state.status === "running" ? data.toolPermission?.(tool.id) : undefined
+      const files = toolMetadata(permission?.metadata ?? currentToolMetadata(tool)).files ?? []
 
       // Invalid entries render nothing, but metadata files still replace the input-derived preview.
       if (files.length > 0)
         return files.flatMap((value, index) =>
-          changedFileDiff(value) ? [{ key: `${tool.id}:${index}`, toolID: tool.id, value }] : [],
+          changedFileDiff(value)
+            ? [{ key: `${tool.id}:${index}`, toolID: tool.id, value, preview: !!permission }]
+            : [],
         )
+
+      // A reply removes the pending request before the tool finishes. Keep its full-file preview instead of
+      // replacing it with input snippets (or treating an overwrite as an entirely new file).
+      if (previous.some((entry) => entry.toolID === tool.id && entry.preview)) return []
+
       const input = toolInput(currentToolInput(tool))
 
       if (input.path === undefined) return []
@@ -1070,6 +1079,7 @@ export function CurrentFileToolGroup(props: {
               deletions,
               status: "modified" as const,
             },
+            preview: false,
           },
         ]
       }
@@ -1087,22 +1097,23 @@ export function CurrentFileToolGroup(props: {
             deletions: 0,
             status: "modified" as const,
           },
+          preview: false,
         },
       ]
     })
 
-    const updates = new Map(next.map((entry) => [entry.key, entry.value]))
+    const updates = new Map(next.map((entry) => [entry.key, entry]))
     const existing = new Set(previous.map((entry) => entry.key))
     const owners = new Set(props.tools.map((tool) => tool.id))
 
     const result = [
       ...previous.flatMap((entry) => {
         if (!owners.has(entry.toolID)) return []
-        const value = updates.get(entry.key)
+        const update = updates.get(entry.key)
 
-        if (!value || samePatchFile(value, entry.value)) return [entry]
+        if (!update || (samePatchFile(update.value, entry.value) && update.preview === entry.preview)) return [entry]
 
-        return [{ ...entry, value }]
+        return [update]
       }),
       ...next.filter((entry) => !existing.has(entry.key)),
     ]
@@ -1457,6 +1468,19 @@ export function ToolDisplay(
   const errorSubtitle = createMemo(() => toolErrorSubtitle(props, i18n))
   const error = createMemo(() => toolDisplayError(props))
   const render = createMemo(() => ToolRegistry.render(props.tool) ?? ResponseTool)
+  const metadata = createMemo<Record<string, unknown>>((previous) => {
+    if (props.tool !== "edit" && props.tool !== "write" && props.tool !== "patch") return props.metadata
+
+    const permission = props.status === "running" ? data.toolPermission?.(props.id) : undefined
+
+    if (permission?.metadata) return { ...props.metadata, ...permission.metadata }
+
+    if (props.status === "error" || toolMetadata(props.metadata).files?.length) return props.metadata
+
+    // The standalone tool path needs the same approval preview as grouped file cards, including the gap
+    // between the permission reply and the completed tool metadata.
+    return previous?.files ? { ...props.metadata, files: previous.files } : props.metadata
+  })
 
   return (
     <Show when={!hideQuestion()}>
@@ -1505,7 +1529,7 @@ export function ToolDisplay(
             }}
           </Match>
           <Match when={true}>
-            <Dynamic component={render()} {...props} />
+            <Dynamic component={render()} {...props} metadata={metadata()} />
           </Match>
         </Switch>
       </div>

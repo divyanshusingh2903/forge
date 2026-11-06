@@ -1,5 +1,6 @@
 import type {
   FileDiffInfo,
+  PermissionRequest,
   SessionInfo,
   SessionStatus,
   ShellOutputInput,
@@ -69,6 +70,7 @@ export const {
     agents?: boolean
     shellRunning?: (id: string) => boolean
     shellOutput?: (input: ShellOutputInput) => Promise<ShellOutputOutput>
+    toolPermission?: (toolID: string) => PermissionRequest | undefined
     turnDiff?: TurnDiffSource
     readMedia?: ReadMediaUrlFn
     peekMedia?: PeekMediaUrlFn
@@ -97,6 +99,7 @@ export const {
       sessionHref: props.onSessionHref,
       shellRunning: props.shellRunning,
       shellOutput: props.shellOutput,
+      toolPermission: props.toolPermission,
       get turnDiff() {
         return props.turnDiff
       },

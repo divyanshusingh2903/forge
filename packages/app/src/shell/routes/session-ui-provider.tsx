@@ -140,6 +140,13 @@ export function SessionUIProvider(
         agents={settings.visibility.customAgents()}
         shellRunning={(id) => !!data.shell.get(id)}
         shellOutput={(input) => serverSDK.api.shell.output(input)}
+        toolPermission={(toolID) =>
+          params.id
+            ? data.session.permission
+                .list(params.id)
+                ?.find((request) => request.action === "edit" && request.source?.id === toolID)
+            : undefined
+        }
         readMedia={(uri, mime, signal) => serverSDK.media.load(uri, mime, signal)}
         peekMedia={(uri, mime) => serverSDK.media.peek(uri, mime)}
         turnDiff={turnDiff()}
