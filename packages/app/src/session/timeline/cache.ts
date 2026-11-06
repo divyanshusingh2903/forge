@@ -136,6 +136,9 @@ export function createTimelineCache(
                 get shellOutput() {
                   return active() ? data.shellOutput : undefined
                 },
+                get toolPermissions() {
+                  return active() ? data.toolPermissions : undefined
+                },
                 get turnDiff() {
                   return turnDiff()
                 },

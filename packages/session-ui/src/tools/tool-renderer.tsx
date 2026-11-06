@@ -46,6 +46,7 @@ import { animate } from "@kitlangton/solid-motion"
 import { SessionProgressIndicatorV2 } from "../v2/components/session-progress-indicator-v2"
 import type {
   FileDiffInfo,
+  PermissionRequest,
   SessionMessageAssistantReasoning,
   SessionMessageAssistantTool,
   SessionMessageShell,
@@ -129,6 +130,7 @@ const toolInput = Schema.decodeUnknownSync(
     agent: optional(Schema.String),
     description: optional(Schema.String),
     command: optional(Schema.String),
+    workdir: optional(Schema.String),
     code: optional(Schema.String),
     oldString: optional(Schema.String),
     newString: optional(Schema.String),
@@ -145,6 +147,9 @@ const toolMetadata = Schema.decodeUnknownSync(
     provider: optional(Schema.String),
     sessionID: optional(Schema.String),
     command: optional(Schema.String),
+    cwd: optional(Schema.String),
+    input: optional(Schema.Record(Schema.String, Schema.Unknown)),
+    mcp: optional(Schema.Struct({ server: Schema.String, tool: Schema.String, path: Schema.String })),
     shellID: optional(Schema.String),
     status: optional(Schema.String),
     background: optional(Schema.Boolean),
@@ -508,7 +513,20 @@ export function CurrentContextToolGroup(props: {
   patchGroupKey?: (tools: SessionMessageAssistantTool[]) => string
 }) {
   const i18n = useI18n()
+  const data = useData()
   const tools = createMemo(() => props.parts.filter((part) => part.type === "tool"))
+  const approvalPending = createMemo(() =>
+    tools().some(
+      (tool) =>
+        tool.state.status === "running" &&
+        data.toolPermissions?.(tool.id)?.some(
+          (request) =>
+            request.action === "shell" ||
+            (tool.name === "shell" && request.action === "external_directory") ||
+            toolMetadata(request.metadata).mcp !== undefined,
+        ),
+    ),
+  )
 
   const pending = createMemo(
     () => props.busy || tools().some((tool) => tool.state.status === "streaming" || tool.state.status === "running"),
@@ -681,6 +699,7 @@ export function CurrentContextToolGroup(props: {
         compact
         hasContent
         allowOpenWhilePending
+        forceOpen={approvalPending()}
         open={props.open}
         onOpenChange={change}
         trigger={
@@ -1033,15 +1052,27 @@ export function CurrentFileToolGroup(props: {
   onFileOpenChange?: (path: string, open: boolean) => void
   onSizeChange?: () => void
 }) {
-  const files = createMemo((previous: { key: string; toolID: string; value: FileDiffInfo }[]) => {
+  const data = useData()
+  const files = createMemo((previous: { key: string; toolID: string; value: FileDiffInfo; preview?: boolean }[]) => {
     const next = props.tools.flatMap((tool) => {
-      const files = toolMetadata(currentToolMetadata(tool)).files ?? []
+      const permission =
+        tool.state.status === "running"
+          ? data.toolPermissions?.(tool.id)?.find((request) => request.action === "edit")
+          : undefined
+      const files = toolMetadata(permission?.metadata ?? currentToolMetadata(tool)).files ?? []
 
       // Invalid entries render nothing, but metadata files still replace the input-derived preview.
       if (files.length > 0)
         return files.flatMap((value, index) =>
-          changedFileDiff(value) ? [{ key: `${tool.id}:${index}`, toolID: tool.id, value }] : [],
+          changedFileDiff(value)
+            ? [{ key: `${tool.id}:${index}`, toolID: tool.id, value, preview: !!permission }]
+            : [],
         )
+
+      // A reply removes the pending request before the tool finishes. Keep its full-file preview instead of
+      // replacing it with input snippets (or treating an overwrite as an entirely new file).
+      if (previous.some((entry) => entry.toolID === tool.id && entry.preview)) return []
+
       const input = toolInput(currentToolInput(tool))
 
       if (input.path === undefined) return []
@@ -1070,6 +1101,7 @@ export function CurrentFileToolGroup(props: {
               deletions,
               status: "modified" as const,
             },
+            preview: false,
           },
         ]
       }
@@ -1087,22 +1119,23 @@ export function CurrentFileToolGroup(props: {
             deletions: 0,
             status: "modified" as const,
           },
+          preview: false,
         },
       ]
     })
 
-    const updates = new Map(next.map((entry) => [entry.key, entry.value]))
+    const updates = new Map(next.map((entry) => [entry.key, entry]))
     const existing = new Set(previous.map((entry) => entry.key))
     const owners = new Set(props.tools.map((tool) => tool.id))
 
     const result = [
       ...previous.flatMap((entry) => {
         if (!owners.has(entry.toolID)) return []
-        const value = updates.get(entry.key)
+        const update = updates.get(entry.key)
 
-        if (!value || samePatchFile(value, entry.value)) return [entry]
+        if (!update || (samePatchFile(update.value, entry.value) && update.preview === entry.preview)) return [entry]
 
-        return [{ ...entry, value }]
+        return [update]
       }),
       ...next.filter((entry) => !existing.has(entry.key)),
     ]
@@ -1212,6 +1245,7 @@ export interface ToolProps {
   error?: string
   // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- see SAFETY above
   metadata: Record<string, unknown>
+  permissions?: readonly PermissionRequest[]
   tool: string
   sessionID?: string
   output?: string
@@ -1457,6 +1491,31 @@ export function ToolDisplay(
   const errorSubtitle = createMemo(() => toolErrorSubtitle(props, i18n))
   const error = createMemo(() => toolDisplayError(props))
   const render = createMemo(() => ToolRegistry.render(props.tool) ?? ResponseTool)
+  const permissions = createMemo(() => (props.status === "running" ? data.toolPermissions?.(props.id) : undefined))
+  const metadata = createMemo<Record<string, unknown>>((previous) => {
+    if (props.tool === "execute") return props.metadata
+
+    const permission = permissions()?.find((request) =>
+      props.tool === "edit" || props.tool === "write" || props.tool === "patch"
+        ? request.action === "edit"
+        : props.tool === "shell"
+          ? request.action === "shell" || request.action === "external_directory"
+          : toolMetadata(request.metadata).mcp !== undefined,
+    )
+
+    if (permission?.metadata) return { ...props.metadata, ...permission.metadata }
+
+    // Keep the approved command/arguments visible while the tool transitions to its execution result.
+    if (previous?.mcp || (props.tool === "shell" && previous?.cwd)) return { ...previous, ...props.metadata }
+
+    if (props.tool !== "edit" && props.tool !== "write" && props.tool !== "patch") return props.metadata
+
+    if (props.status === "error" || toolMetadata(props.metadata).files?.length) return props.metadata
+
+    // The standalone tool path needs the same approval preview as grouped file cards, including the gap
+    // between the permission reply and the completed tool metadata.
+    return previous?.files ? { ...props.metadata, files: previous.files } : props.metadata
+  })
 
   return (
     <Show when={!hideQuestion()}>
@@ -1505,7 +1564,20 @@ export function ToolDisplay(
             }}
           </Match>
           <Match when={true}>
-            <Dynamic component={render()} {...props} />
+            <Dynamic
+              component={render()}
+              {...props}
+              metadata={metadata()}
+              permissions={permissions()}
+              forceOpen={
+                props.forceOpen ||
+                (!!permissions()?.length &&
+                  (props.tool === "shell" ||
+                    toolMetadata(metadata()).mcp !== undefined ||
+                    (props.tool === "execute" &&
+                      permissions()?.some((request) => toolMetadata(request.metadata).mcp !== undefined))))
+              }
+            />
           </Match>
         </Switch>
       </div>
@@ -1942,8 +2014,19 @@ ToolRegistry.register({
 
 // Tools without their own renderer, such as MCP tools called directly, show their response under the arguments.
 function ResponseTool(props: ToolProps) {
+  const metadata = createMemo(() => toolMetadata(props.metadata))
+  const input = () => (metadata().mcp ? (metadata().input ?? props.input) : props.input)
+
   return (
-    <GenericTool tool={props.tool} status={props.status} hideDetails={props.hideDetails} input={props.input}>
+    <GenericTool {...props} input={input()} allowOpenWhilePending={metadata().mcp !== undefined}>
+      <Show when={metadata().mcp}>
+        {(mcp) => (
+          <div data-component="tool-response">
+            <code>{`${mcp().server}.${mcp().tool}`}</code>
+            <ConsoleOutput output={JSON.stringify(input(), null, 2)} />
+          </div>
+        )}
+      </Show>
       <Show when={props.output?.trim()}>{(output) => <ToolResponse output={output()} />}</Show>
     </GenericTool>
   )
@@ -1982,7 +2065,7 @@ function ToolResponse(props: { output: string }) {
   )
 }
 
-function ConsoleOutput(props: { command?: string; output: string }) {
+function ConsoleOutput(props: { command?: string; cwd?: string; output: string }) {
   const i18n = useI18n()
 
   return (
@@ -1994,6 +2077,15 @@ function ConsoleOutput(props: { command?: string; output: string }) {
         role="region"
         aria-label={i18n.t("ui.scrollView.ariaLabel")}
       >
+        <Show when={props.cwd}>
+          {(cwd) => (
+            <div data-slot="bash-command">
+              <pre data-slot="bash-pre">
+                <code>{i18n.t("ui.tool.shell.workdir", { path: cwd() })}</code>
+              </pre>
+            </div>
+          )}
+        </Show>
         <Show when={props.command}>
           {(command) => (
             <div data-slot="bash-command">
@@ -2058,6 +2150,13 @@ ToolRegistry.register({
     const dialog = useDialog()
     const pending = () => props.status === "streaming" || props.status === "running"
     const calls = createMemo(() => executeToolCalls(props.metadata))
+    const approvals = createMemo(() =>
+      (props.permissions ?? []).flatMap((request) => {
+        const mcp = toolMetadata(request.metadata).mcp
+
+        return mcp ? [mcp.path] : []
+      }),
+    )
     const subtitle = createMemo(() => executeToolSubtitle(calls(), (call) => browserCallSummary(call, i18n)))
     const code = createMemo(() => (toolInput(props.input).code ?? "").trimEnd())
 
@@ -2128,7 +2227,13 @@ ToolRegistry.register({
       >
         <div data-component="execute-tool-calls">
           <Index each={calls()}>
-            {(call, index) => <ExecuteCallRow call={call()} error={index === owner() ? error() : undefined} />}
+            {(call, index) => (
+              <ExecuteCallRow
+                call={call()}
+                error={index === owner() ? error() : undefined}
+                approvalPending={call().status === "running" && approvals().includes(call().tool)}
+              />
+            )}
           </Index>
           <Show when={owner() === -1 && error()}>{(text) => <ExecuteCallRow error={text()} />}</Show>
           <Show when={output()}>{(value) => <ExecuteOutputRow output={value()} />}</Show>
@@ -2321,7 +2426,7 @@ function ExecuteCallImage(props: { path: string }) {
   )
 }
 
-function ExecuteCallRow(props: { call?: ExecuteToolCall; error?: string }) {
+function ExecuteCallRow(props: { call?: ExecuteToolCall; error?: string; approvalPending?: boolean }) {
   const i18n = useI18n()
   const [open, setOpen] = createSignal(false)
   const args = createMemo(() => (props.call ? executeToolCallArgs(props.call) : []))
@@ -2331,6 +2436,15 @@ function ExecuteCallRow(props: { call?: ExecuteToolCall; error?: string }) {
   const failed = () => !props.call || props.call.status === "error"
   const expandable = () => input().length > 0 || !!props.error
   const summary = () => (props.call ? args().join(", ") : props.error?.split("\n", 1)[0])
+
+  createEffect(
+    on(
+      () => props.approvalPending,
+      (pending) => {
+        if (pending) setOpen(true)
+      },
+    ),
+  )
 
   const toggle = () => {
     if (!expandable() || window.getSelection()?.toString()) return
@@ -2431,7 +2545,8 @@ ToolRegistry.register({
     }
 
     const sawStreaming = streaming()
-    const command = createMemo(() => toolInput(props.input).command ?? metadata().command ?? "")
+    const command = createMemo(() => metadata().command ?? toolInput(props.input).command ?? "")
+    const cwd = () => metadata().cwd ?? toolInput(props.input).workdir ?? data.directory
 
     function Output() {
       const [streamed, setStreamed] = createSignal("")
@@ -2459,7 +2574,7 @@ ToolRegistry.register({
         ),
       )
 
-      return <ConsoleOutput command={command()} output={output()} />
+      return <ConsoleOutput command={command()} cwd={cwd()} output={output()} />
     }
 
     return (

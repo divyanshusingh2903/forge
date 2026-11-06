@@ -4,16 +4,19 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { ForgeMode } from "@opencode/schema/forge-mode"
 import type { Session } from "@opencode/schema/session"
 import { Effect } from "effect"
+import { Permission } from "../permission.js"
 
 const editActions = new Set(["edit"])
 
 // Upstream agents allow every action. Forge asks before shell commands and file edits, as v1 did, so Manual has
-// something to ask about and the other modes relax it.
+// something to ask about and the other modes relax it. MCP defaults are applied at evaluation because their
+// action names are discovered dynamically, rather than belonging to a fixed list of built-in actions.
 const askActions = ["shell", "edit"]
 
 /**
  * Settles permission requests by the session's Forge mode. It runs after configured denies have been applied, so it
- * only turns an `ask` into an `allow`. It also makes shell commands and file edits ask by default. Subagents follow the mode of the session at the top of their lineage, which
+ * makes shell commands, file edits, and MCP calls ask by default. Explicit rules and saved approvals still win.
+ * Subagents follow the mode of the session at the top of their lineage, which
  * the user sets, rather than the copy of its metadata they inherited when they started.
  */
 export const Plugin = define({
@@ -46,6 +49,23 @@ export const Plugin = define({
 
     yield* ctx.permission.hook("evaluate", (event) =>
       Effect.gen(function* () {
+        const rules = event.rules
+        if (event.effect === "allow" && event.metadata?.mcp && rules) {
+          const base = rules.findIndex(
+            (rule) => rule.action === "*" && rule.resource === "*" && rule.effect === "allow",
+          )
+
+          // Ignore only the agent's base allow-all. Later config, session rules, and saved approvals retain
+          // their normal precedence; with no later matching rule, MCP calls default to asking.
+          if (
+            base !== -1 &&
+            event.resources.some(
+              (resource) => Permission.evaluate(event.action, resource, rules.slice(base + 1)).effect === "ask",
+            )
+          )
+            event.effect = "ask"
+        }
+
         if (event.effect !== "ask") return
         const mode = yield* rootMode(event.sessionID)
         if (mode === "auto" || (mode === "edits" && editActions.has(event.action))) event.effect = "allow"
