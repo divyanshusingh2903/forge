@@ -72,8 +72,11 @@ export function projectForSession<T extends { id?: string; worktree: string; san
     .sort((a, b) => b.worktree.length - a.worktree.length)[0]
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- the boundary for any thrown or rejected value
 export const errorMessage = (err: unknown, fallback: string) => {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- narrows a caught value to the server error shape below
   if (err && typeof err === "object" && "data" in err) {
+    // SAFETY: server errors carry `data.message`; `data` is read optionally and checked before use.
     const data = (err as { data?: { message?: string } }).data
 
     if (data?.message) return data.message

@@ -5,6 +5,7 @@ import { ServerConnection } from "@/runtime/server/registry"
 
 const serverKey = ServerConnection.Key.make
 
+// SAFETY: tests fill only the SessionInfo fields the code under test reads.
 const session = (input: Partial<SessionInfo> & Pick<SessionInfo, "id"> & { directory: string }) =>
   ({
     projectID: "project",
@@ -77,13 +78,15 @@ describe("layout workspace helpers", () => {
 
 describe("compareSessionEdited", () => {
   test("orders by last run and ignores later activity", () => {
-    const ran = session({ id: "ran", directory: "/a", time: { created: 1, updated: 10, busy: 5 } as SessionInfo["time"] })
+    const ran = session({ id: "ran", directory: "/a", time: { created: 1, updated: 10, busy: 5 } })
+
     const touched = session({
       id: "touched",
       directory: "/a",
-      time: { created: 1, updated: 99, busy: 2 } as SessionInfo["time"],
+      time: { created: 1, updated: 99, busy: 2 },
     })
-    const idle = session({ id: "idle", directory: "/a", time: { created: 3, updated: 50 } as SessionInfo["time"] })
+
+    const idle = session({ id: "idle", directory: "/a", time: { created: 3, updated: 50 } })
 
     expect([touched, idle, ran].toSorted(compareSessionEdited).map((item) => item.id)).toEqual(["ran", "idle", "touched"])
   })

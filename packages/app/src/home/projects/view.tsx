@@ -689,7 +689,9 @@ function HomeProjectRow(
             <Menu.Content
               onKeyDown={(event: KeyboardEvent) => {
                 if (event.altKey || event.ctrlKey || event.metaKey) return
+
                 const key = event.key.toLowerCase()
+
                 const run =
                   key === "n"
                     ? () => props.onOpenProjectNewSession(props.server, props.project.worktree)
