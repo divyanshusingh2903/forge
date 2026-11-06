@@ -12,6 +12,13 @@ export function compareSessionTime(a: SessionInfo, b: SessionInfo) {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
+/** Orders by when a session last ran, so viewing, renaming or changing its model never moves it. */
+export function compareSessionEdited(a: SessionInfo, b: SessionInfo) {
+  const edited = (item: SessionInfo) => item.time.busy ?? item.time.created
+
+  return edited(b) - edited(a) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+}
+
 export function toggleHomeProjectSelection(
   current: HomeProjectSelection | undefined,
   server: ServerConnection.Key,
@@ -65,8 +72,11 @@ export function projectForSession<T extends { id?: string; worktree: string; san
     .sort((a, b) => b.worktree.length - a.worktree.length)[0]
 }
 
+// oxlint-disable-next-line anti-slop/no-unknown-parameters -- the boundary for any thrown or rejected value
 export const errorMessage = (err: unknown, fallback: string) => {
+  // oxlint-disable-next-line anti-slop/no-runtime-typeof -- narrows a caught value to the server error shape below
   if (err && typeof err === "object" && "data" in err) {
+    // SAFETY: server errors carry `data.message`; `data` is read optionally and checked before use.
     const data = (err as { data?: { message?: string } }).data
 
     if (data?.message) return data.message

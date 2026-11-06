@@ -181,7 +181,7 @@ async function homeProjects(page: Page, projects: unknown[]) {
   return { server, rows: page.locator('[data-component="home-project-row"] [data-slot="home-row-label"]') }
 }
 
-test("Home lists the used server projects by recent activity, hides them, and lists them again once used", async ({
+test("Home lists the used server projects alphabetically, hides them, and lists them again once used", async ({
   page,
 }) => {
   // `recent` was first resolved under another ID, so one directory has two projects.
@@ -190,9 +190,9 @@ test("Home lists the used server projects by recent activity, hides them, and li
   const view = await homeProjects(page, listed)
   await seed(page, { usedProjects: { local: ["proj_recent_before_git", "proj_older", "proj_oldest"] } })
   await page.goto("/")
-  await expect(view.rows).toHaveText(["recent", "older", "oldest"])
+  await expect(view.rows).toHaveText(["older", "oldest", "recent"])
 
-  // Activity moves a project up and an archived project leaves; a project this client never used stays out.
+  // Activity keeps projects in alphabetical order and an archived project leaves; a project this client never used stays out.
   const active = { ...listed[3]!, time: { ...listed[3]!.time, active: T0 + 5 } }
   const archived = { ...listed[2]!, time: { ...listed[2]!.time, archived: T0 + 6 } }
   const fresh = entry("fresh", 7)
@@ -211,7 +211,13 @@ test("Home lists the used server projects by recent activity, hides them, and li
 
   const recent = page.locator('[data-component="home-project-row"]').filter({ hasText: "recent" })
   await recent.locator("..").getByRole("button", { name: "More options", exact: true }).click()
-  await page.getByRole("menuitem", { name: "Close", exact: true }).click()
+  await expect(page.getByRole("menuitem")).toHaveText([
+    /^New session\s*N$/,
+    /^Edit project\s*E$/,
+    /^Clear notifications\s*L$/,
+    /^Close\s*C$/,
+  ])
+  await page.keyboard.press("c")
   await expect(view.rows).toHaveText(["oldest"])
 
   // Closing a project moves it out of the added list, but it remains discoverable in the server inventory.

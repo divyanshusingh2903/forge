@@ -11,7 +11,7 @@ import type { LocalProject } from "@/shell/state/layout"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection } from "@/runtime/server/registry"
 import { sessionHasOpenTab, useTabs } from "@/shell/tabs/tabs"
-import { errorMessage } from "@/shell/layout/helpers"
+import { compareSessionEdited, errorMessage } from "@/shell/layout/helpers"
 import { useSessionTabAvatarState } from "@/shell/layout/project-avatar-state"
 import { sessionTreeIDs } from "@/session/requests/session-request-tree"
 import { pathKey } from "@/workspaces/path-key"
@@ -100,7 +100,7 @@ export function createHomeSessionsController(home: HomeController) {
   const sidebarByProject = createMemo(() => {
     const map = new Map<string, HomeSessionRecord[]>()
 
-    for (const record of sidebarRecords()) {
+    for (const record of sidebarRecords().toSorted((a, b) => compareSessionEdited(a.session, b.session))) {
       const key = pathKey(record.project.worktree)
       const list = map.get(key)
 
