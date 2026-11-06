@@ -70,7 +70,7 @@ export const {
     agents?: boolean
     shellRunning?: (id: string) => boolean
     shellOutput?: (input: ShellOutputInput) => Promise<ShellOutputOutput>
-    toolPermission?: (toolID: string) => PermissionRequest | undefined
+    toolPermissions?: (toolID: string) => readonly PermissionRequest[] | undefined
     turnDiff?: TurnDiffSource
     readMedia?: ReadMediaUrlFn
     peekMedia?: PeekMediaUrlFn
@@ -99,7 +99,7 @@ export const {
       sessionHref: props.onSessionHref,
       shellRunning: props.shellRunning,
       shellOutput: props.shellOutput,
-      toolPermission: props.toolPermission,
+      toolPermissions: props.toolPermissions,
       get turnDiff() {
         return props.turnDiff
       },

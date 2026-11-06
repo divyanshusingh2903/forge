@@ -1,4 +1,5 @@
-import { For, Show } from "solid-js"
+import { createMemo, For, Show } from "solid-js"
+import { Option, Schema } from "effect"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import type { PermissionRequest } from "@opencode/client/promise"
 import { Button } from "@opencode/ui/button"
@@ -9,6 +10,8 @@ import { browserPermissionSummary } from "@opencode/session-ui/tools/browser-cal
 import { Keybind } from "@opencode/ui/keybind"
 import { useLanguage } from "@/runtime/i18n/language"
 
+const decodeMcp = Schema.decodeUnknownOption(Schema.Struct({ server: Schema.String, tool: Schema.String }))
+
 export function SessionPermissionDock(props: {
   request: PermissionRequest
   responding: boolean
@@ -16,9 +19,13 @@ export function SessionPermissionDock(props: {
 }) {
   const language = useLanguage()
   const i18n = useI18n()
+  const mcp = createMemo(() => Option.getOrUndefined(decodeMcp(props.request.metadata?.mcp)))
 
-  // A browser call names what it acts on, as its timeline row does; other requests list their patterns as they are.
+  // MCP's wildcard is a permission scope, not a useful description of the operation awaiting approval.
   const pattern = (resource: string) => {
+    const call = mcp()
+    if (call && resource === "*") return `${call.server}.${call.tool}`
+
     const summary =
       props.request.action === "browser" ? browserPermissionSummary(resource, props.request.metadata, i18n) : undefined
 
@@ -26,6 +33,9 @@ export function SessionPermissionDock(props: {
   }
 
   const toolDescription = () => {
+    const call = mcp()
+    if (call) return language.t("permission.mcp.description", { server: call.server, tool: call.tool })
+
     const key = `settings.permissions.tool.${props.request.action}.description`
     // SAFETY: an action without a description key comes back unchanged from t(), which the check below catches.
     const value = language.t(key as Parameters<typeof language.t>[0])

@@ -186,12 +186,19 @@ const layer = Layer.effect(
         resources: input.resources,
         metadata: input.metadata,
         source: input.source,
+        rules: all,
         effect,
       })
       const unattended = yield* Unattended
       if (event.effect !== "ask" || unattended === undefined)
         return { effect: event.effect, message: event.message, rules: all }
-      const settled = [...all, ...unattended]
+      // A hook can require approval despite the base rules allowing it. Unattended work must then have
+      // its own matching approval rather than silently falling back to that original allow.
+      const settled = [
+        ...all,
+        ...(effect === "allow" ? [{ action: input.action, resource: "*", effect: "ask" as const }] : []),
+        ...unattended,
+      ]
       const allowed = input.resources.every((resource) => evaluate(input.action, resource, settled).effect === "allow")
       if (allowed) return { effect: "allow" as const, rules: all }
       return {
