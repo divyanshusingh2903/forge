@@ -88,4 +88,6 @@ it.live("integration policy filters /connect and blocks denied integrations and 
     // The signed-out free tier and the authored provider are both denied.
     expect((yield* request("GET", "/api/provider")).body.data).toEqual([])
   }),
+  // Builds the whole route layer, which takes seconds on a cold macOS runner.
+  30_000,
 )

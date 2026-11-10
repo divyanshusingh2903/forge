@@ -173,6 +173,8 @@ test("opens file picker launchers when randomUUID is unavailable on insecure HTT
 })
 
 test("open file tab browses, searches, and tracks missing files", async ({ page }) => {
+  // The header buttons share the row with the title, so the context button needs a wider window than the default.
+  await page.setViewportSize({ width: 1700, height: 900 })
   const searches: { query: string; dirs?: string; limit?: number; directory: string }[] = []
   const directory = "C:/OpenCode/ReviewOpenFile"
   const files = Array.from({ length: 80 }, (_, index) => `file-${String(index).padStart(2, "0")}.ts`)
@@ -1419,6 +1421,8 @@ test("review file navigation focuses the arrow for the keyboard direction", asyn
 })
 
 test("restores review state and the side-panel tab per session", async ({ page }) => {
+  await page.setViewportSize({ width: 1700, height: 900 })
+
   const sessions = [
     { id: "ses_review_state_a", title: "Alpha review state" },
     { id: "ses_review_state_b", title: "Beta review state" },
