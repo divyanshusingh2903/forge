@@ -24,6 +24,7 @@ export function SessionPermissionDock(props: {
   // MCP's wildcard is a permission scope, not a useful description of the operation awaiting approval.
   const pattern = (resource: string) => {
     const call = mcp()
+
     if (call && resource === "*") return `${call.server}.${call.tool}`
 
     const summary =
@@ -34,6 +35,7 @@ export function SessionPermissionDock(props: {
 
   const toolDescription = () => {
     const call = mcp()
+
     if (call) return language.t("permission.mcp.description", { server: call.server, tool: call.tool })
 
     const key = `settings.permissions.tool.${props.request.action}.description`

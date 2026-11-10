@@ -515,6 +515,7 @@ export function CurrentContextToolGroup(props: {
   const i18n = useI18n()
   const data = useData()
   const tools = createMemo(() => props.parts.filter((part) => part.type === "tool"))
+
   const approvalPending = createMemo(() =>
     tools().some(
       (tool) =>
@@ -1053,12 +1054,14 @@ export function CurrentFileToolGroup(props: {
   onSizeChange?: () => void
 }) {
   const data = useData()
+
   const files = createMemo((previous: { key: string; toolID: string; value: FileDiffInfo; preview?: boolean }[]) => {
     const next = props.tools.flatMap((tool) => {
       const permission =
         tool.state.status === "running"
           ? data.toolPermissions?.(tool.id)?.find((request) => request.action === "edit")
           : undefined
+
       const files = toolMetadata(permission?.metadata ?? currentToolMetadata(tool)).files ?? []
 
       // Invalid entries render nothing, but metadata files still replace the input-derived preview.
@@ -1492,7 +1495,8 @@ export function ToolDisplay(
   const error = createMemo(() => toolDisplayError(props))
   const render = createMemo(() => ToolRegistry.render(props.tool) ?? ResponseTool)
   const permissions = createMemo(() => (props.status === "running" ? data.toolPermissions?.(props.id) : undefined))
-  const metadata = createMemo<Record<string, unknown>>((previous) => {
+
+  const metadata = createMemo<ToolProps["metadata"]>((previous) => {
     if (props.tool === "execute") return props.metadata
 
     const permission = permissions()?.find((request) =>
@@ -2079,7 +2083,7 @@ function ConsoleOutput(props: { command?: string; cwd?: string; output: string }
       >
         <Show when={props.cwd}>
           {(cwd) => (
-            <div data-slot="bash-command">
+            <div data-slot="bash-workdir">
               <pre data-slot="bash-pre">
                 <code>{i18n.t("ui.tool.shell.workdir", { path: cwd() })}</code>
               </pre>
@@ -2150,6 +2154,7 @@ ToolRegistry.register({
     const dialog = useDialog()
     const pending = () => props.status === "streaming" || props.status === "running"
     const calls = createMemo(() => executeToolCalls(props.metadata))
+
     const approvals = createMemo(() =>
       (props.permissions ?? []).flatMap((request) => {
         const mcp = toolMetadata(request.metadata).mcp
@@ -2157,6 +2162,7 @@ ToolRegistry.register({
         return mcp ? [mcp.path] : []
       }),
     )
+
     const subtitle = createMemo(() => executeToolSubtitle(calls(), (call) => browserCallSummary(call, i18n)))
     const code = createMemo(() => (toolInput(props.input).code ?? "").trimEnd())
 
