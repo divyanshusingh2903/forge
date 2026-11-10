@@ -35,6 +35,38 @@ const Label = Schema.Struct({ name: Schema.String, color: Schema.String.pipe(opt
 const Field = Schema.Struct({ name: Schema.String, value: Schema.String })
 
 /**
+ * Direct sub-issue progress. `unavailable` means the provider did not say, which is never the same as no children or
+ * all done; `partial` means the counts are a lower bound. An issue without children carries no progress at all.
+ */
+const Progress = Schema.Struct({
+  status: Schema.Literals(["ok", "unavailable"]),
+  completed: Schema.Finite,
+  cancelled: Schema.Finite,
+  open: Schema.Finite,
+  total: Schema.Finite,
+  partial: Schema.Boolean,
+})
+
+/**
+ * CI results for a pull or merge request's head revision. `unit` says what is counted: only a provider test report
+ * counts `tests`, while GitHub check runs and GitLab jobs are `checks` and `jobs`. `none` is no CI for this head, and
+ * `complete: false` marks counts that stop short of what the provider holds.
+ */
+const Ci = Schema.Struct({
+  status: Schema.Literals(["ok", "none", "unavailable", "forbidden"]),
+  unit: Schema.Literals(["tests", "checks", "jobs"]),
+  passed: Schema.Finite,
+  failed: Schema.Finite,
+  pending: Schema.Finite,
+  skipped: Schema.Finite,
+  cancelled: Schema.Finite,
+  total: Schema.Finite,
+  complete: Schema.Boolean,
+  sha: Schema.String.pipe(optional),
+  failures: Schema.Array(Schema.Struct({ name: Schema.String, url: Schema.String.pipe(optional) })),
+})
+
+/**
  * `unavailable` covers a missing CLI or MCP connection and transient failures; `forbidden` is a private or
  * unauthorised item. Only `ok` carries details, and each provider fills just the fields it has. `state` is
  * open/closed/merged/draft/not-planned (issues, pull and merge requests), draft/prerelease/release (releases) or the
@@ -76,4 +108,6 @@ export const Result = Schema.Struct({
   path: Schema.String.pipe(optional),
   icon: Schema.String.pipe(optional),
   fields: Schema.Array(Field).pipe(optional),
+  progress: Progress.pipe(optional),
+  ci: Ci.pipe(optional),
 }).annotate({ identifier: "LinkPreview.Result" })

@@ -1,13 +1,22 @@
 import type { LinkPreviewResult } from "@opencode/client/promise"
 import { useI18n } from "@opencode/ui/context/i18n"
 import { createSignal, For, type JSXElement, Show } from "solid-js"
+import { Donut } from "./reference-chart"
 import { referenceLabel, type Reference } from "./reference"
 import { compactNumber, initials, relativeTime, stateTone, visiblePriority } from "./reference-view"
 
 const MAX_LABELS = 3
 
 // The popup body for a resolved reference. It is purely presentational so stories can render it from fixtures.
-export function ReferenceCard(props: { reference: Reference; result: LinkPreviewResult }) {
+export function ReferenceCard(props: {
+  reference: Reference
+  result: LinkPreviewResult
+  // The item's own page, which makes the title a link.
+  href?: string
+  onRefresh?: () => void
+  // The last refresh failed, so what shows may be out of date.
+  stale?: boolean
+}) {
   const i18n = useI18n()
   const when = (iso: string | undefined) => relativeTime(iso, i18n.locale())
   const kind = () => props.reference.kind
@@ -103,16 +112,40 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
     <div data-component="reference-card" data-kind={kind()}>
       <div data-slot="reference-card-head">
         <span data-slot="reference-card-eyebrow">{eyebrow()}</span>
-        <Show when={state()}>
-          {(label) => (
-            <span data-slot="reference-card-state" data-tone={stateTone(props.reference, props.result)}>
-              {label()}
-            </span>
-          )}
-        </Show>
+        <span data-slot="reference-card-head-end">
+          <Show when={state()}>
+            {(label) => (
+              <span data-slot="reference-card-state" data-tone={stateTone(props.reference, props.result)}>
+                {label()}
+              </span>
+            )}
+          </Show>
+          <Show when={props.onRefresh}>
+            {(refresh) => (
+              <button
+                type="button"
+                data-slot="reference-card-refresh"
+                aria-label={i18n.t("ui.reference.refresh")}
+                title={i18n.t("ui.reference.refresh")}
+                onClick={refresh()}
+              >
+                <span aria-hidden="true">↻</span>
+              </button>
+            )}
+          </Show>
+        </span>
       </div>
 
-      <span data-slot="reference-card-title">{props.result.title}</span>
+      <Show
+        when={props.href}
+        fallback={<span data-slot="reference-card-title">{props.result.title}</span>}
+      >
+        {(href) => (
+          <a data-slot="reference-card-title" href={href()} target="_blank" rel="noopener noreferrer">
+            {props.result.title}
+          </a>
+        )}
+      </Show>
 
       <Show when={props.result.tag}>{(tag) => <code data-slot="reference-card-tag">{tag()}</code>}</Show>
 
@@ -180,6 +213,16 @@ export function ReferenceCard(props: { reference: Reference; result: LinkPreview
       <Show when={stats().length > 0}>
         <span data-slot="reference-card-stats">{stats().join(" · ")}</span>
       </Show>
+
+      <Show when={props.result.progress}>{(progress) => <Progress progress={progress()} />}</Show>
+
+      <Show when={props.result.ci}>{(ci) => <CiSummary ci={ci()} />}</Show>
+
+      <Show when={props.stale}>
+        <span data-slot="reference-card-stale" role="status">
+          {i18n.t("ui.reference.stale")}
+        </span>
+      </Show>
     </div>
   )
 }
@@ -230,5 +273,140 @@ function Chip(props: { text: string; color?: string }) {
       </Show>
       {props.text}
     </span>
+  )
+}
+
+type Progress = NonNullable<LinkPreviewResult["progress"]>
+
+type Ci = NonNullable<LinkPreviewResult["ci"]>
+
+// Sub-issue progress. Only direct children are counted, and the card says so.
+function Progress(props: { progress: Progress }) {
+  const i18n = useI18n()
+
+  const rows = () => [
+    { key: "completed", glyph: "✓", value: props.progress.completed },
+    { key: "cancelled", glyph: "∅", value: props.progress.cancelled },
+    { key: "open", glyph: "○", value: props.progress.open },
+  ]
+
+  return (
+    <section data-slot="reference-card-section" data-section="progress" aria-label={i18n.t("ui.reference.progress.label")}>
+      <Show
+        when={props.progress.status === "ok"}
+        fallback={<span data-slot="reference-card-note">{i18n.t("ui.reference.progress.unavailable")}</span>}
+      >
+        <div data-slot="reference-card-chart">
+          <Donut slices={rows().map((row) => ({ key: row.key, value: row.value }))} />
+          <div data-slot="reference-card-chart-text">
+            <span data-slot="reference-card-headline">
+              {i18n.plural("ui.reference.progress.summary", props.progress.total, {
+                completed: props.progress.completed,
+                percent: Math.round((props.progress.completed / props.progress.total) * 100),
+              })}
+            </span>
+            <span data-slot="reference-card-note">
+              {i18n.t(props.progress.partial ? "ui.reference.progress.partial" : "ui.reference.progress.direct")}
+            </span>
+            <Legend rows={rows().map((row) => ({ ...row, label: i18n.t(`ui.reference.progress.${row.key}`) }))} />
+          </div>
+        </div>
+      </Show>
+    </section>
+  )
+}
+
+// CI for the head revision. Zero failing is only shown as passing when nothing is still running or missing.
+function CiSummary(props: { ci: Ci }) {
+  const i18n = useI18n()
+
+  const rows = () => [
+    { key: "passed", glyph: "✓", value: props.ci.passed },
+    { key: "failed", glyph: "✕", value: props.ci.failed },
+    { key: "pending", glyph: "…", value: props.ci.pending },
+    { key: "skipped", glyph: "–", value: props.ci.skipped },
+    { key: "cancelled", glyph: "∅", value: props.ci.cancelled },
+  ]
+
+  const headline = () => {
+    const ci = props.ci
+
+    if (ci.failed > 0) return i18n.plural(`ui.reference.ci.failing.${ci.unit}`, ci.total, { failed: ci.failed })
+
+    if (ci.pending > 0) return i18n.plural(`ui.reference.ci.running.${ci.unit}`, ci.total, { pending: ci.pending })
+
+    return i18n.plural(`ui.reference.ci.passing.${ci.unit}`, ci.total)
+  }
+
+  return (
+    <section data-slot="reference-card-section" data-section="ci" aria-label={i18n.t("ui.reference.ci.label")}>
+      <Show
+        when={props.ci.status === "ok"}
+        fallback={<span data-slot="reference-card-note">{i18n.t(`ui.reference.ci.${props.ci.status}`)}</span>}
+      >
+        <div data-slot="reference-card-chart">
+          <Donut slices={rows().map((row) => ({ key: row.key, value: row.value }))} />
+          <div data-slot="reference-card-chart-text">
+            <span data-slot="reference-card-headline" data-failing={props.ci.failed > 0 ? "" : undefined}>
+              {headline()}
+            </span>
+            <Show when={!props.ci.complete}>
+              <span data-slot="reference-card-note">{i18n.t("ui.reference.ci.partial")}</span>
+            </Show>
+            <Legend rows={rows().map((row) => ({ ...row, label: i18n.t(`ui.reference.ci.${row.key}`) }))} />
+          </div>
+        </div>
+        <Show when={props.ci.failures.length > 0}>
+          <ul data-slot="reference-card-failures" aria-label={i18n.t("ui.reference.ci.failures")}>
+            <For each={props.ci.failures}>
+              {(failure) => (
+                <li>
+                  <Show when={failure.url} fallback={<span>{failure.name}</span>}>
+                    {(url) => (
+                      <a href={url()} target="_blank" rel="noopener noreferrer">
+                        {failure.name}
+                      </a>
+                    )}
+                  </Show>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
+      </Show>
+    </section>
+  )
+}
+
+// Every entry is a glyph, a label and a count, so the legend reads the same without colour. Empty entries are left out.
+function Legend(props: { rows: { key: string; glyph: string; label: string; value: number }[] }) {
+  return (
+    <ul data-slot="reference-card-legend">
+      <For each={props.rows.filter((row) => row.value > 0)}>
+        {(row) => (
+          <li data-slice={row.key}>
+            <span data-slot="reference-card-glyph" aria-hidden="true">
+              {row.glyph}
+            </span>
+            {row.label} {row.value}
+          </li>
+        )}
+      </For>
+    </ul>
+  )
+}
+
+// Stands in for the card while a refresh is under way, so what is on screen is never the old numbers.
+export function ReferenceSkeleton() {
+  const i18n = useI18n()
+
+  return (
+    <div data-component="reference-skeleton" role="status" aria-label={i18n.t("ui.reference.refreshing")}>
+      <span data-bar style={{ width: "34%" }} />
+      <span data-bar data-tall style={{ width: "78%" }} />
+      <span data-bar style={{ width: "52%" }} />
+      <span data-bar data-tall style={{ width: "64%" }} />
+      <span data-bar style={{ width: "88%" }} />
+    </div>
   )
 }

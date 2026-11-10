@@ -458,6 +458,27 @@ export type LinkPreviewResult = {
   path?: string
   icon?: string
   fields?: Array<{ name: string; value: string }>
+  progress?: {
+    status: "ok" | "unavailable"
+    completed: number
+    cancelled: number
+    open: number
+    total: number
+    partial: boolean
+  }
+  ci?: {
+    status: "ok" | "none" | "unavailable" | "forbidden"
+    unit: "tests" | "checks" | "jobs"
+    passed: number
+    failed: number
+    pending: number
+    skipped: number
+    cancelled: number
+    total: number
+    complete: boolean
+    sha?: string
+    failures: Array<{ name: string; url?: string }>
+  }
 }
 
 export type GitChange = { file: string; staged: boolean; unstaged: boolean; untracked: boolean; conflicted?: boolean }

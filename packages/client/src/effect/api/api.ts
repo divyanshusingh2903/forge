@@ -2878,6 +2878,31 @@ export type LinkPreviewResolveOutput = {
     readonly path?: string | undefined
     readonly icon?: string | undefined
     readonly fields?: ReadonlyArray<{ readonly name: string; readonly value: string }> | undefined
+    readonly progress?:
+      | {
+          readonly status: "ok" | "unavailable"
+          readonly completed: number
+          readonly cancelled: number
+          readonly open: number
+          readonly total: number
+          readonly partial: boolean
+        }
+      | undefined
+    readonly ci?:
+      | {
+          readonly status: "ok" | "none" | "unavailable" | "forbidden"
+          readonly unit: "tests" | "checks" | "jobs"
+          readonly passed: number
+          readonly failed: number
+          readonly pending: number
+          readonly skipped: number
+          readonly cancelled: number
+          readonly total: number
+          readonly complete: boolean
+          readonly sha?: string | undefined
+          readonly failures: ReadonlyArray<{ readonly name: string; readonly url?: string | undefined }>
+        }
+      | undefined
   }
 }
 export type LinkPreviewResolveOperation<E = never> = (
