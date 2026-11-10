@@ -420,3 +420,39 @@ describe("LinkPreview CI", () => {
     expect(LinkPreview.ciActive(base)).toBe(false)
   })
 })
+
+describe("LinkPreview GitLab children through the MCP server", () => {
+  test("a work item names its parent but never lists its children", () => {
+    const result = LinkPreview.gitlabResult(
+      "gitlab-issue",
+      JSON.stringify({
+        title: "Sub-task",
+        state: "OPEN",
+        widgets: [{ type: "HIERARCHY", hasChildren: false, hasParent: true, parent: { iid: "2" } }],
+      }),
+    )
+    expect(result?.progress).toBeUndefined()
+  })
+
+  test("counts the direct children list_work_items returns", () => {
+    const result = LinkPreview.gitlabListedChildren(
+      JSON.stringify({
+        work_items: [{ state: "OPEN" }, { state: "CLOSED" }, { state: "OPEN" }],
+        pageInfo: { endCursor: null, hasNextPage: false },
+      }),
+    )
+    expect(result?.progress).toEqual({ status: "ok", completed: 1, cancelled: 0, open: 2, total: 3, partial: false })
+  })
+
+  test("a further page makes the counts a lower bound, and no children means no progress", () => {
+    expect(
+      LinkPreview.gitlabListedChildren(
+        JSON.stringify({ work_items: [{ state: "closed" }], pageInfo: { hasNextPage: true } }),
+      )?.progress?.partial,
+    ).toBe(true)
+    expect(
+      LinkPreview.gitlabListedChildren(JSON.stringify({ work_items: [], pageInfo: { hasNextPage: false } }))?.progress,
+    ).toBeUndefined()
+    expect(LinkPreview.gitlabListedChildren("not json")).toBeUndefined()
+  })
+})

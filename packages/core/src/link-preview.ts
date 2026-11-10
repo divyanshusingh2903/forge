@@ -226,6 +226,20 @@ const layer = Layer.effect(
                   name,
                   { url: `https://gitlab.com/${input.repository}/-/${mr ? "merge_requests" : "issues"}/${input.number}` },
                   map,
+                ).pipe(
+                  Effect.flatMap((result) =>
+                    mr || result.outcome !== "ok" || result.progress
+                      ? Effect.succeed(result)
+                      : // The work item itself does not list its children; the direct ones are the items under it.
+                        tool(
+                          /gitlab/i,
+                          "list_work_items",
+                          { project_id: input.repository, parent_iid: input.number, state: "all", first: 100 },
+                          gitlabListedChildren,
+                        ).pipe(
+                          Effect.map((children) => (children.progress ? { ...result, progress: children.progress } : result)),
+                        ),
+                  ),
                 )
               : gitlabCli(input, route, project),
           ),
@@ -544,6 +558,19 @@ function hierarchyProgress(widgets: unknown): Progress | "none" | undefined {
   if (!children || !Array.isArray(children.nodes)) return
   const states = children.nodes.map((item) => (text(record(item)?.state)?.toUpperCase() === "OPEN" ? "open" : "completed"))
   return tally(states, record(children.pageInfo)?.hasNextPage === true) ?? "none"
+}
+
+// `list_work_items` under a parent: its direct children, as an array or wrapped in `nodes` or `items`.
+export function gitlabListedChildren(body: string): Result | undefined {
+  const data = Option.getOrUndefined(JsonValue(body))
+  const found = [data, ...["nodes", "items", "work_items", "workItems", "results"].map((key) => record(data)?.[key])]
+  const items = found.find((item) => Array.isArray(item))
+  if (!Array.isArray(items)) return
+  const states = items.map((item) =>
+    ["OPEN", "OPENED"].includes(text(record(item)?.state)?.toUpperCase() ?? "") ? "open" : "completed",
+  )
+  const more = record(record(data)?.pageInfo)?.hasNextPage === true
+  return compact({ outcome: "ok", progress: tally(states, more) })
 }
 
 // Linear lists the issues under a parent; its workflow status type separates completed from cancelled.
