@@ -4,7 +4,7 @@ import { MarkdownProvider, useMarkdown } from "@opencode/session-ui/context/mark
 import { SourcesProvider } from "@opencode/session-ui/context/sources"
 import { sourcesExperiment } from "@opencode/session-ui/sources/experiment"
 import { Style, type MountedSession } from "@opencode/plugin/gui"
-import { BuiltinSlot, type BuiltinSlotMap } from "@opencode/plugin/gui/builtin"
+import { BuiltinCodeBlockAction, BuiltinSlot, type BuiltinSlotMap } from "@opencode/plugin/gui/builtin"
 import { PluginContext } from "@opencode/plugin/gui/host"
 import { usePluginHost } from "./host"
 import { createLinkCheck } from "./link-check"
@@ -86,6 +86,19 @@ export function PluginLinks(props: ParentProps<{ session: MountedSession; active
   const host = usePluginHost()
   const markdown = useMarkdown()
 
+  const codeActions = createMemo(() =>
+    host
+      .items(BuiltinCodeBlockAction)
+      .filter((item) => item.value.available(props.session))
+      .map((item) => ({
+        id: `${item.plugin}:${item.value.id}`,
+        label: item.value.label,
+        languages: item.value.languages,
+        run: (command: string, language: string, onStart?: () => void, blockID?: string) =>
+          item.value.run({ session: props.session, command, language, onStart, blockID }),
+      })),
+  )
+
   // Checks untracked: markdown calls this inside its render effect, which must not follow the routed session.
   const localFileExists = createLinkCheck(
     () => props.active !== false,
@@ -97,6 +110,7 @@ export function PluginLinks(props: ParentProps<{ session: MountedSession; active
       readImage={markdown?.readImage}
       openLocalFile={(href) => void host.links.open({ href, session: props.session })}
       localFileExists={localFileExists}
+      codeActions={codeActions()}
     >
       <SourcesProvider
         enabled={sourcesExperiment.enabled}

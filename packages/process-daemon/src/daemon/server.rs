@@ -473,6 +473,17 @@ fn dispatch(
         Request::List => Response::Terminals {
             terminals: service.list()?,
         },
+        Request::Run {
+            id,
+            attachment_id,
+            run_id,
+            command,
+        } => Response::RunAdmission {
+            data: service.run(id, attachment_id, run_id, command)?,
+        },
+        Request::GetRun { id, run_id } => Response::RunStatus {
+            data: service.get_run(id, run_id)?,
+        },
         Request::Write {
             id,
             attachment_id,

@@ -1,6 +1,7 @@
 import { createRoot, getOwner, runWithOwner, type Owner } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Predicate, Schema } from "effect"
+import type { TerminalRunConnection } from "./connection"
 import {
   ClientError,
   isPtyFeatureUnsupportedError,
@@ -66,6 +67,7 @@ export function createTerminalModel(input: {
   const cleanups: VoidFunction[] = []
   const ghostty: Ghostty = {}
   const focus = { request: 0 }
+  const connections = new Map<string, TerminalRunConnection>()
 
   const available = (server: ServerRef) => {
     watch(server)
@@ -266,6 +268,7 @@ export function createTerminalModel(input: {
             cwd: target.server.data.session.get(target.id)?.location.directory ?? target.location?.directory,
             title: defaultTitle(number),
             env: {},
+            experimental: { shellIntegration: true },
           })
           .catch((error) => {
             cancelFocus(request)
@@ -352,6 +355,12 @@ export function createTerminalModel(input: {
   }
 
   return {
+    connection: (id: string) => connections.get(id),
+    connect(id: string, value: TerminalRunConnection | undefined) {
+      if (value) connections.set(id, value)
+
+      if (!value) connections.delete(id)
+    },
     /** The server offers terminals. Servers that predate the capability count as offering them. */
     available,
     /** The session's terminals; the first load lists them from its server. */
@@ -396,6 +405,7 @@ export function createTerminalModel(input: {
       })
     },
     dispose() {
+      connections.clear()
       watched.forEach((entry) => entry.stop())
       watched.clear()
       cleanups.forEach((cleanup) => cleanup())

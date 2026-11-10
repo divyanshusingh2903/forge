@@ -115,6 +115,8 @@ type TimelineServerInput = Partial<
     | "permissions"
     | "sessionPermissions"
     | "onPrompt"
+    | "onSynthetic"
+    | "persistentPty"
     | "onInboxChange"
     | "beforeMessagesResponse"
     | "onMessages"
@@ -273,16 +275,19 @@ export async function setupTimeline(
   }
 
   const timelineDetail =
-    general.timelineDetail ??
+    input.settings?.timelineDetail ??
     legacyTimelineDetail({
       shell: general.shellToolPartsExpanded,
       edit: general.editToolPartsExpanded,
       thinking: general.showReasoningSummaries,
     })
 
-  await page.addInitScript((general) => {
-    localStorage.setItem("settings.v3", JSON.stringify({ general }))
-  }, { ...general, timelineDetail })
+  await page.addInitScript(
+    (general) => {
+      localStorage.setItem("settings.v3", JSON.stringify({ general }))
+    },
+    { ...general, timelineDetail },
+  )
 
   if (input.locale) {
     await page.addInitScript((locale) => {
@@ -655,9 +660,7 @@ export function userMessage(
       const file: NonNullable<SessionMessageUser["files"]>[number] = {
         data: part.url.match(/^data:[^,]*;base64,(.*)$/)?.[1] ?? "",
         mime: part.mime,
-        source: part.url.startsWith("data:")
-          ? { type: "inline" }
-          : { type: "uri", uri: part.source?.path ?? part.url },
+        source: part.url.startsWith("data:") ? { type: "inline" } : { type: "uri", uri: part.source?.path ?? part.url },
       }
 
       if (part.filename) file.name = part.filename
@@ -671,8 +674,7 @@ export function userMessage(
 
       const agent: NonNullable<SessionMessageUser["agents"]>[number] = { name: part.name }
 
-      if (part.source)
-        agent.mention = { text: part.source.value, start: part.source.start, end: part.source.end }
+      if (part.source) agent.mention = { text: part.source.value, start: part.source.start, end: part.source.end }
 
       return [agent]
     }),
@@ -1087,7 +1089,9 @@ function makeEvent<Type extends OpenCodeEvent["type"]>(
   return Schema.decodeUnknownSync(definition)(input) as OpenCodeEvent
 }
 
-const decodeJsonRecord = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.Record(Schema.String, Schema.MutableJson)))
+const decodeJsonRecord = Schema.decodeUnknownSync(
+  Schema.fromJsonString(Schema.Record(Schema.String, Schema.MutableJson)),
+)
 
 function jsonRecord(value: JsonRecord | undefined): Record<string, JsonValue> {
   if (!value) return {}

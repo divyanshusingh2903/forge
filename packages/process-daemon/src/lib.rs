@@ -7,5 +7,6 @@ mod musl;
 mod ownership;
 pub mod protocol;
 pub mod service;
+pub mod shell_integration;
 #[cfg(any(unix, windows))]
 mod transport;

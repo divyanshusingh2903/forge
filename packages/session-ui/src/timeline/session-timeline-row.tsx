@@ -18,6 +18,20 @@ import {
   type Accessor,
   type JSX,
 } from "solid-js"
+
+const terminalResultMetadata = Schema.Struct({
+  source: Schema.Literal("terminal"),
+  command: Schema.String,
+  output: Schema.String,
+  outcome: Schema.Literals(["completed", "terminated", "unknown", "not_executed"]),
+  error: Schema.optional(Schema.String),
+  success: Schema.NullOr(Schema.Boolean),
+  exitCode: Schema.NullOr(Schema.Number),
+  truncated: Schema.Boolean,
+})
+
+const decodeTerminalResult = Schema.decodeUnknownOption(terminalResultMetadata)
+
 import { DiffChanges } from "@opencode/ui/diff-changes"
 import { Icon } from "@opencode/ui/icon"
 import { Spring, frameLoop, prefersReducedMotion } from "@opencode/ui/motion"
@@ -551,6 +565,26 @@ export function createSessionTimelineRowRenderer(input: {
       return { label: i18n.t("ui.sessionTimeline.notice.restart") }
     const source = message.metadata?.source
 
+    if (source === "terminal") {
+      const notExecuted = message.metadata?.outcome === "not_executed"
+      const completed = message.metadata?.outcome === "completed"
+      const success = message.metadata?.success === true
+
+      return {
+        label: i18n.t(
+          notExecuted
+            ? "ui.terminal.result.notExecuted"
+            : !completed
+              ? "ui.terminal.result.unknown"
+              : success
+                ? "ui.terminal.result.completed"
+                : "ui.terminal.result.failed",
+        ),
+        outcome: completed && success ? ("completed" as const) : ("error" as const),
+        icon: "outline-console" as const,
+      }
+    }
+
     if (source === "subagent" || source === "shell") {
       const agent = message.metadata?.agent
 
@@ -648,6 +682,12 @@ export function createSessionTimelineRowRenderer(input: {
       return value ? notice(value) : undefined
     })
 
+    const terminalResult = createMemo(() => {
+      const value = message()
+
+      return value?.type === "synthetic" ? Option.getOrUndefined(decodeTerminalResult(value.metadata)) : undefined
+    })
+
     const childID = createMemo(() => {
       const value = message()
 
@@ -722,43 +762,64 @@ export function createSessionTimelineRowRenderer(input: {
                     <Show
                       when={content().items?.length}
                       fallback={
-                        <Dynamic
-                          component={href() ? "a" : "div"}
-                          data-slot="session-timeline-notice"
-                          data-outcome={content().outcome}
-                          class={`block w-full truncate ${props.grouped ? "py-1" : "pt-3 pb-1"} text-13-regular leading-text-compact text-v2-text-text-faint ${inset()}`}
-                          classList={{ "cursor-pointer hover:text-v2-text-text-base": clickable() }}
-                          href={href()}
-                          role={clickable() && !href() ? (shellID() ? "button" : "link") : undefined}
-                          tabIndex={clickable() && !href() ? 0 : undefined}
-                          onClick={navigate}
-                          onKeyDown={navigateKey}
-                        >
-                          <Show when={content().icon}>
-                            {(icon) => (
-                              <Icon
-                                name={icon()}
-                                size="normal"
-                                class={`inline-block align-top me-1.5 ${outcomeNoticeColor(content().outcome)}`}
-                              />
-                            )}
-                          </Show>
-                          <bdi
-                            dir="auto"
-                            class={`font-[530] ${outcomeNoticeColor(content().outcome)}`}
-                            classList={{ "text-v2-text-text-faint": message()?.type === "agent-switched" }}
+                        <>
+                          <Dynamic
+                            component={href() ? "a" : "div"}
+                            data-slot="session-timeline-notice"
+                            data-outcome={content().outcome}
+                            class={`block w-full truncate ${props.grouped ? "py-1" : "pt-3 pb-1"} text-13-regular leading-text-compact text-v2-text-text-faint ${inset()}`}
+                            classList={{ "cursor-pointer hover:text-v2-text-text-base": clickable() }}
+                            href={href()}
+                            role={clickable() && !href() ? (shellID() ? "button" : "link") : undefined}
+                            tabIndex={clickable() && !href() ? 0 : undefined}
+                            onClick={navigate}
+                            onKeyDown={navigateKey}
                           >
-                            {content().label}
-                          </bdi>
-                          <Show when={content().data}>
-                            {(data) => (
-                              <span classList={{ "ms-2": message()?.type === "agent-switched" }}>
-                                <Show when={message()?.type !== "agent-switched"}>{" · "}</Show>
-                                <bdi dir="auto">{data()}</bdi>
-                              </span>
+                            <Show when={content().icon}>
+                              {(icon) => (
+                                <Icon
+                                  name={icon()}
+                                  size="normal"
+                                  class={`inline-block align-top me-1.5 ${outcomeNoticeColor(content().outcome)}`}
+                                />
+                              )}
+                            </Show>
+                            <bdi
+                              dir="auto"
+                              class={`font-[530] ${outcomeNoticeColor(content().outcome)}`}
+                              classList={{ "text-v2-text-text-faint": message()?.type === "agent-switched" }}
+                            >
+                              {content().label}
+                            </bdi>
+                            <Show when={content().data}>
+                              {(data) => (
+                                <span classList={{ "ms-2": message()?.type === "agent-switched" }}>
+                                  <Show when={message()?.type !== "agent-switched"}>{" · "}</Show>
+                                  <bdi dir="auto">{data()}</bdi>
+                                </span>
+                              )}
+                            </Show>
+                          </Dynamic>
+                          <Show when={terminalResult()}>
+                            {(result) => (
+                              <details class={`w-full pb-2 text-13-regular leading-text-compact ${inset()}`}>
+                                <summary class="cursor-pointer font-mono font-[440] tracking-[-0.04px] whitespace-pre-wrap">
+                                  {result().command}
+                                </summary>
+                                <Show when={result().error}>
+                                  {(error) => <p class="whitespace-pre-wrap text-v2-text-text-base">{error()}</p>}
+                                </Show>
+                                <Show when={result().output}>
+                                  {(output) => (
+                                    <pre data-scrollable class="max-h-80 overflow-auto whitespace-pre-wrap font-mono">
+                                      {output()}
+                                    </pre>
+                                  )}
+                                </Show>
+                              </details>
                             )}
                           </Show>
-                        </Dynamic>
+                        </>
                       }
                     >
                       <div data-slot="session-timeline-notice" class={`w-full py-1 ${inset()}`}>

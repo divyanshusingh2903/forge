@@ -5,6 +5,8 @@ import type { ExperimentalPersistentPtyConnectTokenInput, OpenCodeClient } from 
 // Declares only the fields clients read, so servers can add or drop the rest without a client silently ignoring a
 // message it depends on.
 export const PersistentPtyMessage = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("run_admission"), runID: Schema.String, ...PersistentPty.RunAdmission.fields }),
+  Schema.Struct({ type: Schema.Literal("run_uncertain"), runID: Schema.String }),
   Schema.Struct({
     type: Schema.Literal("attached"),
     inputProtocol: Schema.optional(Schema.Number),

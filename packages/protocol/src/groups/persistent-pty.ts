@@ -28,6 +28,33 @@ const terminalErrors = [PtyNotFoundError, ServiceUnavailableError] as const
 
 export const PersistentPtyGroup = HttpApiGroup.make("server.experimental")
   .add(
+    HttpApiEndpoint.post("persistentPty.run", "/api/experimental/persistent-pty/:ptyID/run", {
+      params: { ptyID: Pty.ID },
+      payload: PersistentPty.RunInput,
+      success: Schema.Struct({ data: PersistentPty.RunAdmission }),
+      error: [...terminalErrors, PtyFeatureUnsupportedError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "experimental.persistentPty.run",
+        description:
+          "Execute in an integrated, clean, ready terminal controlled by the attachment. Never retry an uncertain execution. Experimental: may change without compatibility guarantees.",
+      }),
+    ),
+  )
+  .add(
+    HttpApiEndpoint.get("persistentPty.getRun", "/api/experimental/persistent-pty/:ptyID/run/:runID", {
+      params: { ptyID: Pty.ID, runID: Schema.String },
+      success: Schema.Struct({ data: PersistentPty.RunStatus }),
+      error: [...terminalErrors, PtyFeatureUnsupportedError],
+    }).annotateMerge(
+      OpenApi.annotations({
+        identifier: "experimental.persistentPty.getRun",
+        description:
+          "Read integration readiness and the active or latest completed run. An unrecognized run ID returns a null run and never executes anything. Experimental: may change without compatibility guarantees.",
+      }),
+    ),
+  )
+  .add(
     HttpApiEndpoint.get("persistentPty.read", "/api/experimental/session/:sessionID/terminal/read", {
       params: { sessionID: Session.ID },
       query: {
@@ -123,7 +150,8 @@ export const PersistentPtyGroup = HttpApiGroup.make("server.experimental")
       OpenApi.annotations({
         identifier: "experimental.persistentPty.connect",
         summary: "Connect to a persistent PTY",
-        description: "Stream persistent PTY output through the OpenCode server.",
+        description:
+          "Stream persistent PTY output through the OpenCode server. With input_protocol=1, type 0 frames resize, type 1 frames send keyboard input, and type 2 frames carry a JSON runID/command request after the five-byte size header. Run admission is acknowledged by run_admission or run_uncertain control messages. Send interactive Run requests on this socket to preserve ordering with keyboard input.",
         transform: (operation) => ({
           ...operation,
           "x-websocket": true,

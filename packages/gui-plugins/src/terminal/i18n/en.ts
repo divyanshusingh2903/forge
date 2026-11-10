@@ -1,4 +1,15 @@
 export default {
+  "run.label": "Run in terminal",
+  "run.integrationUnavailable":
+    "This terminal service does not support shell command execution. The command was not executed.",
+  "run.invalid": "Command must be nonempty, contain no NUL characters, and be at most 64 KiB.",
+  "run.notReady": "Terminal did not become ready.",
+  "run.recreate": "Recreate this terminal to enable Run.",
+  "run.busy": "Terminal is busy or has unfinished input.",
+  "run.mismatch": "This command block uses a different shell than this terminal.",
+  "run.unknown": "Command outcome is unknown. It will not be run again automatically.",
+  "run.sendFailed": "Send terminal result failed",
+  "run.retrySend": "Retry sending result",
   "command.category": "Terminal",
   "command.toggle": "Toggle terminal",
   "command.new": "New terminal",

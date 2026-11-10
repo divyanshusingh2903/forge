@@ -11796,6 +11796,198 @@
         "x-websocket": true
       }
     },
+    "/api/experimental/persistent-pty/{ptyID}/run": {
+      "post": {
+        "tags": ["persistentPty"],
+        "operationId": "experimental.persistentPty.run",
+        "parameters": [
+          {
+            "name": "ptyID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Pty.ID"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PersistentPty.RunAdmission"
+                    }
+                  },
+                  "required": ["data"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PtyNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "PtyFeatureUnsupportedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtyFeatureUnsupportedErrorEncoded"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Execute in an integrated, clean, ready terminal controlled by the attachment. Never retry an uncertain execution. Experimental: may change without compatibility guarantees.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersistentPty.RunInput"
+              }
+            }
+          },
+          "required": true
+        }
+      }
+    },
+    "/api/experimental/persistent-pty/{ptyID}/run/{runID}": {
+      "get": {
+        "tags": ["persistentPty"],
+        "operationId": "experimental.persistentPty.getRun",
+        "parameters": [
+          {
+            "name": "ptyID",
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Pty.ID"
+            },
+            "required": true
+          },
+          {
+            "name": "runID",
+            "in": "path",
+            "schema": {
+              "type": "string"
+            },
+            "required": true
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "$ref": "#/components/schemas/PersistentPty.RunStatus"
+                    }
+                  },
+                  "required": ["data"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "InvalidRequestError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidRequestErrorEncoded"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "UnauthorizedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedErrorEncoded"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PtyNotFoundError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtyNotFoundErrorEncoded"
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "PtyFeatureUnsupportedError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PtyFeatureUnsupportedErrorEncoded"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "ServiceUnavailableError",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableErrorEncoded"
+                }
+              }
+            }
+          }
+        },
+        "description": "Read integration readiness and the active or latest completed run. An unrecognized run ID returns a null run and never executes anything. Experimental: may change without compatibility guarantees."
+      }
+    },
     "/api/experimental/session/{sessionID}/terminal/read": {
       "get": {
         "tags": ["persistentPty"],
@@ -12663,7 +12855,7 @@
             }
           }
         },
-        "description": "Stream persistent PTY output through the OpenCode server.",
+        "description": "Stream persistent PTY output through the OpenCode server. With input_protocol=1, type 0 frames resize, type 1 frames send keyboard input, and type 2 frames carry a JSON runID/command request after the five-byte size header. Run admission is acknowledged by run_admission or run_uncertain control messages. Send interactive Run requests on this socket to preserve ordering with keyboard input.",
         "summary": "Connect to a persistent PTY",
         "x-websocket": true
       }
@@ -23372,6 +23564,15 @@
       "PersistentPty.CreateInput": {
         "type": "object",
         "properties": {
+          "experimental": {
+            "type": "object",
+            "properties": {
+              "shellIntegration": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
           "command": {
             "type": "string"
           },
@@ -23614,6 +23815,132 @@
           }
         },
         "required": ["ptyID", "title", "cwd", "foregroundProcess", "screen"],
+        "additionalProperties": false
+      },
+      "PersistentPty.RunAdmission": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "unsupported",
+                  "not_ready",
+                  "dirty",
+                  "busy",
+                  "not_controller",
+                  "invalid_command",
+                  "already_executed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["accepted", "reason"],
+        "additionalProperties": false
+      },
+      "PersistentPty.RunInput": {
+        "type": "object",
+        "properties": {
+          "runID": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "attachmentID": {
+            "type": "string",
+            "minLength": 1
+          },
+          "command": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 65536
+          }
+        },
+        "required": ["runID", "attachmentID", "command"],
+        "additionalProperties": false
+      },
+      "PersistentPty.RunResult": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["running", "completed", "terminated", "unknown"]
+          },
+          "exitCode": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string",
+                "enum": ["Infinity", "-Infinity", "NaN"]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "success": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "output": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "outcome", "exitCode", "success", "output", "truncated"],
+        "additionalProperties": false
+      },
+      "PersistentPty.RunStatus": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["unsupported", "unknown", "ready", "dirty", "running"]
+          },
+          "shell": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["bash", "zsh", "fish", "powershell"]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PersistentPty.RunResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["state", "shell", "run"],
         "additionalProperties": false
       },
       "PersistentPty.Snapshot": {

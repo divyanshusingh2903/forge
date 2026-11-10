@@ -227,6 +227,10 @@ import type {
   PtyRemoveOutput,
   PtyConnectTokenInput,
   PtyConnectTokenOutput,
+  ExperimentalPersistentPtyRunInput,
+  ExperimentalPersistentPtyRunOutput,
+  ExperimentalPersistentPtyGetRunInput,
+  ExperimentalPersistentPtyGetRunOutput,
   ExperimentalPersistentPtyReadInput,
   ExperimentalPersistentPtyReadOutput,
   ExperimentalPersistentPtyListInput,
@@ -1525,6 +1529,27 @@ const adaptGroupPty = (raw: RawClient["server.pty"]) => ({
   connect: { token: EndpointPtyConnectToken(raw) },
 })
 
+const EndpointExperimentalPersistentPtyRun =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalPersistentPtyRunInput) =>
+    preserveEffect<ExperimentalPersistentPtyRunOutput>()(
+      raw["persistentPty.run"]({
+        params: { ptyID: input["ptyID"] },
+        payload: { runID: input["runID"], attachmentID: input["attachmentID"], command: input["command"] },
+      }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
+const EndpointExperimentalPersistentPtyGetRun =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalPersistentPtyGetRunInput) =>
+    preserveEffect<ExperimentalPersistentPtyGetRunOutput>()(
+      raw["persistentPty.getRun"]({ params: { ptyID: input["ptyID"], runID: input["runID"] } }).pipe(
+        Effect.mapError(mapClientError),
+        Effect.map((value) => value.data),
+      ),
+    )
+
 const EndpointExperimentalPersistentPtyRead =
   (raw: RawClient["server.experimental"]) => (input: ExperimentalPersistentPtyReadInput) =>
     preserveEffect<ExperimentalPersistentPtyReadOutput>()(
@@ -1549,6 +1574,7 @@ const EndpointExperimentalPersistentPtyCreate =
       raw["persistentPty.create"]({
         params: { sessionID: input["sessionID"] },
         payload: {
+          experimental: input["experimental"],
           command: input["command"],
           args: input["args"],
           cwd: input["cwd"],
@@ -1740,6 +1766,8 @@ const EndpointExperimentalArtifactsDelete =
 
 const adaptGroupExperimental = (raw: RawClient["server.experimental"]) => ({
   persistentPty: {
+    run: EndpointExperimentalPersistentPtyRun(raw),
+    getRun: EndpointExperimentalPersistentPtyGetRun(raw),
     read: EndpointExperimentalPersistentPtyRead(raw),
     list: EndpointExperimentalPersistentPtyList(raw),
     create: EndpointExperimentalPersistentPtyCreate(raw),

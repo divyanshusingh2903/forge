@@ -177,7 +177,10 @@ export const Terminal = (props: TerminalProps) => {
       if (!disposed) term?.resize(size.cols, size.rows)
     },
     send: (frame) => {
-      if (socket?.readyState === WebSocket.OPEN) socket.send(frame)
+      if (socket?.readyState !== WebSocket.OPEN) return false
+      socket.send(frame)
+
+      return true
     },
     fail: (next) => {
       if (disposed) return
@@ -187,6 +190,12 @@ export const Terminal = (props: TerminalProps) => {
 
       if (next === "outdated") socket?.close(1000)
     },
+  })
+
+  props.onConnection?.({ attachmentID, ready: connection.ready, run: connection.run })
+  onCleanup(() => {
+    connection.dispose()
+    props.onConnection?.(undefined)
   })
 
   const failureText = () => {

@@ -4,7 +4,7 @@
 import type { Schema } from "effect"
 import type { Context } from "./context.js"
 import { Registry, type Catalog, type Messages, type Persisted, type StoreDeclaration, type StoreFrom } from "./core.js"
-import type { Desktop, Layout, Locale, StorageScope, StoreOptions } from "./host-apis.js"
+import type { Desktop, Layout, Locale, StorageScope, StoreOptions, MountedSession } from "./host-apis.js"
 import type { MainContext } from "./main.js"
 import type { Command, IconName, Panel, PanelTab, SlotMap } from "./registries.js"
 import { type JSX } from "solid-js"
@@ -53,6 +53,40 @@ export interface BuiltinCommand extends Command {
  * ```
  */
 export const BuiltinCommand = Registry.define<BuiltinCommand>("command")
+
+/** Experimental action on a completed assistant code block. The host owns the button, never plugin row components. */
+export interface BuiltinCodeBlockAction {
+  /** Stable contribution identity. */
+  readonly id: string
+  /** Localized button label. */
+  readonly label: string
+  /** Exact lowercase language tags this action accepts. */
+  readonly languages: readonly string[]
+  /** Whether the session's server supports this action. @param session - Owning session, not the current route. */
+  available(session: MountedSession): boolean
+  /** Invoke only after an explicit click. Reject on failure. @param input - Frozen command and owning session. */
+  run(input: {
+    /** Owning session. */
+    readonly session: MountedSession
+    /** Complete block source. */
+    readonly command: string
+    /** Lowercase fence language. */
+    readonly language: string
+    /** Called immediately before dispatch; queued actions have not started yet. */
+    readonly onStart?: () => void
+    /** Stable block identity for sharing an in-flight action across remounts. */
+    readonly blockID?: string
+  }): Promise<void>
+}
+
+/**
+ * Experimental built-in code-block actions. Withdrawn with the contributing plugin.
+ * @example
+ * ```ts
+ * ctx.add(BuiltinCodeBlockAction, action)
+ * ```
+ */
+export const BuiltinCodeBlockAction = Registry.define<BuiltinCodeBlockAction>("experimental.code-block-action")
 
 /** A `PanelTab` with the fields only built-ins set. */
 export interface BuiltinPanelTab extends PanelTab {

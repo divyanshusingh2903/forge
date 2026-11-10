@@ -2255,6 +2255,45 @@ export interface PtyApi<E = never> {
   readonly connect: { readonly token: PtyConnectTokenOperation<E> }
 }
 
+export type ExperimentalPersistentPtyRunInput = {
+  readonly ptyID: Pty.ID
+  readonly runID: string
+  readonly attachmentID: string
+  readonly command: string
+}
+export type ExperimentalPersistentPtyRunOutput = {
+  readonly accepted: boolean
+  readonly reason:
+    | "unsupported"
+    | "not_ready"
+    | "dirty"
+    | "busy"
+    | "not_controller"
+    | "invalid_command"
+    | "already_executed"
+    | null
+}
+export type ExperimentalPersistentPtyRunOperation<E = never> = (
+  input: ExperimentalPersistentPtyRunInput,
+) => Effect.Effect<ExperimentalPersistentPtyRunOutput, E>
+
+export type ExperimentalPersistentPtyGetRunInput = { readonly ptyID: Pty.ID; readonly runID: string }
+export type ExperimentalPersistentPtyGetRunOutput = {
+  readonly state: "unsupported" | "unknown" | "ready" | "dirty" | "running"
+  readonly shell: "bash" | "zsh" | "fish" | "powershell" | null
+  readonly run: {
+    readonly id: string
+    readonly outcome: "running" | "completed" | "terminated" | "unknown"
+    readonly exitCode: number | null
+    readonly success: boolean | null
+    readonly output: string
+    readonly truncated: boolean
+  } | null
+}
+export type ExperimentalPersistentPtyGetRunOperation<E = never> = (
+  input: ExperimentalPersistentPtyGetRunInput,
+) => Effect.Effect<ExperimentalPersistentPtyGetRunOutput, E>
+
 export type ExperimentalPersistentPtyReadInput = { readonly sessionID: Session.ID; readonly lines?: number | undefined }
 export type ExperimentalPersistentPtyReadOutput = {
   readonly ptyID: Pty.ID
@@ -2294,6 +2333,7 @@ export type ExperimentalPersistentPtyListOperation<E = never> = (
 
 export type ExperimentalPersistentPtyCreateInput = {
   readonly sessionID: Session.ID
+  readonly experimental?: { readonly shellIntegration?: boolean | undefined } | undefined
   readonly command?: string | undefined
   readonly args: ReadonlyArray<string>
   readonly cwd?: string | undefined
@@ -2538,6 +2578,8 @@ export type ExperimentalArtifactsDeleteOperation<E = never> = (
 
 export interface ExperimentalApi<E = never> {
   readonly persistentPty: {
+    readonly run: ExperimentalPersistentPtyRunOperation<E>
+    readonly getRun: ExperimentalPersistentPtyGetRunOperation<E>
     readonly read: ExperimentalPersistentPtyReadOperation<E>
     readonly list: ExperimentalPersistentPtyListOperation<E>
     readonly create: ExperimentalPersistentPtyCreateOperation<E>

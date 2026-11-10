@@ -25,6 +25,7 @@ export const Handoff = Schema.Struct({
 export interface Handoff extends Schema.Schema.Type<typeof Handoff> {}
 
 export const CreateInput = Schema.Struct({
+  experimental: optional(Schema.Struct({ shellIntegration: optional(Schema.Boolean) })),
   command: optional(Schema.String),
   args: Schema.Array(Schema.String),
   cwd: optional(Schema.String),
@@ -33,6 +34,52 @@ export const CreateInput = Schema.Struct({
   size: optional(Schema.Struct({ cols: PositiveInt, rows: PositiveInt })),
 }).annotate({ identifier: "PersistentPty.CreateInput" })
 export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
+
+export const RunInput = Schema.Struct({
+  runID: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128)),
+  attachmentID: Schema.String.check(Schema.isMinLength(1)),
+  command: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(65536)),
+}).annotate({ identifier: "PersistentPty.RunInput" })
+export interface RunInput extends Schema.Schema.Type<typeof RunInput> {}
+
+/** Ordered WebSocket run payload. The PTY actor owns byte limits and command admission. */
+export const RunFrame = Schema.Struct({ runID: Schema.String, command: Schema.String }).annotate({
+  identifier: "PersistentPty.RunFrame",
+})
+export interface RunFrame extends Schema.Schema.Type<typeof RunFrame> {}
+
+export const RunAdmission = Schema.Struct({
+  accepted: Schema.Boolean,
+  reason: Schema.NullOr(
+    Schema.Literals([
+      "unsupported",
+      "not_ready",
+      "dirty",
+      "busy",
+      "not_controller",
+      "invalid_command",
+      "already_executed",
+    ]),
+  ),
+}).annotate({ identifier: "PersistentPty.RunAdmission" })
+export interface RunAdmission extends Schema.Schema.Type<typeof RunAdmission> {}
+
+export const RunResult = Schema.Struct({
+  id: Schema.String,
+  outcome: Schema.Literals(["running", "completed", "terminated", "unknown"]),
+  exitCode: Schema.NullOr(Schema.Number),
+  success: Schema.NullOr(Schema.Boolean),
+  output: Schema.String,
+  truncated: Schema.Boolean,
+}).annotate({ identifier: "PersistentPty.RunResult" })
+export interface RunResult extends Schema.Schema.Type<typeof RunResult> {}
+
+export const RunStatus = Schema.Struct({
+  state: Schema.Literals(["unsupported", "unknown", "ready", "dirty", "running"]),
+  shell: Schema.NullOr(Schema.Literals(["bash", "zsh", "fish", "powershell"])),
+  run: Schema.NullOr(RunResult),
+}).annotate({ identifier: "PersistentPty.RunStatus" })
+export interface RunStatus extends Schema.Schema.Type<typeof RunStatus> {}
 
 export const UpdateInput = Schema.Struct({
   attachmentID: optional(Schema.String),

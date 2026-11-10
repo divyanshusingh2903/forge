@@ -1,4 +1,8 @@
 const source = {
+  "ui.terminal.result.notExecuted": "Terminal could not run the command",
+  "ui.terminal.result.completed": "Terminal command completed",
+  "ui.terminal.result.failed": "Terminal command failed",
+  "ui.terminal.result.unknown": "Terminal command outcome unknown",
   "ui.preview.controls": "Preview controls",
   "ui.preview.zoomIn": "Zoom in",
   "ui.preview.zoomOut": "Zoom out",

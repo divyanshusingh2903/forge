@@ -143,6 +143,7 @@ export interface MockServerConfig {
   sessionStatus?: Resolvable<Record<string, { type: string }>>
   inbox?: unknown[] | (() => unknown[])
   onPrompt?: (input: { sessionID: string; body: Schema.JsonObject }) => void
+  onSynthetic?: (input: { sessionID: string; body: Schema.JsonObject }) => void
   onCompact?: (input: { sessionID: string; body: Schema.JsonObject }) => void
   generate?: (input: { sessionID: string; prompt: string }) => { text: string } | Promise<{ text: string }>
   onInboxChange?: (input: { sessionID: string; inboxID: string; action: "cancel" | "steer" | "queue" }) => void
@@ -948,7 +949,9 @@ function mockHandlers(
             data: {
               branch: "main",
               changes: (Predicate.isFunction(config.vcsDiff) ? config.vcsDiff({ mode: "git" }) : (config.vcsDiff ?? []))
-                .flatMap((diff) => (Predicate.hasProperty(diff, "file") && Predicate.isString(diff.file) ? [diff.file] : []))
+                .flatMap((diff) =>
+                  Predicate.hasProperty(diff, "file") && Predicate.isString(diff.file) ? [diff.file] : [],
+                )
                 .map((file) => ({ file, staged: false, unstaged: true, untracked: false })),
               remote: { upstream: false, ahead: 0, behind: 0, remotes: false },
             },
@@ -1076,6 +1079,23 @@ function mockHandlers(
             }),
           ),
         persistentPtyGet: (ctx) => findPersistentPty(ctx.params.ptyID).pipe(Effect.map((data) => ({ data }))),
+        persistentPtyGetRun: (ctx) =>
+          findPersistentPty(ctx.params.ptyID).pipe(
+            Effect.flatMap(() =>
+              state.persistentPty.shellIntegrationSupported
+                ? Effect.succeed({ data: state.persistentPty.getRun(ctx.params.ptyID, ctx.params.runID) })
+                : Effect.fail(
+                    new MockPtyFeatureUnsupported({
+                      feature: "shell_integration",
+                      message: "Terminal shell integration is unavailable",
+                    }),
+                  ),
+            ),
+          ),
+        persistentPtyRun: (ctx) =>
+          findPersistentPty(ctx.params.ptyID).pipe(
+            Effect.map(() => ({ data: state.persistentPty.run(ctx.params.ptyID, ctx.payload) })),
+          ),
         persistentPtyUpdate: (ctx) =>
           findPersistentPty(ctx.params.ptyID).pipe(
             Effect.flatMap((found) =>
@@ -1225,6 +1245,22 @@ function mockHandlers(
                 // Keys the request omits stay omitted.
                 payload: { text: "", ...Option.getOrUndefined(decodePromptPayload(body)) },
                 delivery: prompt?.delivery ?? "steer",
+              },
+            }
+          }),
+        sessionSynthetic: (ctx) =>
+          Effect.sync(() => {
+            const body = Option.getOrElse(decodeJsonObject(ctx.payload), (): Schema.JsonObject => ({}))
+            config.onSynthetic?.({ sessionID: ctx.params.sessionID, body })
+
+            return {
+              data: {
+                id: Predicate.isString(body.id) ? body.id : `inb_mock_${Date.now()}`,
+                sessionID: ctx.params.sessionID,
+                time: { created: Date.now() },
+                type: "synthetic",
+                payload: body,
+                delivery: body.delivery ?? "steer",
               },
             }
           }),

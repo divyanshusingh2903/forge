@@ -313,7 +313,14 @@ describe("terminal model", () => {
     const id = await terminal.new()
 
     expect(server.calls.create).toEqual([
-      { sessionID: "ses_1", args: [], cwd: "/repo/worktree", title: "Terminal 2", env: {} },
+      {
+        sessionID: "ses_1",
+        args: [],
+        cwd: "/repo/worktree",
+        title: "Terminal 2",
+        env: {},
+        experimental: { shellIntegration: true },
+      },
     ])
     expect(id).toBe("pty_new1")
     expect(terminal.active()).toBe("pty_new1")

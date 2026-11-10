@@ -7,6 +7,9 @@ import { nodeExecArgv, nodeTarget, type NodeTarget, photonWasmAsset } from "./sr
 
 const dir = import.meta.dirname
 
+// The terminal's shell hooks (.bash, .zshrc, .fish, .ps1, ...) are imported as text, which only Bun's bundler reads.
+const shellIntegrationAsset = /[/\\]persistent-pty[/\\]shell-integration[/\\]/
+
 function rawTextPlugin(modelsSnapshot?: string): Plugin {
   return {
     name: "opencode:raw-text",
@@ -16,7 +19,7 @@ function rawTextPlugin(modelsSnapshot?: string): Plugin {
     // .md only ever worked without it because .md is not a known asset type.
     enforce: "pre",
     async load(id) {
-      if (!id.endsWith(".md") && !id.endsWith(".txt")) return
+      if (!id.endsWith(".md") && !id.endsWith(".txt") && !shellIntegrationAsset.test(id)) return
       const text =
         modelsSnapshot && /models-dev[/\\]snapshot\.txt$/.test(id) ? modelsSnapshot : await readFile(id, "utf8")
       return `export default ${JSON.stringify(text)}`

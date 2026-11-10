@@ -225,6 +225,10 @@ import type {
   PtyRemoveOutput,
   PtyConnectTokenInput,
   PtyConnectTokenOutput,
+  ExperimentalPersistentPtyRunInput,
+  ExperimentalPersistentPtyRunOutput,
+  ExperimentalPersistentPtyGetRunInput,
+  ExperimentalPersistentPtyGetRunOutput,
   ExperimentalPersistentPtyReadInput,
   ExperimentalPersistentPtyReadOutput,
   ExperimentalPersistentPtyListInput,
@@ -1412,6 +1416,29 @@ export function make(options: ClientOptions) {
           ),
       },
       persistentPty: {
+        run: (input: ExperimentalPersistentPtyRunInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: ExperimentalPersistentPtyRunOutput }>(
+            {
+              method: "POST",
+              path: `/api/experimental/persistent-pty/${encodeURIComponent(input.ptyID)}/run`,
+              body: { runID: input["runID"], attachmentID: input["attachmentID"], command: input["command"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 501, 503],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
+        getRun: (input: ExperimentalPersistentPtyGetRunInput, requestOptions?: RequestOptions) =>
+          request<{ readonly data: ExperimentalPersistentPtyGetRunOutput }>(
+            {
+              method: "GET",
+              path: `/api/experimental/persistent-pty/${encodeURIComponent(input.ptyID)}/run/${encodeURIComponent(input.runID)}`,
+              successStatus: 200,
+              declaredStatuses: [400, 401, 404, 501, 503],
+              empty: false,
+            },
+            requestOptions,
+          ).then((value) => value.data),
         read: (input: ExperimentalPersistentPtyReadInput, requestOptions?: RequestOptions) =>
           request<{ readonly data: ExperimentalPersistentPtyReadOutput }>(
             {
@@ -1441,6 +1468,7 @@ export function make(options: ClientOptions) {
               method: "POST",
               path: `/api/experimental/session/${encodeURIComponent(input.sessionID)}/terminal`,
               body: {
+                experimental: input["experimental"],
                 command: input["command"],
                 args: input["args"],
                 cwd: input["cwd"],

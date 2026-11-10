@@ -2,6 +2,19 @@ import { expect, test, type Page } from "@playwright/test"
 import { holdRoute } from "../utils/app"
 import { terminalScreen, terminalText } from "../utils/terminal"
 import { openSession } from "../utils/workspace"
+import { Schema } from "effect"
+import { SessionInbox } from "@opencode/schema/session-inbox"
+import { SessionMessage } from "@opencode/schema/session-message"
+import {
+  assistantMessage,
+  inboxDelivered,
+  inboxEnqueued,
+  sessionID,
+  setupTimeline,
+  textPart,
+  userMessage,
+  userText,
+} from "../utils/timeline"
 
 test.use({ viewport: { width: 1440, height: 900 } })
 
@@ -10,6 +23,124 @@ test.beforeEach(async ({ context }) => {
 })
 
 const SESSION = "ses_terminals"
+
+test("runs a response command and sends its result without changing the draft or appending to manual input", async ({
+  page,
+}) => {
+  const admissions: { sessionID: string; body: Schema.JsonObject }[] = []
+
+  const timeline = await setupTimeline(page, {
+    messages: [
+      userMessage([userText("Show a terminal command")]),
+      assistantMessage([textPart("terminal-command", "```sh\necho hello\n```")]),
+    ],
+    persistentPty: {},
+    onSynthetic: (input) => {
+      admissions.push(input)
+    },
+  })
+
+  const editor = page.locator('[data-component="composer-editor"]')
+  await expect(editor).toBeEditable()
+  await editor.fill("Leave this draft untouched")
+  await page.getByRole("button", { name: "Run in terminal", exact: true }).click()
+  await expect.poll(() => timeline.persistentPty.runs.length).toBe(1)
+  const run = timeline.persistentPty.runs[0]!
+  expect(run.command).toBe("echo hello")
+  await expect(terminalScreen(page, run.ptyID)).toBeVisible()
+  timeline.persistentPty.completeRun(run.ptyID, { output: "hello\n", exitCode: 1 })
+  await expect.poll(() => admissions.length).toBe(1)
+  const admission = admissions[0]!
+  expect(admission.sessionID).toBe(sessionID)
+  expect(admission.body).toMatchObject({
+    delivery: "steer",
+    metadata: { source: "terminal", ptyID: run.ptyID, command: "echo hello", exitCode: 1, output: "hello\n" },
+  })
+  const inboxID = Schema.decodeUnknownSync(SessionMessage.ID)(admission.body.id)
+
+  const item = Schema.decodeUnknownSync(SessionInbox.Item)({
+    type: "synthetic",
+    payload: admission.body,
+    delivery: "steer",
+  })
+
+  if (item.type !== "synthetic") throw new Error("Expected a synthetic terminal result")
+  await timeline.send([inboxEnqueued({ sessionID, inboxID, item }), inboxDelivered({ sessionID, inboxID })])
+  await expect(page.getByText("Terminal command failed", { exact: true })).toBeVisible()
+  const result = page.locator("details").filter({ hasText: "echo hello" })
+  await result.locator("summary").click()
+  await expect(result.locator("pre")).toHaveText("hello\n")
+  await expect(editor).toHaveText("Leave this draft untouched")
+  await expect(page.getByRole("button", { name: "Run in terminal", exact: true })).toBeEnabled()
+
+  const terminal = terminalScreen(page, run.ptyID)
+  await terminal.click()
+  await expect(terminal.locator("textarea")).toBeFocused()
+  await page.keyboard.type("echo partial")
+  await expect
+    .poll(() => timeline.persistentPty.sockets.flatMap((socket) => socket.input).join(""))
+    .toBe("echo partial")
+  await page.getByRole("button", { name: "Run in terminal", exact: true }).click()
+  await expect.poll(() => admissions.length).toBe(2)
+  expect(timeline.persistentPty.runs).toHaveLength(1)
+  expect(admissions[1]?.body).toMatchObject({
+    metadata: { outcome: "not_executed", error: "Terminal is busy or has unfinished input." },
+  })
+  await expect(page.getByRole("button", { name: "Run in terminal", exact: true })).toBeEnabled()
+  await expect(editor).toHaveText("Leave this draft untouched")
+})
+
+test("reports unavailable terminal integration to the session as not executed", async ({ page }) => {
+  const admissions: { sessionID: string; body: Schema.JsonObject }[] = []
+
+  const timeline = await setupTimeline(page, {
+    messages: [
+      userMessage([userText("Show a terminal command")]),
+      assistantMessage([textPart("terminal-command", "```sh\necho hello\n```")]),
+    ],
+    persistentPty: { shellIntegrationSupported: false },
+    onSynthetic: (input) => {
+      admissions.push(input)
+    },
+  })
+
+  const run = page.getByRole("button", { name: "Run in terminal", exact: true })
+  await run.click()
+  await expect.poll(() => admissions.length).toBe(1)
+  expect(timeline.persistentPty.created).toHaveLength(1)
+  expect(timeline.persistentPty.runs).toHaveLength(0)
+  const admission = admissions[0]!
+  expect(admission.sessionID).toBe(sessionID)
+  expect(admission.body).toMatchObject({
+    delivery: "steer",
+    metadata: {
+      source: "terminal",
+      outcome: "not_executed",
+      command: "echo hello",
+      exitCode: null,
+      success: null,
+      error: "This terminal service does not support shell command execution. The command was not executed.",
+    },
+  })
+  const inboxID = Schema.decodeUnknownSync(SessionMessage.ID)(admission.body.id)
+
+  const item = Schema.decodeUnknownSync(SessionInbox.Item)({
+    type: "synthetic",
+    payload: admission.body,
+    delivery: "steer",
+  })
+
+  if (item.type !== "synthetic") throw new Error("Expected a synthetic terminal result")
+  await timeline.send([inboxEnqueued({ sessionID, inboxID, item }), inboxDelivered({ sessionID, inboxID })])
+  await expect(page.getByText("Terminal could not run the command", { exact: true })).toBeVisible()
+  await page.locator("details").filter({ hasText: "echo hello" }).locator("summary").click()
+  await expect(
+    page.getByText("This terminal service does not support shell command execution. The command was not executed.", {
+      exact: true,
+    }),
+  ).toBeVisible()
+  await expect(run).toBeEnabled()
+})
 
 test("restores a terminal from the server's snapshot after a reload", async ({ page }) => {
   const output = "first-line\r\n"

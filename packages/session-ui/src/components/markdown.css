@@ -531,3 +531,23 @@
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+[data-slot="markdown-code-action"] {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 32px;
+  transition: opacity 0.15s ease;
+  z-index: 1;
+
+  @media (hover: hover) {
+    opacity: 0;
+  }
+}
+
+[data-component="markdown-code"]:hover [data-slot="markdown-code-action"],
+[data-slot="markdown-code-action"]:focus-within {
+  opacity: 1;
+}
+
+[data-component="markdown-code"]:has(> [data-slot="markdown-code-action"]) > pre {
+  padding-inline-end: 64px;
+}
