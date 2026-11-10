@@ -760,7 +760,12 @@ export interface SessionScreen {
    * @param input - `turnMessageID` is the user message that opened the turn. `messageID` is the message to land on
    * inside it, when that is not the user message itself.
    */
-  revealMessage(input: { readonly turnMessageID: string; readonly messageID?: string }): void
+  revealMessage(input: {
+    /** The user message that opened the turn. */
+    readonly turnMessageID: string
+    /** The message to land on inside the turn; omit it for the user message itself. */
+    readonly messageID?: string
+  }): void
 }
 
 /** The session screen, while it routes the mounted session. */

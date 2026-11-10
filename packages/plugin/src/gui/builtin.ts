@@ -95,19 +95,26 @@ export const BuiltinCodeBlockAction = Registry.define<BuiltinCodeBlockAction>("e
 export interface BuiltinMessageAction {
   /** Stable contribution identity. */
   readonly id: string
-  /** The icon for the off and the on state. */
+  /** The icon for the off and the on state. @param active - Whether the action is on for the message. */
   icon(active: boolean): "pin" | "pin-filled"
-  /** Localized button label for the off and the on state. */
+  /** Localized button label for the off and the on state. @param active - Whether the action is on for the message. */
   label(active: boolean): string
   /** Whether the action is on for a message. Reactive. @param input - Owning session and message. */
-  active(input: { readonly session: MountedSession; readonly messageID: string }): boolean
+  active(input: {
+    /** Owning session. */
+    readonly session: MountedSession
+    /** The message the button sits on. */
+    readonly messageID: string
+  }): boolean
   /** Invoke only after an explicit click. @param input - The message, and the user message that opened its turn. */
   run(input: {
     /** Owning session. */
     readonly session: MountedSession
+    /** The message the button sits on. */
     readonly messageID: string
     /** The user message that opened the message's turn: the message itself for a user message. */
     readonly turnMessageID: string
+    /** Whether the message is the user's or the agent's. */
     readonly role: "user" | "assistant"
     /** The message's visible text. */
     readonly text: string
