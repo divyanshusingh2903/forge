@@ -92,9 +92,7 @@ function modelItems(data: ReturnType<typeof useData>, model: SessionMessageAssis
 }
 
 function sameModel(a: SessionMessageAssistant["model"], b: SessionMessageAssistant["model"]) {
-  return (
-    a.providerID === b.providerID && a.id === b.id && (a.variant ?? "default") === (b.variant ?? "default")
-  )
+  return a.providerID === b.providerID && a.id === b.id && (a.variant ?? "default") === (b.variant ?? "default")
 }
 
 function MetaItems(props: { items: MetaItem[]; slot: "user-message" | "text-part" }) {
@@ -263,7 +261,7 @@ function createPacedValue(getValue: () => string, live?: () => boolean) {
   return value
 }
 
-function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boolean }) {
+function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boolean; codeActions?: boolean }) {
   const value = createPacedValue(
     () => props.text,
     () => props.streaming,
@@ -271,7 +269,13 @@ function PacedMarkdown(props: { text: string; cacheKey: string; streaming: boole
 
   return (
     <Show when={value()}>
-      <Markdown text={value()} cacheKey={props.cacheKey} streaming={props.streaming} deferUntilReady />
+      <Markdown
+        text={value()}
+        cacheKey={props.cacheKey}
+        streaming={props.streaming}
+        codeActions={props.codeActions}
+        deferUntilReady
+      />
     </Show>
   )
 }
@@ -1208,7 +1212,12 @@ export function AssistantTextContent(props: {
     <Show when={props.text}>
       <div data-component="text-part" data-timeline-part-id={props.id}>
         <div data-slot="text-part-body">
-          <PacedMarkdown text={props.text} cacheKey={props.id} streaming={props.message.time.completed === undefined} />
+          <PacedMarkdown
+            text={props.text}
+            cacheKey={props.id}
+            streaming={props.message.time.completed === undefined}
+            codeActions
+          />
         </div>
         <Show when={sources()} fallback={<Show when={props.showCopy}>{copyFooter()}</Show>}>
           {(value) => (

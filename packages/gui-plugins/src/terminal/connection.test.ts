@@ -49,7 +49,11 @@ function setup(options: { reply?: string } = {}) {
       pending.push(done)
     },
     resize: (size) => log.push(`resize ${size.cols}x${size.rows}`),
-    send: (frame) => sent.push(frame),
+    send: (frame) => {
+      sent.push(frame)
+
+      return true
+    },
     fail: (failure) => failures.push(failure),
   })
 
@@ -66,6 +70,39 @@ function setup(options: { reply?: string } = {}) {
 }
 
 describe("terminalConnection", () => {
+  test("orders Run after keyboard input on the same socket and waits for its acknowledgement", async () => {
+    const terminal = setup()
+    terminal.connection.restore({ size: info.size, checkpoint: btoa("restored") })
+    terminal.connection.message(attached())
+    terminal.connection.message(replayComplete)
+    await terminal.drain()
+    terminal.connection.input("echo partial")
+    const pending = terminal.connection.run({ runID: "run-one", command: "pwd" })
+    expect(terminal.sent.map((frame) => frame[0])).toEqual([1, 2])
+    expect(new TextDecoder().decode(terminal.sent[0]!.subarray(5))).toBe("echo partial")
+    expect(JSON.parse(new TextDecoder().decode(terminal.sent[1]!.subarray(5)))).toEqual({
+      runID: "run-one",
+      command: "pwd",
+    })
+    terminal.connection.message(
+      JSON.stringify({ type: "run_admission", runID: "run-one", accepted: false, reason: "dirty" }),
+    )
+    expect(await pending).toEqual({ accepted: false, reason: "dirty" })
+  })
+
+  test("never resends a Run whose acknowledgement was lost on disconnect", async () => {
+    const terminal = setup()
+    terminal.connection.restore({ size: info.size, checkpoint: btoa("restored") })
+    terminal.connection.message(attached())
+    terminal.connection.message(replayComplete)
+    await terminal.drain()
+    const pending = terminal.connection.run({ runID: "run-one", command: "pwd" })
+    terminal.connection.close()
+    await expect(pending).rejects.toThrow("run_uncertain")
+    expect(terminal.sent.map((frame) => frame[0])).toEqual([2])
+    expect(terminal.connection.ready()).toBeFalse()
+  })
+
   test("writes output received before a resize at the old size, then resets to the resize checkpoint", async () => {
     const terminal = setup()
     terminal.connection.restore({ size: { cols: 80, rows: 24 }, checkpoint: btoa("restored") })

@@ -3,7 +3,7 @@ import { mkdir, readFile, rename } from "node:fs/promises"
 import net from "node:net"
 import path from "node:path"
 import { Cause, Data, Duration, Effect, Schema, Semaphore } from "effect"
-import type { Handoff } from "@opencode/schema/persistent-pty"
+import { PersistentPty, type Handoff } from "@opencode/schema/persistent-pty"
 import { Session } from "@opencode/schema/session"
 
 const ProtocolVersion = 7
@@ -43,6 +43,8 @@ const Registration = Schema.Struct({
 type Registration = typeof Registration.Type
 
 export const WireResponse = Schema.Union([
+  Schema.Struct({ type: Schema.Literal("run_admission"), data: PersistentPty.RunAdmission }),
+  Schema.Struct({ type: Schema.Literal("run_status"), data: PersistentPty.RunStatus }),
   Schema.Struct({
     type: Schema.Literal("pong"),
     instance_id: Schema.String,
@@ -236,11 +238,11 @@ export const makeDaemonTransport = Effect.fn("PersistentPty.makeDaemonTransport"
     const child = yield* Effect.tryPromise({
       try: () =>
         new Promise<ReturnType<typeof spawn>>((resolve, reject) => {
-          const child = spawn(
-            executable,
-            ["daemon", "--runtime-dir", root, "--name", id],
-            { detached: true, windowsHide: true, stdio: "ignore" },
-          )
+          const child = spawn(executable, ["daemon", "--runtime-dir", root, "--name", id], {
+            detached: true,
+            windowsHide: true,
+            stdio: "ignore",
+          })
           child.once("spawn", () => {
             child.unref()
             resolve(child)

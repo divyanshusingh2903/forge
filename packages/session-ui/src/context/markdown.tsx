@@ -11,12 +11,20 @@ export type OpenMarkdownLocalFile = (path: string) => void
  */
 export type MarkdownLocalFileExists = (path: string) => boolean | Promise<boolean>
 
+export type MarkdownCodeAction = {
+  readonly id: string
+  readonly label: string
+  readonly languages: readonly string[]
+  readonly run: (command: string, language: string, onStart?: () => void, blockID?: string) => Promise<void>
+}
+
 const context = createContext<{
   readonly readImage?: ReadMarkdownImage
   readonly openLocalFile?: OpenMarkdownLocalFile
   readonly localFileExists?: MarkdownLocalFileExists
   readonly openSession?: (sessionID: string) => void
   readonly sessionTitle?: (sessionID: string) => string | undefined
+  readonly codeActions?: readonly MarkdownCodeAction[]
 }>()
 
 export function MarkdownProvider(
@@ -26,6 +34,7 @@ export function MarkdownProvider(
     localFileExists?: MarkdownLocalFileExists
     openSession?: (id: string) => void
     sessionTitle?: (id: string) => string | undefined
+    codeActions?: readonly MarkdownCodeAction[]
   }>,
 ) {
   const parent = useMarkdown()
@@ -35,6 +44,9 @@ export function MarkdownProvider(
       value={{
         get readImage() {
           return props.readImage
+        },
+        get codeActions() {
+          return props.codeActions ?? parent?.codeActions
         },
         get openLocalFile() {
           return props.openLocalFile

@@ -186,6 +186,7 @@ export default function TerminalPanel(props: {
               ptyID={surface.id}
               server={surface.server()}
               ghostty={props.model.ghostty}
+              onConnection={(value) => props.model.connect(surface.id, value)}
               quote={quote}
               autoFocus={terminal().focusRequested(surface.id)}
               onAutoFocus={() => terminal().consumeFocus(surface.id)}

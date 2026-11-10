@@ -30,6 +30,9 @@ export async function mountMarkdown(options: {
   cached?: boolean
   images?: boolean
   synchronousFiles?: boolean
+  codeActions?: boolean
+  assistant?: boolean
+  failRun?: boolean
   localFileExists?: MarkdownLocalFileExists
 }) {
   if (options.cached) await preloadMarkdown(options.text, "markdown-test")
@@ -47,6 +50,8 @@ export async function mountMarkdown(options: {
     const [visible, setVisible] = createSignal(true)
     const [german, setGerman] = createSignal(false)
     const english = useI18n()
+    const [run, setRun] = createSignal("")
+    let finishRun: VoidFunction | undefined
 
     return (
       <DialogProvider>
@@ -64,6 +69,10 @@ export async function mountMarkdown(options: {
           onChange={(event) => setGerman(event.currentTarget.checked)}
         />
         <button onClick={() => setVisible((value) => !value)}>Toggle Markdown</button>
+        <Show when={options.codeActions}>
+          <output aria-label="Run request">{run()}</output>
+          <button onClick={() => finishRun?.()}>Finish run</button>
+        </Show>
         <I18nProvider
           value={{
             locale: () => (german() ? "de" : "en"),
@@ -73,6 +82,36 @@ export async function mountMarkdown(options: {
           }}
         >
           <MarkdownProvider
+            codeActions={
+              options.codeActions
+                ? [
+                    {
+                      id: "run",
+                      label: "Run in terminal",
+                      languages: [
+                        "sh",
+                        "bash",
+                        "zsh",
+                        "fish",
+                        "shell",
+                        "console",
+                        "terminal",
+                        "powershell",
+                        "pwsh",
+                        "ps1",
+                      ],
+                      run(command, language, onStart) {
+                        onStart?.()
+                        setRun(JSON.stringify({ command, language }))
+
+                        return new Promise<void>((resolve, reject) => {
+                          finishRun = () => (options.failRun ? reject(new Error("Terminal unavailable")) : resolve())
+                        })
+                      },
+                    },
+                  ]
+                : undefined
+            }
             readImage={(path, signal) =>
               options.images ? readLocalImage(api, "C:/project", path, signal) : Promise.resolve(undefined)
             }
@@ -85,6 +124,7 @@ export async function mountMarkdown(options: {
               <Markdown
                 text={text()}
                 streaming={streaming()}
+                codeActions={options.assistant}
                 cacheKey={options.cached ? "markdown-test" : undefined}
                 deferUntilReady
               />

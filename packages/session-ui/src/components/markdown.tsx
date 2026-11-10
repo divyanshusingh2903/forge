@@ -132,6 +132,46 @@ type CopyButtonState = {
 
 const copyButtonState = new WeakMap<HTMLElement, CopyButtonState>()
 
+type CodeActionButton = {
+  label: string
+  disabled: boolean
+}
+
+const codeActionButtonState = new WeakMap<
+  HTMLElement,
+  {
+    get: () => CodeActionButton
+    set: Setter<CodeActionButton>
+    dispose: () => void
+  }
+>()
+
+function createCodeActionButton(label: string) {
+  const host = document.createElement("div")
+  host.dataset.slot = "markdown-code-action"
+  const [state, set] = createSignal<CodeActionButton>({ label, disabled: true })
+
+  const dispose = render(
+    () => (
+      <Tooltip placement="top" value={state().label}>
+        <IconButton
+          type="button"
+          size="normal"
+          variant="ghost-muted"
+          aria-label={state().label}
+          disabled={state().disabled}
+          icon={<Icon name="outline-console" />}
+        />
+      </Tooltip>
+    ),
+    host,
+  )
+
+  codeActionButtonState.set(host, { get: state, set, dispose })
+
+  return host
+}
+
 const urlPattern = /^https?:\/\/[^\s<>()`"']+$/
 
 function codeUrl(text: string) {
@@ -208,14 +248,16 @@ function setCopyState(host: HTMLElement, labels: CopyLabels, copied: boolean) {
 function disposeCopyButton(host: HTMLElement) {
   copyButtonState.get(host)?.dispose()
   copyButtonState.delete(host)
+  codeActionButtonState.get(host)?.dispose()
+  codeActionButtonState.delete(host)
 }
 
 function disposeCopyButtons(root: Element) {
   const hosts = [
     ...(root instanceof HTMLElement && root.getAttribute("data-slot") === "markdown-copy-button" ? [root] : []),
-    ...Array.from(root.querySelectorAll('[data-slot="markdown-copy-button"]')).filter(
-      (el): el is HTMLElement => el instanceof HTMLElement,
-    ),
+    ...Array.from(
+      root.querySelectorAll('[data-slot="markdown-copy-button"], [data-slot="markdown-code-action"]'),
+    ).filter((el): el is HTMLElement => el instanceof HTMLElement),
   ]
 
   hosts.forEach(disposeCopyButton)
@@ -234,7 +276,18 @@ function disposeRenderedMarkdown(root: Element) {
   })
 }
 
-const shellLanguages = new Set(["bash", "sh", "shell", "zsh", "fish", "console", "terminal"])
+const shellLanguages = new Set([
+  "bash",
+  "sh",
+  "shell",
+  "zsh",
+  "fish",
+  "console",
+  "terminal",
+  "powershell",
+  "pwsh",
+  "ps1",
+])
 
 function codeKind(language: string | undefined) {
   const value = language?.toLowerCase()
@@ -635,11 +688,21 @@ export function Markdown(
     cacheKey?: string
     streaming?: boolean
     deferUntilReady?: boolean
+    codeActions?: boolean
     class?: string
     classList?: Record<string, boolean>
   },
 ) {
-  const [local, others] = splitProps(props, ["text", "cacheKey", "streaming", "deferUntilReady", "class", "classList"])
+  const [local, others] = splitProps(props, [
+    "text",
+    "cacheKey",
+    "streaming",
+    "deferUntilReady",
+    "codeActions",
+    "class",
+    "classList",
+  ])
+
   const i18n = useI18n()
   const markdown = useMarkdown()
   const previewImages = createImagePreview()
@@ -920,6 +983,54 @@ export function Markdown(
         .forEach((button) => setCopyState(button, labels, button.dataset.copied === "true"))
 
     appliedLabels = labels
+
+    const actions = local.codeActions ? (markdown?.codeActions ?? []) : []
+    container.querySelectorAll<HTMLElement>('[data-component="markdown-code"]').forEach((wrapper, index) => {
+      const code = wrapper.querySelector("code")
+      const language = code?.className.match(/language-([^\s]+)/)?.[1]?.toLowerCase() ?? ""
+      const action = actions.find((item) => item.languages.includes(language))
+      const previous = wrapper.querySelector<HTMLElement>('[data-slot="markdown-code-action"]')
+
+      if (!action || !code) {
+        if (previous) disposeCopyButton(previous)
+        previous?.remove()
+
+        return
+      }
+
+      const button = previous ?? createCodeActionButton(action.label)
+      const state = codeActionButtonState.get(button)
+
+      if (!state) return
+      const complete = wrapper.closest("[data-markdown-complete]")?.getAttribute("data-markdown-complete") !== "false"
+      state.set({ label: action.label, disabled: !complete || button.dataset.running === "true" })
+      button.onclick = async () => {
+        if (state.get().disabled || lifetime.signal.aborted) return
+
+        const source = code.textContent ?? ""
+        const lines = source.split("\n")
+
+        const command = lines.filter((line) => line.trim()).every((line) => line.startsWith("$ "))
+          ? lines.map((line) => (line.startsWith("$ ") ? line.slice(2) : line)).join("\n")
+          : source
+
+        button.dataset.running = "true"
+        state.set((value) => ({ ...value, disabled: true }))
+        await action
+          .run(command, language, undefined, `${local.cacheKey ?? owner}:${index}`)
+          // Outcomes belong to the terminal/session, never to the source block.
+          .catch(() => undefined)
+        delete button.dataset.running
+
+        if (!lifetime.signal.aborted)
+          state.set((value) => ({
+            ...value,
+            disabled: wrapper.closest("[data-markdown-complete]")?.getAttribute("data-markdown-complete") === "false",
+          }))
+      }
+
+      if (!previous) wrapper.appendChild(button)
+    })
 
     if (!copyCleanup)
       copyCleanup = setupCodeCopy(container, () => ({

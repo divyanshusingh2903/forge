@@ -1,5 +1,6 @@
 import { PersistentPty } from "@opencode/core/persistent-pty"
 import { PtyTicket } from "@opencode/core/pty/ticket"
+import { RunFrame } from "@opencode/schema/persistent-pty"
 import {
   ForbiddenError,
   InvalidRequestError,
@@ -12,7 +13,7 @@ import {
   PTY_CONNECT_TOKEN_HEADER,
   PTY_CONNECT_TOKEN_HEADER_VALUE,
 } from "@opencode/protocol/groups/persistent-pty"
-import { Effect, Queue } from "effect"
+import { Effect, Option, Queue, Schema } from "effect"
 import { HttpServerRequest, HttpServerResponse } from "effect/http"
 import { HttpApiBuilder, HttpApiSchema } from "effect/http-api"
 import { Socket } from "effect/socket"
@@ -22,6 +23,8 @@ import { makeArtifact } from "./artifact"
 import { makeMediaGet } from "./media"
 import { type Outbound, runPtySocket } from "./pty-socket"
 import { makeSchedule } from "./schedule"
+
+const decodeRunFrame = Schema.decodeUnknownOption(Schema.fromJsonString(RunFrame))
 
 export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experimental", (handlers) =>
   Effect.gen(function* () {
@@ -33,6 +36,18 @@ export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experiment
     const schedule = yield* makeSchedule
 
     return handlers
+      .handle(
+        "persistentPty.run",
+        Effect.fn(function* (ctx) {
+          return { data: yield* pty.run(ctx.params.ptyID, ctx.payload).pipe(mapRunError) }
+        }),
+      )
+      .handle(
+        "persistentPty.getRun",
+        Effect.fn(function* (ctx) {
+          return { data: yield* pty.getRun(ctx.params.ptyID, ctx.params.runID).pipe(mapRunError) }
+        }),
+      )
       .handleRaw("media.get", (ctx) => mediaGet(ctx.params.hash, ctx.request))
       .handle("artifacts.providers", (ctx) => artifact.providers(ctx.query, ctx.request))
       .handle("artifacts.list", (ctx) => artifact.list(ctx.query, ctx.request))
@@ -72,6 +87,7 @@ export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experiment
                 env: ctx.payload.env,
                 cols: ctx.payload.size?.cols,
                 rows: ctx.payload.size?.rows,
+                shellIntegration: ctx.payload.experimental?.shellIntegration,
               })
               .pipe(
                 Effect.catchTags({
@@ -243,7 +259,26 @@ export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experiment
               const type = data[0]
               const cols = view.getUint16(1)
               const rows = view.getUint16(3)
-              if ((type !== 0 && type !== 1) || cols === 0 || rows === 0) return Effect.void
+              if ((type !== 0 && type !== 1 && type !== 2) || cols === 0 || rows === 0) return Effect.void
+              if (type === 2) {
+                const decoded = decodeRunFrame(Buffer.from(data.subarray(5)).toString("utf8"))
+                if (Option.isNone(decoded)) return Effect.void
+                const frame = decoded.value
+                // Read through the same sequential socket reader as keyboard
+                // input, so an HTTP request cannot overtake an earlier edit.
+                return pty.run(ctx.params.ptyID, { ...frame, attachmentID }).pipe(
+                  Effect.match({
+                    onSuccess: (admission) =>
+                      Queue.offerUnsafe(
+                        outbox,
+                        JSON.stringify({ type: "run_admission", runID: frame.runID, ...admission }),
+                      ),
+                    onFailure: () =>
+                      Queue.offerUnsafe(outbox, JSON.stringify({ type: "run_uncertain", runID: frame.runID })),
+                  }),
+                  Effect.asVoid,
+                )
+              }
               if (type === 0) return pty.control(ctx.params.ptyID, attachmentID, cols, rows).pipe(Effect.ignore)
               return pty.input(ctx.params.ptyID, attachmentID, cols, rows, data.subarray(5)).pipe(Effect.ignore)
             },
@@ -257,6 +292,24 @@ export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experiment
 
 const mapUnavailable = <A>(effect: Effect.Effect<A, PersistentPty.UnavailableError>) =>
   effect.pipe(Effect.catchTag("PersistentPty.UnavailableError", unavailable))
+
+const mapRunError = <A>(
+  effect: Effect.Effect<
+    A,
+    PersistentPty.NotFoundError | PersistentPty.UnsupportedError | PersistentPty.UnavailableError
+  >,
+) =>
+  effect.pipe(
+    Effect.catchTags({
+      "PersistentPty.NotFoundError": notFound,
+      "PersistentPty.UnsupportedError": (error) =>
+        new PtyFeatureUnsupportedError({
+          feature: error.feature,
+          message: "Terminal shell integration is unavailable",
+        }),
+      "PersistentPty.UnavailableError": unavailable,
+    }),
+  )
 
 const mapTerminalError = <A>(effect: Effect.Effect<A, PersistentPty.NotFoundError | PersistentPty.UnavailableError>) =>
   effect.pipe(

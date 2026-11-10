@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ghostty::{Format, Terminal, TerminalOptions};
 use crate::protocol::AttachmentRole;
+use crate::shell_integration::{RunAdmission, RunStatus, ShellIntegration};
 
 #[cfg(windows)]
 mod windows;
@@ -244,6 +245,26 @@ impl TerminalService {
 
     pub fn write(&self, id: TerminalId, bytes: Vec<u8>) -> Result<()> {
         self.write_for(id, None, bytes)
+    }
+
+    pub fn run(
+        &self,
+        id: TerminalId,
+        attachment_id: String,
+        run_id: String,
+        command: String,
+    ) -> Result<RunAdmission> {
+        self.get(id)?.request(|reply| ActorMessage::Run {
+            attachment_id,
+            run_id,
+            command,
+            reply,
+        })
+    }
+
+    pub fn get_run(&self, id: TerminalId, run_id: String) -> Result<RunStatus> {
+        self.get(id)?
+            .request(|reply| ActorMessage::GetRun { run_id, reply })
     }
 
     pub fn write_for(
@@ -682,6 +703,16 @@ fn await_reply<T>(reply: &Receiver<Result<T>>, actor_done: &Receiver<()>) -> Res
 }
 
 enum ActorMessage {
+    Run {
+        attachment_id: String,
+        run_id: String,
+        command: String,
+        reply: Reply<Result<RunAdmission>>,
+    },
+    GetRun {
+        run_id: String,
+        reply: Reply<Result<RunStatus>>,
+    },
     Output(Vec<u8>),
     ReaderEof,
     ReaderFailed(String),
@@ -845,6 +876,7 @@ fn run_actor(config: ActorConfig) -> Result<()> {
     let mut reader_eof = false;
     let mut final_exit = None::<StreamEvent>;
     let mut pending_message = None;
+    let mut shell = ShellIntegration::default();
     let _ = init_tx.send(Ok(()));
 
     let result = loop {
@@ -864,6 +896,7 @@ fn run_actor(config: ActorConfig) -> Result<()> {
                 let _ = reply.send(Ok(()));
             }
             Ok(ActorMessage::Output(bytes)) => {
+                shell.output(&bytes);
                 let (start, end) = replay.append(&bytes);
                 terminal.vt_write(&bytes);
                 // Once the Windows master is handed off for closing, the writer
@@ -910,9 +943,49 @@ fn run_actor(config: ActorConfig) -> Result<()> {
                     authorize_controller(&controller, attachment_id.as_deref()).and_then(|_| {
                         #[cfg(windows)]
                         master.get()?;
+                        shell.input(&bytes);
                         queue_write(&writes, &shutdown, bytes)
                     });
                 let _ = reply.send(result);
+            }
+            Ok(ActorMessage::Run {
+                attachment_id,
+                run_id,
+                command,
+                reply,
+            }) => {
+                let result = (|| {
+                    if controller.as_ref() != Some(&attachment_id) {
+                        return Ok(RunAdmission {
+                            accepted: false,
+                            reason: Some("not_controller".to_string()),
+                        });
+                    }
+                    master.get()?;
+                    shell.expire(Instant::now());
+                    let bytes = match shell.admit(run_id, &command) {
+                        Ok(bytes) => bytes,
+                        Err(error) => {
+                            return Ok(RunAdmission {
+                                accepted: false,
+                                reason: Some(error.to_string()),
+                            });
+                        }
+                    };
+                    if let Err(error) = queue_write(&writes, &shutdown, bytes) {
+                        shell.failed_write();
+                        return Err(error);
+                    }
+                    Ok(RunAdmission {
+                        accepted: true,
+                        reason: None,
+                    })
+                })();
+                let _ = reply.send(result);
+            }
+            Ok(ActorMessage::GetRun { run_id, reply }) => {
+                shell.expire(Instant::now());
+                let _ = reply.send(Ok(shell.status(&run_id)));
             }
             Ok(ActorMessage::Resize {
                 attachment_id,
@@ -1024,6 +1097,7 @@ fn run_actor(config: ActorConfig) -> Result<()> {
                     if let Some(bytes) = bytes {
                         #[cfg(windows)]
                         master.get()?;
+                        shell.input(&bytes);
                         queue_write(&writes, &shutdown, bytes)?;
                     }
                     Ok(())
@@ -1185,7 +1259,10 @@ fn run_actor(config: ActorConfig) -> Result<()> {
                     value.lifecycle = TerminalLifecycle::Failed { message };
                 }
             }
-            Ok(ActorMessage::ReaderEof) => reader_eof = true,
+            Ok(ActorMessage::ReaderEof) => {
+                shell.exited();
+                reader_eof = true;
+            }
             Err(crossbeam_channel::RecvTimeoutError::Disconnected) => {
                 break Ok(());
             }

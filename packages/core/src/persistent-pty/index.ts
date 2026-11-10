@@ -28,6 +28,7 @@ import {
   type WireTerminal,
 } from "./daemon.js"
 import { resolveBinary } from "#persistent-pty-binary"
+import { prepareShellIntegration } from "./shell-integration.js"
 
 export type { Role, StreamEvent } from "./daemon.js"
 export { Handoff } from "@opencode/schema/persistent-pty"
@@ -89,6 +90,7 @@ export interface Interface {
       readonly env: Readonly<Record<string, string>>
       readonly cols?: number
       readonly rows?: number
+      readonly shellIntegration?: boolean
     },
   ) => Effect.Effect<Info, InvalidCwdError | UnavailableError>
   readonly write: (
@@ -120,6 +122,14 @@ export interface Interface {
     title: string | null,
   ) => Effect.Effect<Info, NotFoundError | UnsupportedError | UnavailableError>
   readonly snapshot: (id: Pty.ID) => Effect.Effect<Snapshot, NotFoundError | UnavailableError>
+  readonly run: (
+    id: Pty.ID,
+    input: PersistentPty.RunInput,
+  ) => Effect.Effect<PersistentPty.RunAdmission, NotFoundError | UnsupportedError | UnavailableError>
+  readonly getRun: (
+    id: Pty.ID,
+    runID: string,
+  ) => Effect.Effect<PersistentPty.RunStatus, NotFoundError | UnsupportedError | UnavailableError>
   readonly read: (sessionID: Session.ID, lines?: number) => Effect.Effect<ReadResult | null, UnavailableError>
   readonly remove: (id: Pty.ID) => Effect.Effect<void, NotFoundError | UnavailableError>
   readonly shutdown: () => Effect.Effect<void, UnavailableError>
@@ -159,6 +169,9 @@ const makeLayer = (options: Options = {}) =>
         options.handoff,
       ).pipe(Effect.mapError(unavailable))
       const removing = new Set<Pty.ID>()
+      // Exited visible terminals are removed immediately. Keep a bounded result
+      // tail so a UI polling completion can still collect their final output.
+      const retiredRuns = new Map<Pty.ID, { sessionID: Session.ID; status: PersistentPty.RunStatus }>()
       // Controller activity selects a terminal; observer reads and pane visibility do not.
       const current = new Map<Session.ID, Pty.ID>()
 
@@ -190,16 +203,24 @@ const makeLayer = (options: Options = {}) =>
           ),
         )
         if (!directory) return yield* new InvalidCwdError({ cwd, message: `cwd is not a directory: ${cwd}` })
+        const program = input.command ?? ShellSelect.environment(global.bin)
+        const integration =
+          input.shellIntegration && !input.command && input.args.length === 0
+            ? yield* Effect.tryPromise({
+                try: () => prepareShellIntegration(global.state, program, input.env),
+                catch: unavailable,
+              })
+            : { args: input.args, env: input.env }
         const response = yield* request(
           daemon,
           {
             op: "create",
-            program: input.command ?? ShellSelect.environment(global.bin),
-            args: input.args,
+            program,
+            args: integration.args,
             cwd,
             title: input.title,
             group_id: sessionID,
-            env: input.env,
+            env: integration.env,
             cols: input.cols ?? 80,
             rows: input.rows ?? 24,
           },
@@ -221,6 +242,32 @@ const makeLayer = (options: Options = {}) =>
         })
         if (response.type !== "ok") return yield* unexpected(response)
         return undefined
+      })
+
+      const getRun = Effect.fn("PersistentPty.getRun")(function* (id: Pty.ID, runID: string) {
+        const retired = retiredRuns.get(id)
+        if (retired) return { ...retired.status, run: retired.status.run?.id === runID ? retired.status.run : null }
+        yield* get(id)
+        if (!(yield* daemon.supports("shell_integration").pipe(Effect.mapError(unavailable))))
+          return yield* new UnsupportedError({ feature: "shell_integration" })
+        const response = yield* request(daemon, { op: "get_run", id: fromID(id), run_id: runID })
+        if (response.type !== "run_status") return yield* unexpected(response)
+        return response.data
+      })
+
+      const run = Effect.fn("PersistentPty.run")(function* (id: Pty.ID, input: PersistentPty.RunInput) {
+        yield* get(id)
+        if (!(yield* daemon.supports("shell_integration").pipe(Effect.mapError(unavailable))))
+          return yield* new UnsupportedError({ feature: "shell_integration" })
+        const response = yield* request(daemon, {
+          op: "run",
+          id: fromID(id),
+          attachment_id: input.attachmentID,
+          run_id: input.runID,
+          command: input.command,
+        })
+        if (response.type !== "run_admission") return yield* unexpected(response)
+        return response.data
       })
 
       const resize = Effect.fn("PersistentPty.resize")(function* (
@@ -346,6 +393,7 @@ const makeLayer = (options: Options = {}) =>
       const shutdown = Effect.fn("PersistentPty.shutdown")(function* () {
         const response = yield* daemon.shutdown.pipe(Effect.mapError(unavailable))
         current.clear()
+        retiredRuns.clear()
         if (!response) return
         if (response.type !== "ok") return yield* unexpected(response)
       })
@@ -355,8 +403,20 @@ const makeLayer = (options: Options = {}) =>
       const removeVisibleExit = (id: Pty.ID) => {
         if (removing.has(id)) return
         removing.add(id)
+        const retain = Effect.gen(function* () {
+          if (!(yield* daemon.supports("shell_integration").pipe(Effect.mapError(unavailable)))) return
+          const terminal = yield* get(id)
+          const response = yield* request(daemon, { op: "get_run", id: fromID(id), run_id: "" })
+          if (response.type !== "run_status" || !response.data.run) return
+          retiredRuns.set(id, { sessionID: terminal.sessionID, status: response.data })
+          if (retiredRuns.size > 16) {
+            const oldest = retiredRuns.keys().next().value
+            if (oldest) retiredRuns.delete(oldest)
+          }
+        }).pipe(Effect.catch(() => Effect.void))
         runFork(
-          remove(id).pipe(
+          retain.pipe(
+            Effect.andThen(() => remove(id)),
             Effect.catchTags({
               "PersistentPty.NotFoundError": () => Effect.void,
               "PersistentPty.UnavailableError": (error) =>
@@ -390,7 +450,14 @@ const makeLayer = (options: Options = {}) =>
           Effect.catchTag("PersistentPty.UnavailableError", (error) =>
             Effect.logWarning("failed to list deleted session's terminals", { sessionID, error: error.message }),
           ),
-          Effect.ensuring(Effect.sync(() => current.delete(sessionID))),
+          Effect.ensuring(
+            Effect.sync(() => {
+              current.delete(sessionID)
+              retiredRuns.forEach((value, id) => {
+                if (value.sessionID === sessionID) retiredRuns.delete(id)
+              })
+            }),
+          ),
         )
 
       // Errors are handled per event so one failed cleanup does not end the subscription.
@@ -434,6 +501,8 @@ const makeLayer = (options: Options = {}) =>
         input,
         rename,
         snapshot,
+        run,
+        getRun,
         read,
         remove,
         shutdown,

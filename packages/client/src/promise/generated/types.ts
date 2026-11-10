@@ -357,6 +357,28 @@ export type SessionStatus =
     }
   | { type: "busy" }
 
+export type PersistentPtyRunAdmission = {
+  accepted: boolean
+  reason:
+    | "unsupported"
+    | "not_ready"
+    | "dirty"
+    | "busy"
+    | "not_controller"
+    | "invalid_command"
+    | "already_executed"
+    | null
+}
+
+export type PersistentPtyRunResult = {
+  id: string
+  outcome: "running" | "completed" | "terminated" | "unknown"
+  exitCode: number | null
+  success: boolean | null
+  output: string
+  truncated: boolean
+}
+
 export type PersistentPtyHandoff = { directory: string; instanceID: string; ticket: string; expiresAt: number }
 
 export type ScheduleID = string
@@ -999,6 +1021,12 @@ export type FormMultiselectField1 = {
 }
 
 export type FormAnswer1 = { [x: string]: FormValue1 }
+
+export type PersistentPtyRunStatus = {
+  state: "unsupported" | "unknown" | "ready" | "dirty" | "running"
+  shell: "bash" | "zsh" | "fish" | "powershell" | null
+  run: PersistentPtyRunResult | null
+}
 
 export type ScheduleWhenIn = { type: "in"; in: ScheduleDuration; tz?: string }
 
@@ -4563,6 +4591,19 @@ export type PtyConnectTokenInput = {
 
 export type PtyConnectTokenOutput = { location: LocationPublicRef; data: PtyTicketConnectToken }
 
+export type ExperimentalPersistentPtyRunInput = {
+  readonly ptyID: string
+  readonly runID: string
+  readonly attachmentID: string
+  readonly command: string
+}
+
+export type ExperimentalPersistentPtyRunOutput = { data: PersistentPtyRunAdmission }["data"]
+
+export type ExperimentalPersistentPtyGetRunInput = { readonly ptyID: string; readonly runID: string }
+
+export type ExperimentalPersistentPtyGetRunOutput = { data: PersistentPtyRunStatus }["data"]
+
 export type ExperimentalPersistentPtyReadInput = { readonly sessionID: string; readonly lines?: number | undefined }
 
 export type ExperimentalPersistentPtyReadOutput = { data: PersistentPtyReadResult | null }["data"]
@@ -4573,6 +4614,7 @@ export type ExperimentalPersistentPtyListOutput = { data: Array<PersistentPtyInf
 
 export type ExperimentalPersistentPtyCreateInput = {
   readonly sessionID: string
+  readonly experimental?: { readonly shellIntegration?: boolean } | undefined
   readonly command?: string | undefined
   readonly args: ReadonlyArray<string>
   readonly cwd?: string | undefined

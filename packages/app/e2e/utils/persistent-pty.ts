@@ -1,11 +1,13 @@
 import type { WebSocketRoute } from "@playwright/test"
 import type { OpenCodeEvent } from "@opencode/client/promise"
 import type { PersistentPty } from "@opencode/schema/persistent-pty"
-import { Predicate } from "effect"
+import { Predicate, Schema } from "effect"
+import { RunFrame } from "@opencode/schema/persistent-pty"
 
 // Serves the session-scoped persistent PTY routes (`/api/experimental/.../terminal`, `/api/experimental/persistent-pty`)
 // and their connect WebSockets, like a server backed by the opencode-pty daemon.
 export type MockPersistentPtyConfig = {
+  shellIntegrationSupported?: boolean
   // `server.info().capabilities.persistentPty`; omitted by default, like a server that predates the field. `false`
   // also makes the routes answer 503 like a server without the daemon.
   capability?: boolean
@@ -17,6 +19,7 @@ export type MockPersistentPtyConfig = {
 }
 
 export type MockPersistentPtySeed = {
+  integration?: NonNullable<PersistentPty.RunStatus["shell"]>
   // Default: the next `pty_persistent_<n>`.
   id?: string
   sessionID: string
@@ -69,6 +72,7 @@ export type MockServerEvent = OpenCodeEvent | MockPersistentPtyUpdated
 
 // The JSON text frames the server sends; output travels as binary frames.
 export type MockPersistentPtyMessage =
+  | ({ type: "run_admission"; runID: string } & PersistentPty.RunAdmission)
   | {
       type: "attached"
       attachmentID: string
@@ -85,7 +89,7 @@ export type MockPersistentPtyMessage =
   | { type: "title_changed"; title: string }
 
 // One decoded `input_protocol=1` frame: type 0 takes control at a size, type 1 also writes `data`.
-export type MockPersistentPtyFrame = { type: 0 | 1; cols: number; rows: number; data: string }
+export type MockPersistentPtyFrame = { type: 0 | 1 | 2; cols: number; rows: number; data: string }
 
 export type MockPersistentPtySocket = {
   id: string
@@ -105,6 +109,9 @@ export type MockPersistentPtySocket = {
 }
 
 export type MockPersistentPty = {
+  shellIntegrationSupported: boolean
+  runs: ({ ptyID: string } & PersistentPty.RunInput)[]
+  completeRun(id: string, result: { output: string; exitCode: number }): void
   // Read by `/api/info`; tests may change both mid-test.
   capability: boolean | undefined
   renameSupported: boolean
@@ -143,6 +150,7 @@ export type MockPersistentPty = {
 }
 
 type Terminal = {
+  runStatus: PersistentPty.RunStatus
   info: MockPersistentPtyInfo
   createTitle: string
   oscTitle: string
@@ -269,6 +277,7 @@ export function createPersistentPty(
     const createTitle = seed.title ?? "Terminal"
 
     const terminal: Terminal = {
+      runStatus: { state: seed.integration ? "ready" : "unsupported", shell: seed.integration ?? null, run: null },
       createTitle,
       oscTitle: "",
       bytes,
@@ -330,10 +339,34 @@ export function createPersistentPty(
     if (terminal.controller !== connection.attachmentID) setController(terminal, connection.attachmentID)
     resize(terminal, size)
 
-    if (data) connection.input.push(new TextDecoder().decode(data))
+    if (data) {
+      connection.input.push(new TextDecoder().decode(data))
+
+      if (data.length) terminal.runStatus = { ...terminal.runStatus, state: "dirty" }
+    }
   }
 
   const pty: MockPersistentPty = {
+    shellIntegrationSupported: input.config?.shellIntegrationSupported ?? true,
+    runs: [],
+    completeRun(id, result) {
+      const terminal = get(id)
+      const run = terminal.runStatus.run
+
+      if (!run) throw new Error("No active terminal run")
+      pty.output(id, result.output)
+      terminal.runStatus = {
+        ...terminal.runStatus,
+        state: terminal.runStatus.state === "dirty" ? "dirty" : "ready",
+        run: {
+          ...run,
+          outcome: "completed",
+          output: result.output,
+          exitCode: result.exitCode,
+          success: result.exitCode === 0,
+        },
+      }
+    },
     capability: input.config?.capability,
     renameSupported: input.config?.renameSupported ?? true,
     terminals: [],
@@ -387,7 +420,32 @@ export function createPersistentPty(
 
   pty.terminals.push(...(input.config?.initial ?? []).map(build))
 
+  const run = (id: string, body: PersistentPty.RunInput): PersistentPty.RunAdmission => {
+    const terminal = get(id)
+
+    if (terminal.controller !== body.attachmentID) return { accepted: false, reason: "not_controller" }
+
+    if (terminal.runStatus.state === "unsupported") return { accepted: false, reason: "unsupported" }
+
+    if (terminal.runStatus.state !== "ready") return { accepted: false, reason: "dirty" }
+    pty.runs.push({ ptyID: id, ...body })
+    terminal.runStatus = {
+      ...terminal.runStatus,
+      state: "running",
+      run: { id: body.runID, outcome: "running", exitCode: null, success: null, output: "", truncated: false },
+    }
+    pty.output(id, `${body.command}\r\n`)
+
+    return { accepted: true, reason: null }
+  }
+
   return Object.assign(pty, {
+    run,
+    getRun(id: string, runID: string) {
+      const status = get(id).runStatus
+
+      return { ...status, run: status.run?.id === runID ? status.run : null }
+    },
     find: (id: string) => terminals.get(id)?.info,
     list: (sessionID: string) => pty.terminals.filter((item) => item.sessionID === sessionID),
     create(sessionID: string, body: PersistentPty.CreateInput) {
@@ -398,6 +456,7 @@ export function createPersistentPty(
           cwd: body.cwd,
           command: body.command,
           args: [...body.args],
+          integration: body.experimental?.shellIntegration ? "bash" : undefined,
           size: body.size,
         }),
       )
@@ -496,8 +555,17 @@ export function createPersistentPty(
         const cols = data.readUInt16BE(1)
         const rows = data.readUInt16BE(3)
 
-        if ((type !== 0 && type !== 1) || cols === 0 || rows === 0) return
+        if ((type !== 0 && type !== 1 && type !== 2) || cols === 0 || rows === 0) return
         const payload = data.subarray(5)
+
+        if (type === 2) {
+          const frame = Schema.decodeUnknownSync(Schema.fromJsonString(RunFrame))(payload.toString("utf8"))
+          connection.frames.push({ type, cols, rows, data: payload.toString("utf8") })
+          send(connection, { type: "run_admission", runID: frame.runID, ...run(id, { ...frame, attachmentID }) })
+
+          return
+        }
+
         connection.frames.push({ type, cols, rows, data: type === 1 ? new TextDecoder().decode(payload) : "" })
         interact(connection, { cols, rows }, type === 1 ? payload : undefined)
       })

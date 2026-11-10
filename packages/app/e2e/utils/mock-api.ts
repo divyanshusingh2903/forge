@@ -295,6 +295,21 @@ const Group = HttpApiGroup.make("mock")
     }),
   )
   .add(
+    HttpApiEndpoint.get("persistentPtyGetRun", "/api/experimental/persistent-pty/:ptyID/run/:runID", {
+      params: { ...PtyParams, runID: Schema.String },
+      success: Json,
+      error: [...PersistentPtyMissing, MockPtyFeatureUnsupported.pipe(HttpApiSchema.status(501))],
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("persistentPtyRun", "/api/experimental/persistent-pty/:ptyID/run", {
+      params: PtyParams,
+      payload: PersistentPty.RunInput,
+      success: Json,
+      error: PersistentPtyMissing,
+    }),
+  )
+  .add(
     HttpApiEndpoint.put("persistentPtyUpdate", "/api/experimental/persistent-pty/:ptyID", {
       params: PtyParams,
       payload: PersistentPtyUpdate,
@@ -405,6 +420,13 @@ const Group = HttpApiGroup.make("mock")
   )
   .add(
     HttpApiEndpoint.post("sessionPrompt", "/api/session/:sessionID/prompt", {
+      params: SessionParams,
+      payload: JsonPayload,
+      success: Json,
+    }),
+  )
+  .add(
+    HttpApiEndpoint.post("sessionSynthetic", "/api/session/:sessionID/synthetic", {
       params: SessionParams,
       payload: JsonPayload,
       success: Json,

@@ -21,6 +21,36 @@ flowchart LR
   me -- "Ipc: methods, state, events<br/>(schemas over the bridge)" --> we
 ```
 
+## Run in terminal (experimental)
+
+Completed shell blocks in assistant responses have a **Run in terminal** action while the terminal plugin is enabled. The action opens the session's active terminal, or creates one. Commands explicitly clicked in the same terminal run in order. Nothing executes just because a response streams, finishes, or remounts.
+
+New GUI-created terminals opt into `experimental.shellIntegration`. Forge keeps the machine's default shell and ordinary profile initialization: Bash, Zsh, Fish, and PowerShell have integration assets in `packages/core/src/persistent-pty/shell-integration`. Existing terminals and surviving older daemons remain usable, but need recreation or a future normal service lifecycle before Run is available. Do not inject installation commands into running shells or force-restart the app/service.
+
+Source development prefers `packages/process-daemon/target/debug/opencode-pty` when built; `OPENCODE_PTY_BIN` still overrides it. Packaged builds keep their explicitly embedded asset. This does not replace a daemon already running from an older binary.
+
+The experimental `BuiltinCodeBlockAction` registry is a **built-in-only**, generic Markdown action boundary. The host supplies the owning session, source, language, stable block identity, and an optional dispatch callback. The terminal plugin owns terminal selection, the per-PTY queue, and all asynchronous work; neither the host nor session-ui imports terminal implementation code. Disable/reload withdraws the contribution and aborts pending requests. Duplicate clicks on an in-flight block share its run; a later intentional rerun gets a new run ID.
+
+Run never changes the terminal's interpreter based on a fence label. `shell`, `console`, and `terminal` mean the current shell; Bash/Zsh/sh, Fish, and PowerShell-specific blocks require a compatible family. In Bash, Zsh and Fish the source arrives as a bracketed paste followed by Enter, so the prompt shows it, the shell runs it and history records it exactly as if it had been typed; directory and environment changes persist. Bash and Zsh suspend `!` history expansion for that one line. Source containing control characters other than newline and tab is refused, because it could end the paste early. Bash before 4.4 has no hook between accepting and executing a line and stays unintegrated. PowerShell still evaluates the source through a `__forge_run` wrapper line, which the terminal shows.
+
+The PTY actor atomically checks controller ownership and clean readiness before writing. The UI sends run requests as type-2 frames on the same sequential WebSocket as keyboard input, so a Run request cannot overtake earlier editing bytes over a separate HTTP connection. Only the current prompt line can refuse a run: text typed but not yet submitted, a line the shell has not answered yet (such as an open quote), or a command that is still running. Every new prompt starts clean, so manual commands, input typed into a running program, an empty Enter and Ctrl+C never disable a terminal afterwards. A run whose shell never prints the start marker within 10 seconds (the shell was replaced, or the hooks are gone) ends as unknown, as does a run whose prompt returns without an end marker.
+
+The actor captures at most 20 KiB of output (10 KiB head and 10 KiB tail), stripping terminal escapes and marking truncation. Output is a merged PTY stream, so background output can interleave and full-screen application output is not a screen recording. PowerShell reports logical success/failure without inventing an exact native exit code. Replacing the shell, disabling hooks, or losing the daemon can leave an unknown outcome. **Never retry execution automatically.**
+
+The plugin reads readiness/completion through the experimental PTY run APIs, polling every 250 ms only while a requested run is waiting or active. Startup readiness has a 10-second deadline; long commands have no arbitrary execution timeout. The daemon retains the active/latest run; Core also retains up to 16 final results from automatically removed exited terminals so their completion can still be collected. This is not durable run history or restart recovery.
+
+On completion or terminal failure, the plugin sends one synthetic input to the originating session using the existing durable admission API with `delivery: "steer"`. Failures before dispatch are explicitly recorded as `not_executed`, without fabricating an exit code; failures after uncertain dispatch remain `unknown`. It does not edit the composer or apply its unsent agent/model selections. The timeline displays the terminal outcome, diagnostic, and expandable text output. The source code block stays stateless: its Run icon and label do not become a success or failure indicator; it is only disabled during an in-flight request. A failed handoff offers **Retry sending result**, reusing the same frozen message ID/payload without executing the command again. Queued runs stop on an uncertain outcome or a failed handoff.
+
+Verification owners:
+
+- `packages/process-daemon/src/shell_integration.rs`: lifecycle parsing, output limits, input safety, and shell-specific command encoding.
+- `packages/core/test/persistent-pty-shell-integration.test.ts`: real Unix PTYs with installed Bash/Zsh/Fish/PowerShell; profile loading, persistent directory/exports, and dirty-input refusal. Set `OPENCODE_PTY_BIN` to the **rebuilt** daemon; missing binaries/shells skip their smoke cases. Windows PowerShell profile initialization still needs platform verification.
+- `packages/session-ui/component-tests/markdown.spec.ts`: complete assistant-only actions, prompt stripping, streaming state retention, and Copy/non-shell regressions.
+- `packages/gui-plugins/src/terminal/connection.test.ts`: keyboard/Run frame ordering, correlated admission, and no execution resend after disconnect.
+- `packages/app/e2e/regression/terminal.spec.ts`: response-to-terminal-to-session wiring, expandable result output, an unchanged draft, and refusal of partial manual input. The shared mock PTY does not substitute for real-shell tests.
+
+From `packages/process-daemon`, build the daemon with `cargo build` and run its tests with `cargo test`. From `packages/core`, run `OPENCODE_PTY_BIN=/absolute/path/to/rebuilt/opencode-pty bun run script/test.ts test/persistent-pty-shell-integration.test.ts`. From `packages/session-ui`, run `bun run test:components -- component-tests/markdown.spec.ts` using the installed browser configuration.
+
 ## Anatomy
 
 ```text

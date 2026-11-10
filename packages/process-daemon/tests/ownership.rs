@@ -313,10 +313,16 @@ fn rename_is_advertised_and_served() {
     use opencode_pty::protocol::{SubscriptionEvent, read_subscription_event};
 
     let mut daemon = Daemon::start();
-    assert_eq!(daemon.registration.features, ["rename"]);
+    assert!(
+        daemon
+            .registration
+            .features
+            .iter()
+            .any(|feature| feature == "rename")
+    );
     assert!(matches!(
         daemon.request(Request::Ping),
-        Response::Pong { features, .. } if features == ["rename"]
+        Response::Pong { features, .. } if features.iter().any(|feature| feature == "rename")
     ));
     let (owner, response) = daemon.own(None);
     assert!(matches!(response, Response::Owned));

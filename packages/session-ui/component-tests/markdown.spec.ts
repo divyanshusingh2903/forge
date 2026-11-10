@@ -321,9 +321,9 @@ story("shows a stable GitHub mark without changing link text or other sites", as
   expect(await mark.evaluate((icon) => getComputedStyle(icon, "::before").width)).toBe("14px")
   expect(await mark.evaluate((icon) => getComputedStyle(icon, "::before").maskImage)).toContain("data:image/svg+xml")
   await expect(mark.locator("img")).toHaveCount(0)
-  await expect(markdown.getByRole("link", { name: "GitHub" }).locator(".markdown-link-favicon[data-github]")).toHaveCount(
-    1,
-  )
+  await expect(
+    markdown.getByRole("link", { name: "GitHub" }).locator(".markdown-link-favicon[data-github]"),
+  ).toHaveCount(1)
 
   for (const name of ["other site", "lookalike"]) {
     await expect(markdown.getByRole("link", { name }).locator(".markdown-link-favicon[data-github]")).toHaveCount(0)
@@ -761,6 +761,59 @@ story("replaces completed DOM before live rendering and retains streamed code co
   await expect(markdown.locator('pre, [data-slot="markdown-copy-button"]')).toHaveCount(0)
   await harness.getByRole("button", { name: "Toggle Markdown" }).click()
   await expect(markdown).toHaveCount(0)
+})
+
+story("runs only complete assistant shell blocks and preserves action state while streaming", async ({ page }) => {
+  await page.evaluate(async (fixture) => {
+    const { mountMarkdown } = await import(fixture)
+    await mountMarkdown({ text: "```sh\n$ echo hello\n", streaming: true, codeActions: true, assistant: true })
+  }, fixture)
+  const harness = page.getByTestId("markdown-fixture")
+  const markdown = harness.locator('[data-component="markdown"]')
+  const run = markdown.getByRole("button", { name: "Run in terminal" })
+  await expect(run).toHaveText("")
+  await expect(run).toBeDisabled()
+  await harness.getByLabel("Markdown text").fill("```sh\n$ echo hello\n```\n\nContinuing")
+  await expect(run).toBeEnabled()
+  await run.click()
+  await expect(harness.getByLabel("Run request")).toHaveText(
+    JSON.stringify({ command: "echo hello", language: "sh" }),
+  )
+  await expect(run).toBeDisabled()
+  await harness.getByLabel("Markdown text").fill("```sh\n$ echo hello\n```\n\nContinuing with more prose")
+  await expect(run).toBeDisabled()
+  await harness.getByRole("button", { name: "Finish run" }).click()
+  await expect(run).toBeEnabled()
+  await expect(run).toHaveText("")
+  await expect(markdown.getByRole("button", { name: "Copy" })).toBeVisible()
+  await harness.getByLabel("Streaming").uncheck()
+  await harness.getByLabel("Markdown text").fill("```ts\nconst x = 1\n```")
+  await expect(markdown.locator('[data-slot="markdown-code-action"]')).toHaveCount(0)
+})
+
+story("keeps the Run action unchanged after terminal failure", async ({ page }) => {
+  await page.evaluate(async (fixture) => {
+    const { mountMarkdown } = await import(fixture)
+    await mountMarkdown({ text: "```sh\necho hello\n```", codeActions: true, assistant: true, failRun: true })
+  }, fixture)
+  const harness = page.getByTestId("markdown-fixture")
+  const run = harness.getByRole("button", { name: "Run in terminal", exact: true })
+  await run.click()
+  await expect(run).toBeDisabled()
+  await harness.getByRole("button", { name: "Finish run" }).click()
+  await expect(run).toBeEnabled()
+  await expect(run).toHaveText("")
+  await expect(run.locator("svg use")).toHaveAttribute("href", /-outline-console$/)
+})
+
+story("does not enable code execution for non-assistant markdown", async ({ page }) => {
+  await page.evaluate(async (fixture) => {
+    const { mountMarkdown } = await import(fixture)
+    await mountMarkdown({ text: "```powershell\nWrite-Output hello\n```", codeActions: true })
+  }, fixture)
+  const markdown = page.getByTestId("markdown-fixture").locator('[data-component="markdown"]')
+  await expect(markdown.getByRole("button", { name: "Copy" })).toBeVisible()
+  await expect(markdown.getByRole("button", { name: "Run in terminal" })).toHaveCount(0)
 })
 
 story("relabels streamed code copy actions when the language changes", async ({ page }) => {

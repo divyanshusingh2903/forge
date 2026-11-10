@@ -18,7 +18,7 @@ import { createTerminalModel, type TerminalSession } from "./model"
 import { terminalTabLabel } from "./title"
 import { TerminalTabLabel } from "./label"
 import quoteStyles from "./quote.css?inline"
-import { onIdle, BuiltinCommand, BuiltinSlot } from "@opencode/plugin/gui/builtin"
+import { onIdle, BuiltinCommand, BuiltinSlot, BuiltinCodeBlockAction } from "@opencode/plugin/gui/builtin"
 
 const setup: Plugin.Setup<typeof Terminal> = (ctx) => {
   const sessions = ctx.sessions
@@ -53,6 +53,30 @@ const setup: Plugin.Setup<typeof Terminal> = (ctx) => {
     // A narrow screen shows the terminal view; a wide one adds the tab without replacing the preview tab.
     layout.open(key(id), session, layout.narrow() ? undefined : { tab: "select" })
   }
+
+  const loadRunner = async () => {
+    const { createTerminalRunner } = await import("./run")
+
+    return createTerminalRunner({ model, signal: ctx.signal, toast: ctx.toast, t: ctx.t, show })
+  }
+
+  let runner: ReturnType<typeof loadRunner> | undefined
+  ctx.add(
+    BuiltinCodeBlockAction,
+    (): BuiltinCodeBlockAction => ({
+      id: "run",
+      label: ctx.t("run.label"),
+      languages: ["bash", "sh", "shell", "zsh", "fish", "console", "terminal", "powershell", "pwsh", "ps1"],
+      available: (session) => model.available(session.server),
+      async run(request) {
+        runner ??= loadRunner()
+        const current = await runner
+
+        if (ctx.signal.aborted) throw ctx.signal.reason
+        await current.run(request)
+      },
+    }),
+  )
 
   const create = (session: MountedSession, terminal: TerminalSession) =>
     void terminal.new().then((id) => {

@@ -122,7 +122,7 @@ export function timelineNoticePlacement(message: SessionMessageInfo, detail: Tim
 
   if (placement === "hidden") return timelineNoticeRequired(message) ? "separate" : "hidden"
 
-  return source === "subagent" || source === "shell" ? "separate" : placement
+  return source === "subagent" || source === "shell" || source === "terminal" ? "separate" : placement
 }
 
 export function timelineNoticeRequired(message: SessionMessageInfo) {

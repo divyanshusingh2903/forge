@@ -8,7 +8,7 @@ use crate::service::{TerminalId, TerminalInfo};
 
 pub const PROTOCOL_VERSION: u32 = 7;
 /// Additive capabilities of this daemon. Breaking changes bump `PROTOCOL_VERSION`.
-pub const FEATURES: &[&str] = &["rename"];
+pub const FEATURES: &[&str] = &["rename", "shell_integration"];
 
 pub fn features() -> Vec<String> {
     FEATURES.iter().map(|feature| feature.to_string()).collect()
@@ -53,6 +53,16 @@ pub enum Request {
         id: TerminalId,
         attachment_id: Option<String>,
         data_base64: String,
+    },
+    Run {
+        id: TerminalId,
+        attachment_id: String,
+        run_id: String,
+        command: String,
+    },
+    GetRun {
+        id: TerminalId,
+        run_id: String,
     },
     Resize {
         id: TerminalId,
@@ -104,6 +114,12 @@ pub enum Request {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum Response {
+    RunAdmission {
+        data: crate::shell_integration::RunAdmission,
+    },
+    RunStatus {
+        data: crate::shell_integration::RunStatus,
+    },
     Owned,
     Handoff {
         ticket: String,

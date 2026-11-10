@@ -74,6 +74,7 @@ export function createTimelineCache(
         const readImage = select(() => markdown?.readImage)
         const openSession = select(() => markdown?.openSession)
         const sessionTitle = select(() => markdown?.sessionTitle)
+        const codeActions = select(() => markdown?.codeActions)
         const turnDiff = select(() => data.turnDiff)
 
         // The Location's config is a query: read it in the reader and only while selected, so a pending config
@@ -152,6 +153,9 @@ export function createTimelineCache(
                     },
                     get sessionTitle() {
                       return sessionTitle()
+                    },
+                    get codeActions() {
+                      return codeActions()
                     },
                   },
                   view,
