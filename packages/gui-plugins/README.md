@@ -44,7 +44,7 @@ On completion or terminal failure, the plugin sends one synthetic input to the o
 Verification owners:
 
 - `packages/process-daemon/src/shell_integration.rs`: lifecycle parsing, output limits, input safety, and shell-specific command encoding.
-- `packages/core/test/persistent-pty-shell-integration.test.ts`: real Unix PTYs with installed Bash/Zsh/Fish/PowerShell; profile loading, persistent directory/exports, and dirty-input refusal. Set `OPENCODE_PTY_BIN` to the **rebuilt** daemon; missing binaries/shells skip their smoke cases. Windows PowerShell profile initialization still needs platform verification.
+- `packages/core/test/persistent-pty-shell-integration.test.ts`: real Unix PTYs with installed Bash/Zsh/Fish/PowerShell; profile loading, persistent directory/exports, and dirty-input refusal. It uses `OPENCODE_PTY_BIN`, else this checkout's `process-daemon/target/debug` build; the published `@opencode/pty` daemon predates shell integration and is never used. Without a built daemon, or without the shell installed, those smoke cases skip. Windows PowerShell profile initialization still needs platform verification.
 - `packages/session-ui/component-tests/markdown.spec.ts`: complete assistant-only actions, prompt stripping, streaming state retention, and Copy/non-shell regressions.
 - `packages/gui-plugins/src/terminal/connection.test.ts`: keyboard/Run frame ordering, correlated admission, and no execution resend after disconnect.
 - `packages/app/e2e/regression/terminal.spec.ts`: response-to-terminal-to-session wiring, expandable result output, an unchanged draft, and refusal of partial manual input. The shared mock PTY does not substitute for real-shell tests.

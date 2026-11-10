@@ -2,14 +2,20 @@ import { expect } from "bun:test"
 import { existsSync } from "node:fs"
 import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
-import { binaryPath } from "@opencode/pty"
 import { Effect } from "effect"
 import { makeDaemonTransport, type DaemonTransport } from "../src/persistent-pty/daemon"
 import { prepareShellIntegration } from "../src/persistent-pty/shell-integration"
 import { temporaryDirectory } from "./fixture/persistent-pty-daemon"
 import { it } from "./lib/effect"
 
-const binary = process.env.OPENCODE_PTY_BIN ?? binaryPath
+// The published @opencode/pty daemon predates shell integration and drops the connection on `run`, so only an
+// explicitly rebuilt daemon or this checkout's own debug build can exercise it.
+const local = path.join(
+  import.meta.dir,
+  "../../process-daemon/target/debug",
+  process.platform === "win32" ? "opencode-pty.exe" : "opencode-pty",
+)
+const binary = process.env.OPENCODE_PTY_BIN ?? (existsSync(local) ? local : undefined)
 
 for (const shell of ["bash", "zsh", "fish", "pwsh"]) {
   const program = Bun.which(shell)
