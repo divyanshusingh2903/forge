@@ -176,6 +176,8 @@ story("shows a skeleton, not the old numbers, while a refresh loads, and the pop
   await popup.getByRole("button", { name: "Refresh" }).click()
 
   await expect(popup.getByRole("status", { name: "Refreshing…" })).toBeVisible()
+  // The skeleton takes the card's place at the same size, so the popup neither shrinks nor grows.
+  expect(Math.abs(((await popup.boundingBox())?.height ?? 0) - box.height)).toBeLessThan(2)
   await expect(popup.getByRole("link", { name: "First title" })).toHaveCount(0)
   await expect(popup).toBeVisible()
   await expect(popup.getByRole("link", { name: "Second title" })).toBeVisible()

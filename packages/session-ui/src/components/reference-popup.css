@@ -408,26 +408,21 @@
   }
 }
 
-/* Bars standing in for the card during a refresh; a soft sweep runs across them. */
+/* Bars standing in for the card during a refresh, spread over its height; a soft sweep runs across them. */
 [data-component="reference-skeleton"] {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  justify-content: space-between;
   mask-image: linear-gradient(90deg, rgb(0 0 0 / 0.45) 35%, #000 50%, rgb(0 0 0 / 0.45) 65%);
   mask-size: 300% 100%;
   animation: reference-skeleton-sweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 
   [data-bar] {
-    height: 10px;
-    border-radius: 5px;
-    background: var(--v2-background-bg-layer-01);
-    outline: 1px solid var(--v2-border-border-strong);
-    outline-offset: -1px;
-  }
-
-  [data-bar][data-tall] {
-    height: 14px;
+    height: 12px;
+    border-radius: 6px;
+    background: var(--v2-background-bg-layer-02, var(--v2-background-bg-layer-01));
   }
 
   &:dir(rtl) {

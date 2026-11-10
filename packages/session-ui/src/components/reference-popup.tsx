@@ -39,7 +39,7 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
   // The last refresh failed, so the card on screen may be out of date; it stays rather than being replaced by an error.
   const [stale, setStale] = createSignal(false)
   const [round, setRound] = createSignal(0)
-  // The popup keeps its height while a refresh shows a skeleton, so it does not jump.
+  // The card's height, which the skeleton takes over during a refresh so the popup does not jump.
   const [held, setHeld] = createSignal(0)
 
   // Landscape where there is room, and never wider than the window on a narrow one.
@@ -87,7 +87,7 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
 
   const refresh = (current: Reference, link: HTMLAnchorElement | undefined) => {
     if (refreshing()) return Promise.resolve()
-    setHeld(popup()?.offsetHeight ?? 0)
+    setHeld(popup()?.querySelector<HTMLElement>('[data-component="reference-card"]')?.offsetHeight ?? 0)
     setRefreshing(true)
 
     return cache
@@ -238,7 +238,6 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
               top: `${position().top}px`,
               left: `${position().left}px`,
               width: `${width()}px`,
-              "min-height": refreshing() ? `${held()}px` : undefined,
             }}
           >
             <Show
@@ -262,7 +261,7 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
                 >
                   <Show
                     when={!refreshing()}
-                    fallback={<ReferenceSkeleton />}
+                    fallback={<ReferenceSkeleton height={held()} />}
                   >
                     <ReferenceCard
                       reference={current()}

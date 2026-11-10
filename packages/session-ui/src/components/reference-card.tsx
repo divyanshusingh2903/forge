@@ -396,17 +396,26 @@ function Legend(props: { rows: { key: string; glyph: string; label: string; valu
   )
 }
 
-// Stands in for the card while a refresh is under way, so what is on screen is never the old numbers.
-export function ReferenceSkeleton() {
+const SKELETON_WIDTHS = [34, 78, 52, 64, 88, 46, 72]
+
+const SKELETON_ROW = 22
+
+// Stands in for the card while a refresh is under way, so what is on screen is never the old numbers. It is the
+// card's own height, with as many bars as fit, so the popup neither shrinks nor leaves a gap.
+export function ReferenceSkeleton(props: { height: number }) {
   const i18n = useI18n()
+  const rows = () => Math.max(3, Math.round(props.height / SKELETON_ROW))
 
   return (
-    <div data-component="reference-skeleton" role="status" aria-label={i18n.t("ui.reference.refreshing")}>
-      <span data-bar style={{ width: "34%" }} />
-      <span data-bar data-tall style={{ width: "78%" }} />
-      <span data-bar style={{ width: "52%" }} />
-      <span data-bar data-tall style={{ width: "64%" }} />
-      <span data-bar style={{ width: "88%" }} />
+    <div
+      data-component="reference-skeleton"
+      role="status"
+      aria-label={i18n.t("ui.reference.refreshing")}
+      style={{ height: `${props.height}px` }}
+    >
+      <For each={Array.from({ length: rows() }, (_, index) => SKELETON_WIDTHS[index % SKELETON_WIDTHS.length])}>
+        {(width) => <span data-bar style={{ width: `${width}%` }} />}
+      </For>
     </div>
   )
 }
