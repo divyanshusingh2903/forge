@@ -59,7 +59,14 @@ export const layer = Layer.effect(
                       action: name(tool.server, tool.name),
                       resources: ["*"],
                       save: ["*"],
-                      metadata: { input: input ?? {} },
+                      metadata: {
+                        input: input ?? {},
+                        mcp: {
+                          server: tool.server,
+                          tool: tool.name,
+                          path: `${namespace(tool.server)}.${tool.name.replace(/[^a-zA-Z0-9_-]/g, "_")}`,
+                        },
+                      },
                       sessionID: context.sessionID,
                       agent: context.agent,
                       source: {

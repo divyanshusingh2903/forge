@@ -127,12 +127,14 @@ export const Plugin = {
           kind: "directory",
         }),
       )
-      yield* access.authorizeExternal([target, ...directories], context)
+      const preview = { command: invocation.command, cwd: target.absolute }
+      yield* access.authorizeExternal([target, ...directories], context, preview)
       if (parsed.commands.length > 0)
         yield* permission.assert({
           action: name,
           resources: parsed.commands.map((command) => command.resource),
           save: parsed.commands.map((command) => command.save),
+          metadata: preview,
           sessionID: context.sessionID,
           agent: context.agent,
           source,
@@ -211,7 +213,7 @@ export const Plugin = {
                     finalTimeout = yield* prepare(invocation, context)
                   }),
               )
-              yield* context.progress({ shellID: info.id })
+              yield* context.progress({ shellID: info.id, command: info.command, cwd: info.cwd })
 
               const settled = yield* Deferred.make<Output>()
               const run = Effect.gen(function* () {

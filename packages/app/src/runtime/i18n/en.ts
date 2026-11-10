@@ -610,6 +610,7 @@ export const dict = {
   "error.chain.configInvalidWithMessage": "Config file at {{path}} is invalid: {{message}}",
 
   "notification.permission.title": "Permission required",
+  "permission.mcp.description": "Run {{tool}} on the {{server}} MCP server.",
   "notification.question.title": "Question requires an answer",
   "notification.elicitation.title": "Input requested",
 

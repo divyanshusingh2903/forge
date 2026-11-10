@@ -754,6 +754,7 @@
     /* Each section stacks its copy button over its text in one grid cell, so the sticky button stays in view
        while that section scrolls and never leaves its own section. */
     [data-slot="bash-command"],
+    [data-slot="bash-workdir"],
     [data-slot="bash-result"] {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
@@ -802,7 +803,8 @@
       border-block-start: 0;
     }
 
-    [data-slot="bash-command"] {
+    [data-slot="bash-command"],
+    [data-slot="bash-workdir"] {
       --bash-section-background: var(--v2-background-bg-base);
       color: var(--v2-text-text-base);
     }

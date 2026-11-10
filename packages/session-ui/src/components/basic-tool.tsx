@@ -354,6 +354,11 @@ export function GenericTool(props: {
   tool: string
   status?: string
   hideDetails?: boolean
+  defaultOpen?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+  forceOpen?: boolean
+  allowOpenWhilePending?: boolean
   input?: GenericToolInput
   children?: JSX.Element
 }) {
@@ -369,6 +374,11 @@ export function GenericTool(props: {
         args: args(props.input),
       }}
       hideDetails={props.hideDetails}
+      defaultOpen={props.defaultOpen}
+      open={props.open}
+      onOpenChange={props.onOpenChange}
+      forceOpen={props.forceOpen}
+      allowOpenWhilePending={props.allowOpenWhilePending}
     >
       {props.children}
     </BasicTool>

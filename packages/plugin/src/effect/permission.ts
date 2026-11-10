@@ -14,6 +14,8 @@ export interface PermissionEvaluation {
   readonly resources: ReadonlyArray<string>
   readonly metadata?: Record<string, unknown>
   readonly source?: Permission.Source
+  /** Ordered configured and saved rules used to evaluate this request. */
+  readonly rules?: Permission.Ruleset
   effect: Permission.Effect
   message?: string
 }
