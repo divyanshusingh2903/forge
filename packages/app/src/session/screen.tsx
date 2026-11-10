@@ -22,7 +22,7 @@ import { useSettings } from "@/settings/model"
 import type { SessionModel } from "@/session/model"
 import { SESSION_PANEL_WIDTH_MIN } from "@/session/session-panel-width"
 import { SessionPanelFrame } from "@/session/session-frame"
-import { PluginLinks } from "@/runtime/plugin/render"
+import { PluginLinks, PluginSlot } from "@/runtime/plugin/render"
 import { createPanelSidebar, createRegion, MobilePanel } from "@/runtime/plugin/panels"
 import { createMobileViews, MobileViewTabs } from "@/runtime/plugin/mobile"
 import { usePluginAttachment } from "@/runtime/plugin/host-apis"
@@ -278,6 +278,34 @@ function SessionScreenContent(props: {
   const platform = usePlatform()
   const [headerGap, setHeaderGap] = createSignal<HTMLElement>()
 
+  // The turn at the top of the transcript's viewport, for the rail slot: read once per frame while it scrolls, and
+  // again when the routed session or its rows change.
+  const [railTurn, setRailTurn] = createSignal<string>()
+
+  createEffect(() => {
+    const scroller = timeline.scroller()
+
+    if (!scroller) return
+    session.identity.sessionKey()
+    timeline.lastUserMessage()
+    const frame = { id: 0 }
+
+    const read = () => {
+      if (frame.id) return
+      frame.id = requestAnimationFrame(() => {
+        frame.id = 0
+        setRailTurn(timeline.view.cursor())
+      })
+    }
+
+    read()
+    scroller.addEventListener("scroll", read, { passive: true })
+    onCleanup(() => {
+      scroller.removeEventListener("scroll", read)
+      cancelAnimationFrame(frame.id)
+    })
+  })
+
   const registerHeaderGap = (gap: HTMLElement) => {
     setHeaderGap(gap)
 
@@ -520,6 +548,24 @@ function SessionScreenContent(props: {
             </Show>
             <Show when={windowDragEnabled(platform)}>
               <SessionHeaderDrag pane={chat} gap={headerGap()} />
+            </Show>
+            {/* Floats over the transcript's top start corner, just under the 48px session header; a rail with nothing
+                to show renders nothing. */}
+            <Show when={!!session.identity.params.id}>
+              <div data-slot="session-timeline-rail" class="absolute start-0 top-14 z-20">
+                <PluginSlot
+                  at="session.timeline.rail"
+                  input={{
+                    get session() {
+                      return props.view()
+                    },
+                    screen: props.screen,
+                    get turnMessageID() {
+                      return railTurn()
+                    },
+                  }}
+                />
+              </div>
             </Show>
 
             {/* Hidden rather than unmounted: removing it makes the transcript frame the last child, and structural

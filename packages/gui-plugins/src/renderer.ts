@@ -27,6 +27,8 @@ import microsoftOffice from "./microsoft-office"
 import microsoftOfficeRenderer from "./microsoft-office/renderer"
 import sources from "./sources"
 import sourcesRenderer from "./sources/renderer"
+import chapters from "./chapters"
+import chaptersRenderer from "./chapters/renderer"
 import goal from "./goal"
 import goalRenderer from "./goal/renderer"
 import plan from "./plan"
@@ -55,6 +57,7 @@ export const builtins = compose({
   wsl: { ...wsl, windowEntry: eager(wslRenderer) },
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
+  chapters: { ...chapters, windowEntry: eager(chaptersRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
   plan: { ...plan, windowEntry: eager(planRenderer) },
   "pull-requests": { ...pullRequests, windowEntry: eager(pullRequestsRenderer) },

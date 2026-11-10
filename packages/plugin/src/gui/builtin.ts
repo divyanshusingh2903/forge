@@ -88,6 +88,41 @@ export interface BuiltinCodeBlockAction {
  */
 export const BuiltinCodeBlockAction = Registry.define<BuiltinCodeBlockAction>("experimental.code-block-action")
 
+/**
+ * Experimental toggle on a transcript message, beside its copy action: on every user message and on the final reply of
+ * every turn. The host owns the button, never plugin row components.
+ */
+export interface BuiltinMessageAction {
+  /** Stable contribution identity. */
+  readonly id: string
+  /** The icon for the off and the on state. */
+  icon(active: boolean): "pin" | "pin-filled"
+  /** Localized button label for the off and the on state. */
+  label(active: boolean): string
+  /** Whether the action is on for a message. Reactive. @param input - Owning session and message. */
+  active(input: { readonly session: MountedSession; readonly messageID: string }): boolean
+  /** Invoke only after an explicit click. @param input - The message, and the user message that opened its turn. */
+  run(input: {
+    /** Owning session. */
+    readonly session: MountedSession
+    readonly messageID: string
+    /** The user message that opened the message's turn: the message itself for a user message. */
+    readonly turnMessageID: string
+    readonly role: "user" | "assistant"
+    /** The message's visible text. */
+    readonly text: string
+  }): void | Promise<void>
+}
+
+/**
+ * Experimental built-in message actions. Withdrawn with the contributing plugin.
+ * @example
+ * ```ts
+ * ctx.add(BuiltinMessageAction, action)
+ * ```
+ */
+export const BuiltinMessageAction = Registry.define<BuiltinMessageAction>("experimental.message-action")
+
 /** A `PanelTab` with the fields only built-ins set. */
 export interface BuiltinPanelTab extends PanelTab {
   /**
@@ -132,6 +167,14 @@ export const BuiltinPanel = Registry.define<BuiltinPanel>("panel")
 
 /** The slots of `SlotMap`, and those only built-ins fill. */
 export interface BuiltinSlotMap extends SlotMap {
+  /**
+   * Experimental: the top start corner of the routed session's transcript, just under the session header. For a narrow
+   * navigation rail; what it renders floats above the transcript and must stay out of the way until pointed at.
+   */
+  readonly "session.timeline.rail": SlotMap["session.panel.end"] & {
+    /** The user message whose turn is at the top of the transcript's viewport. Reactive. */
+    readonly turnMessageID: string | undefined
+  }
   /** Items after Copy branch name in the branch submenu. Only rendered for a named branch with an owning screen. */
   readonly "session.location.branch.menu": SlotMap["session.location.menu"]
   /** Items after the host's copy and reveal actions in the session directory's path submenu. Requires an owning screen. */

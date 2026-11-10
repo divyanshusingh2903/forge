@@ -21,6 +21,7 @@ import type {
   MountedSession,
   SessionScreen,
 } from "@opencode/plugin/gui"
+import { useLocation, useNavigate } from "@solidjs/router"
 import { useComments } from "@/composer/comments"
 import { createComposerEditorActions } from "@/composer/editor/actions"
 import { useComposerState } from "@/composer/persistence"
@@ -52,6 +53,8 @@ export function createMountedSession(session: SessionModel) {
   const servers = useServers()
   const location = useWorkspaceLocation()
   const attachment = usePluginAttachment()
+  const navigate = useNavigate()
+  const route = useLocation()
   // The composer region owns background tasks and is created after the view.
   const [background, setBackground] = createSignal<Accessor<readonly BackgroundTask[]>>()
   // The screen's composer view, created after this object, says whether it takes quotes and focuses its prompt.
@@ -297,11 +300,52 @@ export function createMountedSession(session: SessionModel) {
     return view
   }
 
+  // The transcript scrolls to the user message its hash names, paging older history in, so a turn is revealed through
+  // the route. A message inside the turn is scrolled to once the turn's rows are mounted.
+  let revealFrame: number | undefined
+
+  const revealMessage: SessionScreen["revealMessage"] = (input) => {
+    const hash = `#message-${input.turnMessageID}`
+
+    const part = () =>
+      input.messageID && input.messageID !== input.turnMessageID
+        ? document.querySelector(`[data-timeline-part-id^="${CSS.escape(input.messageID)}"]`)
+        : undefined
+
+    if (revealFrame !== undefined) cancelAnimationFrame(revealFrame)
+
+    // The hash already names this turn after an earlier jump, so the route would not change.
+    if (route.hash === hash) (part() ?? document.getElementById(hash.slice(1)))?.scrollIntoView({ block: "center" })
+
+    if (route.hash !== hash) navigate(route.pathname + route.search + hash, { replace: true })
+
+    if (!input.messageID || input.messageID === input.turnMessageID) return
+
+    // Bounded: a turn in history that is still loading may take longer, and then the jump stays on the turn.
+    const seek = (left: number) => {
+      revealFrame = requestAnimationFrame(() => {
+        revealFrame = undefined
+        const element = part()
+
+        if (element) return element.scrollIntoView({ block: "center" })
+
+        if (left > 0) seek(left - 1)
+      })
+    }
+
+    seek(120)
+  }
+
+  onCleanup(() => {
+    if (revealFrame !== undefined) cancelAnimationFrame(revealFrame)
+  })
+
   // One object while this screen is mounted, whichever session it routes: its models follow the route.
   const screen: SessionScreen = Object.freeze({
     file: files,
     comment,
     composer: composerRef,
+    revealMessage,
   })
 
   const owner = getOwner()

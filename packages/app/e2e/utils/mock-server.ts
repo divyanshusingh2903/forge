@@ -1163,14 +1163,16 @@ function mockHandlers(
             cursor: { next: offset + limit < ordered.length ? String(offset + limit) : undefined },
           })
         },
-        // The goal plugin's pill reads each routed session's goal, and the pull requests plugin its tracked list; no
-        // scenario sets either.
+        // The goal plugin's pill reads each routed session's goal, the pull requests plugin its tracked list and the
+        // chapters plugin its chapters; no scenario sets any of them.
         rpcCall: (ctx) =>
           ctx.params.rpcID === "opencode.goal" && ctx.params.method === "get"
             ? Effect.succeed({ output: null })
             : ctx.params.rpcID === "forge.pull-requests" && ctx.params.method === "list"
               ? Effect.succeed({ output: { items: [] } })
-              : Effect.fail(
+              : ctx.params.rpcID === "forge.chapters" && ctx.params.method === "list"
+                ? Effect.succeed({ output: { chapters: [], seen: [] } })
+                : Effect.fail(
                   new MockUnsupported({
                     message: `The mock server has no ${ctx.params.rpcID}.${ctx.params.method} RPC`,
                   }),

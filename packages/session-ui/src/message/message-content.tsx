@@ -21,6 +21,7 @@ import { Markdown } from "../components/markdown"
 import { linkSegments } from "../components/link-segments"
 import { sessionReferenceText, setupSessionLinks } from "../components/markdown-session-links"
 import { useMarkdown } from "../context/markdown"
+import { useMessageActions, type MessageAction } from "../context/message-actions"
 import { useSources } from "../context/sources"
 import { SourcesChip } from "../sources/sources-chip"
 import type { TurnSources } from "../sources/sources"
@@ -120,7 +121,7 @@ function MetaItems(props: { items: MetaItem[]; slot: "user-message" | "text-part
 
 function MessageActionButton(
   props: Pick<ComponentProps<"button">, "disabled" | "onMouseDown" | "onClick" | "aria-label"> & {
-    icon: "check" | "copy" | "reset" | "fork" | "arrow-down-to-line" | "outline-trash"
+    icon: "check" | "copy" | "reset" | "fork" | "arrow-down-to-line" | "outline-trash" | "pin" | "pin-filled"
     label: JSX.Element
     size?: "small" | "normal"
   },
@@ -139,6 +140,38 @@ function MessageActionButton(
         aria-label={props["aria-label"]}
       />
     </Tooltip>
+  )
+}
+
+/** One host action on a message: a toggle whose icon and label follow whether it is on for that message. */
+function HostMessageAction(props: {
+  action: MessageAction
+  messageID: string
+  turnMessageID: string
+  role: "user" | "assistant"
+  text: string
+}) {
+  const active = () => props.action.active(props.messageID)
+
+  return (
+    <span data-slot="message-host-action" data-action={props.action.id} data-active={active() ? "" : undefined}>
+      <MessageActionButton
+        icon={props.action.icon(active())}
+        size="small"
+        label={props.action.label(active())}
+        onMouseDown={(event) => event.preventDefault()}
+        onClick={(event) => {
+          event.stopPropagation()
+          void props.action.run({
+            messageID: props.messageID,
+            turnMessageID: props.turnMessageID,
+            role: props.role,
+            text: props.text,
+          })
+        }}
+        aria-label={props.action.label(active())}
+      />
+    </span>
   )
 }
 
@@ -435,6 +468,8 @@ export function CurrentUserMessageDisplay(props: {
     ),
   )
 
+  const hostActions = useMessageActions()
+
   const revert = async () => {
     if (!props.actions?.revert || state.reverting) return
     setState("reverting", true)
@@ -496,6 +531,19 @@ export function CurrentUserMessageDisplay(props: {
           />
         </UserMessageTransition>
       </Show>
+      <For each={hostActions}>
+        {(action) => (
+          <UserMessageTransition active={!pending()}>
+            <HostMessageAction
+              action={action}
+              messageID={props.message.id}
+              turnMessageID={props.message.id}
+              role="user"
+              text={props.text}
+            />
+          </UserMessageTransition>
+        )}
+      </For>
       <Show when={props.actions?.revert}>
         <UserMessageTransition active={!pending()}>
           <MessageActionButton
@@ -1141,6 +1189,8 @@ export function AssistantTextContent(props: {
   text: string
   message: SessionMessageAssistant
   showCopy: boolean
+  /** The user message that opened this reply's turn. */
+  turnMessageID?: string
   turnDurationMs?: number | null
   /** The finished turn's web searches and fetches, shown as a chip in its footer. */
   sources?: TurnSources
@@ -1149,6 +1199,7 @@ export function AssistantTextContent(props: {
   const data = useData()
   const i18n = useI18n()
   const sourcesHost = useSources()
+  const hostActions = useMessageActions()
   const numfmt = createMemo(() => new Intl.NumberFormat(i18n.locale()))
   // A footer that arrives after the reply rendered belongs to a turn that just finished, so its chip fades in.
   let rendered = false
@@ -1247,6 +1298,17 @@ export function AssistantTextContent(props: {
           onClick={copy}
           aria-label={copied() ? i18n.t("ui.message.copied") : i18n.t("ui.message.copyResponse")}
         />
+        <For each={hostActions}>
+          {(action) => (
+            <HostMessageAction
+              action={action}
+              messageID={props.message.id}
+              turnMessageID={props.turnMessageID ?? props.message.id}
+              role="assistant"
+              text={props.text}
+            />
+          )}
+        </For>
         <Show when={meta().length > 0}>
           <span data-slot="text-part-meta">
             <MetaItems items={meta()} slot="text-part" />

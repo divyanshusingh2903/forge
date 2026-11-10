@@ -60,6 +60,8 @@ export function SessionAssistantContent(props: {
   content: SessionMessageAssistant["content"][number]
   contentID: string
   showAssistantCopyPartID?: string | null
+  /** The user message that opened this reply's turn. */
+  turnMessageID?: string
   turnDurationMs?: number | null
   sources?: TurnSources
   onOpenSources?: () => void
@@ -78,6 +80,7 @@ export function SessionAssistantContent(props: {
             text={content().text}
             message={props.message}
             showCopy={props.showAssistantCopyPartID === props.contentID}
+            turnMessageID={props.turnMessageID}
             turnDurationMs={props.turnDurationMs}
             sources={props.sources}
             onOpenSources={props.onOpenSources}

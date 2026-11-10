@@ -411,6 +411,8 @@ export function createSessionTimelineInteraction(session: SessionModel) {
     visible: () => state.refs.visible,
     view: {
       anchor,
+      /** The user message whose turn is at the reading line of the viewport right now. Not reactive. */
+      cursor,
       markUserScroll,
       onHistoryScroll,
       pin,
