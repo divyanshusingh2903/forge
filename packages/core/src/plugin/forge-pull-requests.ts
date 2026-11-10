@@ -7,7 +7,7 @@ import { Session } from "@opencode/schema/session"
 import { Shell } from "@opencode/schema/shell"
 import { SessionMessage } from "@opencode/schema/session-message"
 import { Tool } from "@opencode/schema/tool"
-import { Cause, Clock, Duration, Effect, FiberMap, Option, Schema, Scope, Semaphore, Stream } from "effect"
+import { Cause, Clock, Duration, Effect, FiberMap, Hash, Option, Schema, Scope, Semaphore, Stream } from "effect"
 import { LinkPreview } from "../link-preview.js"
 import { Service as Shells } from "../shell.js"
 import { PullRequestDiscovery } from "./pull-request-discovery.js"
@@ -94,7 +94,12 @@ export function advance(item: Item): { autoFix: ForgePullRequests.AutoFix; send:
 
 /** The deterministic id of one failed revision's fix prompt, so a repeated or retried send is admitted once. */
 export function fixID(identity: ForgePullRequests.Identity, sha: string) {
-  return SessionMessage.ID.make(`msg_autofix_${Bun.hash(`${ForgePullRequests.key(identity)}@${sha}`).toString(36)}`)
+  // Not Bun.hash: the packed SDK bundle runs without Bun globals. Two differently ordered hashes make it 64 bits.
+  const key = ForgePullRequests.key(identity)
+  const first = Hash.string(`${key}@${sha}`) >>> 0
+  const second = Hash.string(`${sha}|${key}`) >>> 0
+
+  return SessionMessage.ID.make(`msg_autofix_${first.toString(36)}${second.toString(36)}`)
 }
 
 /** The user-visible notice row for a fix prompt. */
