@@ -7,7 +7,10 @@ import { parseReference, referenceLabel, type Reference } from "./reference"
 import { createReferenceStatusCache } from "./reference-status"
 
 const ciActive = (value: LinkPreviewResult | undefined) =>
-  value?.ci?.status === "ok" && (value.ci.pending > 0 || !value.ci.complete)
+  value?.state !== "merged" &&
+  value?.state !== "closed" &&
+  value?.ci?.status === "ok" &&
+  (value.ci.pending > 0 || !value.ci.complete)
 
 const HOVER_DELAY_MS = 250
 
@@ -140,7 +143,10 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
     const left = Math.min(Math.max(MARGIN, rect.left), window.innerWidth - width() - MARGIN)
     const below = rect.bottom + GAP
     // Flip above the link when the popup would run off the bottom of the viewport.
-    setPosition({ left, top: below + height > window.innerHeight - MARGIN ? Math.max(MARGIN, rect.top - GAP - height) : below })
+    setPosition({
+      left,
+      top: below + height > window.innerHeight - MARGIN ? Math.max(MARGIN, rect.top - GAP - height) : below,
+    })
   })
 
   onMount(() => {
@@ -255,14 +261,11 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
                   fallback={
                     <div data-slot="reference-popup-pending">
                       <span data-slot="reference-popup-label">{referenceLabel(current())}</span>
-                      <span data-slot="reference-popup-message">{i18n.t(messageKey(value().outcome))}</span>
+                      <span data-slot="reference-popup-message">{i18n.t(messageKey(value()))}</span>
                     </div>
                   }
                 >
-                  <Show
-                    when={!refreshing()}
-                    fallback={<ReferenceSkeleton height={held()} />}
-                  >
+                  <Show when={!refreshing()} fallback={<ReferenceSkeleton height={held()} />}>
                     <ReferenceCard
                       reference={current()}
                       result={value()}
@@ -281,10 +284,14 @@ export function ReferencePopup(props: { resolve: (reference: Reference) => Promi
   )
 }
 
-function messageKey(outcome: LinkPreviewResult["outcome"]) {
-  if (outcome === "forbidden") return "ui.reference.forbidden"
+function messageKey(result: LinkPreviewResult) {
+  if (result.reason === "authentication") return "ui.reference.authentication"
 
-  if (outcome === "not-found") return "ui.reference.notFound"
+  if (result.reason === "rate-limit") return "ui.reference.rateLimit"
+
+  if (result.outcome === "forbidden") return "ui.reference.forbidden"
+
+  if (result.outcome === "not-found") return "ui.reference.notFound"
 
   return "ui.reference.unavailable"
 }

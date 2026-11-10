@@ -1,4 +1,6 @@
 const source = {
+  "ui.reference.authentication": "Sign in to view this reference",
+  "ui.reference.rateLimit": "Provider rate limit reached. Try again later.",
   "ui.terminal.result.notExecuted": "Terminal could not run the command",
   "ui.terminal.result.completed": "Terminal command completed",
   "ui.terminal.result.failed": "Terminal command failed",

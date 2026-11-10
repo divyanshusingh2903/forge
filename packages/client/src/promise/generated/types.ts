@@ -426,6 +426,7 @@ export type WebSearchResult = { url: string; title?: string; content?: string; t
 
 export type LinkPreviewResult = {
   outcome: "ok" | "unavailable" | "forbidden" | "not-found"
+  reason?: "authentication" | "rate-limit" | "temporary"
   title?: string
   state?: string
   stateType?: string
@@ -468,6 +469,7 @@ export type LinkPreviewResult = {
   }
   ci?: {
     status: "ok" | "none" | "unavailable" | "forbidden"
+    reason?: "authentication" | "rate-limit" | "temporary"
     unit: "tests" | "checks" | "jobs"
     passed: number
     failed: number

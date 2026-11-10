@@ -165,11 +165,24 @@ describe("LinkPreview mappers", () => {
     expect(LinkPreview.failureResult("HTTP 404: Not Found")).toEqual({ outcome: "not-found" })
     expect(LinkPreview.failureResult("To get started with GitHub CLI, please run: gh auth login")).toEqual({
       outcome: "unavailable",
+      reason: "authentication",
     })
     expect(LinkPreview.failureResult("HTTP 403: Resource not accessible by integration")).toEqual({
       outcome: "forbidden",
     })
-    expect(LinkPreview.failureResult("connection reset")).toEqual({ outcome: "unavailable" })
+    expect(LinkPreview.failureResult("connection reset")).toEqual({ outcome: "unavailable", reason: "temporary" })
+    expect(LinkPreview.failureResult("HTTP 401: Bad credentials")).toEqual({
+      outcome: "unavailable",
+      reason: "authentication",
+    })
+    expect(LinkPreview.failureResult("HTTP 403: API rate limit exceeded")).toEqual({
+      outcome: "unavailable",
+      reason: "rate-limit",
+    })
+    expect(LinkPreview.failureResult("HTTP 429: Too many requests")).toEqual({
+      outcome: "unavailable",
+      reason: "rate-limit",
+    })
   })
 })
 
@@ -212,7 +225,12 @@ describe("LinkPreview sub-issue progress", () => {
   })
 
   test("a listing that stops short keeps the aggregate total and says it is partial", () => {
-    expect(LinkPreview.githubProgress({ total: 450, completed: 300 }, Array.from({ length: 300 }, () => closed()))).toEqual({
+    expect(
+      LinkPreview.githubProgress(
+        { total: 450, completed: 300 },
+        Array.from({ length: 300 }, () => closed()),
+      ),
+    ).toEqual({
       status: "ok",
       completed: 300,
       cancelled: 0,
@@ -234,7 +252,10 @@ describe("LinkPreview sub-issue progress", () => {
 
     expect(
       LinkPreview.gitlabChildren(
-        query({ pageInfo: { hasNextPage: true }, nodes: [{ state: "OPEN" }, { state: "CLOSED" }, { state: "CLOSED" }] }),
+        query({
+          pageInfo: { hasNextPage: true },
+          nodes: [{ state: "OPEN" }, { state: "CLOSED" }, { state: "CLOSED" }],
+        }),
       ),
     ).toEqual({ status: "ok", completed: 2, cancelled: 0, open: 1, total: 3, partial: true })
     expect(LinkPreview.gitlabChildren(query({ pageInfo: { hasNextPage: false }, nodes: [] }))).toBe("none")
@@ -272,7 +293,9 @@ describe("LinkPreview sub-issue progress", () => {
 })
 
 describe("LinkPreview CI", () => {
-  const runs = (items: unknown[], total = items.length) => ({ body: JSON.stringify({ total_count: total, check_runs: items }) })
+  const runs = (items: unknown[], total = items.length) => ({
+    body: JSON.stringify({ total_count: total, check_runs: items }),
+  })
   const statuses = (items: unknown[] = []) => ({ body: JSON.stringify({ total_count: items.length, statuses: items }) })
   const run = (name: string, status: string, conclusion: string | null = null) => ({
     name,
@@ -310,10 +333,18 @@ describe("LinkPreview CI", () => {
 
   test("all passing and all failing", () => {
     expect(
-      LinkPreview.githubCiResult("a", runs([run("a", "completed", "success"), run("b", "completed", "success")]), statuses()),
+      LinkPreview.githubCiResult(
+        "a",
+        runs([run("a", "completed", "success"), run("b", "completed", "success")]),
+        statuses(),
+      ),
     ).toMatchObject({ passed: 2, failed: 0, total: 2, complete: true })
     expect(
-      LinkPreview.githubCiResult("a", runs([run("a", "completed", "timed_out"), run("b", "completed", "failure")]), statuses()),
+      LinkPreview.githubCiResult(
+        "a",
+        runs([run("a", "completed", "timed_out"), run("b", "completed", "failure")]),
+        statuses(),
+      ),
     ).toMatchObject({ passed: 0, failed: 2, total: 2 })
   })
 
@@ -338,13 +369,19 @@ describe("LinkPreview CI", () => {
   })
 
   test("no checks at all is none, not green", () => {
-    expect(LinkPreview.githubCiResult("a", runs([]), statuses())).toMatchObject({ status: "none", total: 0, complete: true })
+    expect(LinkPreview.githubCiResult("a", runs([]), statuses())).toMatchObject({
+      status: "none",
+      total: 0,
+      complete: true,
+    })
   })
 
   test("results cut short by pagination are incomplete", () => {
-    expect(
-      LinkPreview.githubCiResult("a", runs([run("a", "completed", "success")], 130), statuses()),
-    ).toMatchObject({ status: "ok", total: 1, complete: false })
+    expect(LinkPreview.githubCiResult("a", runs([run("a", "completed", "success")], 130), statuses())).toMatchObject({
+      status: "ok",
+      total: 1,
+      complete: false,
+    })
   })
 
   test("a source that failed is incomplete, and no source at all is unavailable or forbidden", () => {
@@ -367,7 +404,9 @@ describe("LinkPreview CI", () => {
   })
 
   test("reads a GitLab head pipeline, or its absence", () => {
-    expect(LinkPreview.gitlabPipeline(JSON.stringify({ head_pipeline: { id: 7, status: "running", sha: "f00" } }))).toEqual({
+    expect(
+      LinkPreview.gitlabPipeline(JSON.stringify({ head_pipeline: { id: 7, status: "running", sha: "f00" } })),
+    ).toEqual({
       id: 7,
       status: "running",
       sha: "f00",
@@ -406,7 +445,8 @@ describe("LinkPreview CI", () => {
     expect(ci).toMatchObject({ status: "ok", unit: "jobs", passed: 1, pending: 1, skipped: 1, failed: 1, total: 4 })
     expect(ci.failures).toEqual([{ name: "scan" }])
     expect(
-      LinkPreview.gitlabCiResult({ id: 1, status: "running" }, { body: JSON.stringify({ total: { count: 0 } }) }, jobs).unit,
+      LinkPreview.gitlabCiResult({ id: 1, status: "running" }, { body: JSON.stringify({ total: { count: 0 } }) }, jobs)
+        .unit,
     ).toBe("jobs")
   })
 
@@ -415,7 +455,10 @@ describe("LinkPreview CI", () => {
     const ci = LinkPreview.githubCiResult("a", runs([run("a", "in_progress")]), statuses())
     expect(LinkPreview.ciActive({ ...base, ci })).toBe(true)
     expect(
-      LinkPreview.ciActive({ ...base, ci: LinkPreview.githubCiResult("a", runs([run("a", "completed", "success")]), statuses()) }),
+      LinkPreview.ciActive({
+        ...base,
+        ci: LinkPreview.githubCiResult("a", runs([run("a", "completed", "success")]), statuses()),
+      }),
     ).toBe(false)
     expect(LinkPreview.ciActive(base)).toBe(false)
   })

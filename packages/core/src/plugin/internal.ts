@@ -100,7 +100,9 @@ import { IdentityPlugin } from "./identity.js"
 import { ForgeModePlugin } from "./forge-mode.js"
 import { ForgeMcpPlugin } from "./forge-mcp.js"
 import { ForgeMemoryPlugin } from "./forge-memory.js"
+import { LinkPreview } from "../link-preview.js"
 import { ForgePlanPlugin } from "./forge-plan.js"
+import { ForgePullRequestsPlugin } from "./forge-pull-requests.js"
 import { GoalPlugin } from "./goal.js"
 import { ModelsDevPlugin } from "./models-dev.js"
 import { McpCodeModeDefaultsPlugin } from "./mcp-codemode-defaults.js"
@@ -145,6 +147,7 @@ const services = [
   LLMClient.Service,
   Location.Service,
   Memory.Service,
+  LinkPreview.Service,
   ModelsDev.Service,
   Mcp.Service,
   Npm.Service,
@@ -202,6 +205,7 @@ export const requirements = LayerNode.group([
   llmClient,
   Location.node,
   Memory.node,
+  LinkPreview.node,
   ModelsDev.node,
   Mcp.node,
   Npm.node,
@@ -245,6 +249,7 @@ const pre = [
   ForgeModePlugin.Plugin,
   CommandPlugin.Plugin,
   GoalPlugin.Plugin,
+  ForgePullRequestsPlugin.Plugin,
   SkillPlugin.Plugin,
   VcsHgPlugin.Plugin,
   ModelsDevPlugin,

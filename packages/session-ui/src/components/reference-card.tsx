@@ -83,7 +83,12 @@ export function ReferenceCard(props: {
   }
 
   const date = (value: string) =>
-    new Date(value).toLocaleDateString(i18n.locale(), { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    new Date(value).toLocaleDateString(i18n.locale(), {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    })
 
   const schedule = () => {
     const parts = [
@@ -136,10 +141,7 @@ export function ReferenceCard(props: {
         </span>
       </div>
 
-      <Show
-        when={props.href}
-        fallback={<span data-slot="reference-card-title">{props.result.title}</span>}
-      >
+      <Show when={props.href} fallback={<span data-slot="reference-card-title">{props.result.title}</span>}>
         {(href) => (
           <a data-slot="reference-card-title" href={href()} target="_blank" rel="noopener noreferrer">
             {props.result.title}
@@ -163,12 +165,16 @@ export function ReferenceCard(props: {
         </span>
       </Show>
 
-      <Show when={props.result.summary}>{(summary) => <span data-slot="reference-card-summary">{summary()}</span>}</Show>
+      <Show when={props.result.summary}>
+        {(summary) => <span data-slot="reference-card-summary">{summary()}</span>}
+      </Show>
 
       <Show when={props.result.author || timestamp()}>
         <span data-slot="reference-card-meta">
           <Show when={props.result.author}>{(author) => <Avatar name={author().name} url={author().avatarUrl} />}</Show>
-          <Show when={props.result.author}>{(author) => <span data-slot="reference-card-author">{author().name}</span>}</Show>
+          <Show when={props.result.author}>
+            {(author) => <span data-slot="reference-card-author">{author().name}</span>}
+          </Show>
           <Show when={timestamp()}>{(text) => <span>{text()}</span>}</Show>
         </span>
       </Show>
@@ -291,7 +297,11 @@ function Progress(props: { progress: Progress }) {
   ]
 
   return (
-    <section data-slot="reference-card-section" data-section="progress" aria-label={i18n.t("ui.reference.progress.label")}>
+    <section
+      data-slot="reference-card-section"
+      data-section="progress"
+      aria-label={i18n.t("ui.reference.progress.label")}
+    >
       <Show
         when={props.progress.status === "ok"}
         fallback={<span data-slot="reference-card-note">{i18n.t("ui.reference.progress.unavailable")}</span>}
@@ -340,6 +350,11 @@ function CiSummary(props: { ci: Ci }) {
 
   return (
     <section data-slot="reference-card-section" data-section="ci" aria-label={i18n.t("ui.reference.ci.label")}>
+      <Show when={props.ci.reason === "authentication" || props.ci.reason === "rate-limit"}>
+        <span data-slot="reference-card-note">
+          {i18n.t(props.ci.reason === "rate-limit" ? "ui.reference.rateLimit" : "ui.reference.authentication")}
+        </span>
+      </Show>
       <Show
         when={props.ci.status === "ok"}
         fallback={<span data-slot="reference-card-note">{i18n.t(`ui.reference.ci.${props.ci.status}`)}</span>}
