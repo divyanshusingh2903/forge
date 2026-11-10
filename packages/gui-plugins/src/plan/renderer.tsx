@@ -1,5 +1,6 @@
 import { lazy, Show, Suspense } from "solid-js"
 import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
 import { Tooltip } from "@opencode/ui/tooltip"
 import {
   Command,
@@ -105,31 +106,46 @@ const setup: Plugin.Setup<typeof PlanDefinition> = (ctx) => {
     ),
   })
 
-  // While a plan is being written or waits for review, the title row says so and opens it. Decided plans drop out.
+  // While the session has a plan file, the title row shows its icon and opens it. A plan being written or waiting for
+  // review also says so; once it is decided the icon stays, without a label, so the plan can still be reopened.
   ctx.add(Slot, {
     at: "session.header",
-    // After the context usage and the panel launchers.
-    order: 12,
+    // Right after the MCP button (15), where the Pull requests icon follows.
+    order: 16,
     render: (input) => (
-      <Show when={ForgePlan.open(plan(input.session)) ? plan(input.session) : undefined}>
+      <Show when={plan(input.session)}>
         {(info) => {
           const label = () => ctx.t(info().status === "ready" ? "indicator.ready" : "indicator.drafting")
 
           return (
             <Tooltip placement="bottom" value={ctx.t("indicator.open")}>
-              <button
-                type="button"
-                data-slot="plan-indicator"
-                data-status={info().status}
-                class="flex h-7 shrink-0 cursor-default items-center gap-1.5 rounded-[6px] px-2 text-[12px] [font-weight:530] text-v2-text-text-muted hover:bg-v2-background-bg-layer-01 hover:text-v2-text-text-base data-[status=ready]:text-v2-text-text-base"
-                aria-label={label()}
-                onClick={() => open(input.session)}
+              {/* A plan being written or reviewed says so; a decided one is a plain icon button like its neighbours. */}
+              <Show
+                when={!input.compact && ForgePlan.open(info())}
+                fallback={
+                  <IconButton
+                    icon={<Icon name="file-document" />}
+                    variant="ghost-muted"
+                    size="large"
+                    data-slot="plan-indicator"
+                    data-status={info().status}
+                    aria-label={ForgePlan.open(info()) ? label() : ctx.t("indicator.open")}
+                    onClick={() => open(input.session)}
+                  />
+                }
               >
-                <Icon name="file-document" size="small" />
-                <Show when={!input.compact}>
+                <button
+                  type="button"
+                  data-slot="plan-indicator"
+                  data-status={info().status}
+                  class="flex h-7 shrink-0 cursor-default items-center gap-1.5 rounded-[6px] px-2 text-[12px] [font-weight:530] text-v2-text-text-muted hover:bg-v2-background-bg-layer-01 hover:text-v2-text-text-base"
+                  aria-label={label()}
+                  onClick={() => open(input.session)}
+                >
+                  <Icon name="file-document" size="small" />
                   <span>{label()}</span>
-                </Show>
-              </button>
+                </button>
+              </Show>
             </Tooltip>
           )
         }}

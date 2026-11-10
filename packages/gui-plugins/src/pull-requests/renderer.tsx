@@ -1,6 +1,7 @@
 import { lazy, onCleanup, Show, Suspense } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
 import { Tooltip } from "@opencode/ui/tooltip"
 import { showToast } from "@opencode/ui/toast"
 import {
@@ -192,8 +193,8 @@ const setup: Plugin.Setup<typeof PullRequestsDefinition> = (ctx) => {
   // Only a session that tracks something shows the icon, so sessions without pull requests carry no extra button.
   ctx.add(Slot, {
     at: "session.header",
-    // After the context usage and the panel launchers, beside the plan indicator.
-    order: 14,
+    // After the MCP button (15), beside the plan icon (16).
+    order: 17,
     render: (input) => (
       <Show when={state(input.session).items.length > 0 ? state(input.session) : undefined}>
         {(current) => {
@@ -204,25 +205,28 @@ const setup: Plugin.Setup<typeof PullRequestsDefinition> = (ctx) => {
 
           return (
             <Tooltip placement="bottom" value={label()}>
-              <button
-                type="button"
-                data-slot="pull-requests-indicator"
-                data-failing={red() ? "" : undefined}
-                class="relative flex h-7 shrink-0 cursor-default items-center gap-1.5 rounded-[6px] px-2 text-[12px] [font-weight:530] text-v2-text-text-muted hover:bg-v2-background-bg-layer-01 hover:text-v2-text-text-base"
-                aria-label={label()}
-                onClick={() => open(input.session)}
-              >
-                <Icon name="branch" size="small" />
-                <Show when={!input.compact}>
-                  <span>{current().items.length}</span>
-                </Show>
-                <Show when={red()}>
-                  <span
-                    aria-hidden="true"
-                    class="absolute top-1 right-1 size-1.5 rounded-full bg-v2-state-fg-danger"
-                  />
-                </Show>
-              </button>
+              {/* The same icon button as MCP and Details, so the row keeps one rhythm; the count is a corner badge. */}
+              <span class="relative inline-flex">
+                <IconButton
+                  icon={<Icon name="branch" />}
+                  variant="ghost-muted"
+                  size="large"
+                  data-slot="pull-requests-indicator"
+                  data-failing={red() ? "" : undefined}
+                  aria-label={`${label()} (${current().items.length})`}
+                  onClick={() => open(input.session)}
+                />
+                <span
+                  aria-hidden="true"
+                  class="pointer-events-none absolute -top-0.5 -right-0.5 h-3.5 min-w-3.5 rounded-full px-1 text-center text-[10px] leading-3.5 [font-weight:530]"
+                  classList={{
+                    "bg-v2-state-fg-danger text-v2-background-bg-base": red(),
+                    "bg-v2-background-bg-layer-02 text-v2-text-text-muted": !red(),
+                  }}
+                >
+                  {current().items.length}
+                </span>
+              </span>
             </Tooltip>
           )
         }}
