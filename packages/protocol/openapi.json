@@ -22616,6 +22616,98 @@
               "required": ["name", "value"],
               "additionalProperties": false
             }
+          },
+          "progress": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["ok", "unavailable"]
+              },
+              "completed": {
+                "type": "number"
+              },
+              "cancelled": {
+                "type": "number"
+              },
+              "open": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "partial": {
+                "type": "boolean"
+              }
+            },
+            "required": ["status", "completed", "cancelled", "open", "total", "partial"],
+            "additionalProperties": false
+          },
+          "ci": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["ok", "none", "unavailable", "forbidden"]
+              },
+              "unit": {
+                "type": "string",
+                "enum": ["tests", "checks", "jobs"]
+              },
+              "passed": {
+                "type": "number"
+              },
+              "failed": {
+                "type": "number"
+              },
+              "pending": {
+                "type": "number"
+              },
+              "skipped": {
+                "type": "number"
+              },
+              "cancelled": {
+                "type": "number"
+              },
+              "total": {
+                "type": "number"
+              },
+              "complete": {
+                "type": "boolean"
+              },
+              "sha": {
+                "type": "string"
+              },
+              "failures": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "url": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["name"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "status",
+              "unit",
+              "passed",
+              "failed",
+              "pending",
+              "skipped",
+              "cancelled",
+              "total",
+              "complete",
+              "failures"
+            ],
+            "additionalProperties": false
           }
         },
         "required": ["outcome"],

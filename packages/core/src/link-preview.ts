@@ -16,6 +16,8 @@ export const Result = LinkPreview.Result
 export type Result = LinkPreview.Result
 
 const CACHE_TTL_MS = 60_000
+// Results whose CI is still moving are reused briefly, so an open popup sees checks finish.
+const ACTIVE_CI_TTL_MS = 10_000
 const REQUEST_TIMEOUT = Duration.seconds(10)
 const SAFE_SEGMENT = /^[\w.-]+$/
 const SAFE_TAG = /^[\w.+@/-]{1,200}$/
@@ -28,6 +30,12 @@ const MAX_FIELDS = 4
 const AVATAR_HOSTS = new Set(["avatars.githubusercontent.com", "gitlab.com", "secure.gravatar.com"])
 const MAX_LABELS = 6
 const SNIPPET_LENGTH = 180
+const MAX_FAILURES = 5
+const CHILD_PAGE_SIZE = 100
+const MAX_CHILD_PAGES = 3
+// Only the code hosts' own pages are passed on as links to failing checks, so a popup never links an arbitrary site.
+const LINK_HOSTS = new Set(["github.com", "gitlab.com"])
+const GITLAB_FINISHED = new Set(["success", "failed", "canceled", "skipped"])
 
 export interface Interface {
   readonly resolve: (input: Input) => Effect.Effect<Result>
@@ -36,6 +44,12 @@ export interface Interface {
 export class Service extends Context.Service<Service, Interface>()("@opencode/LinkPreview") {}
 
 type Entry = { expires: number; result: Deferred.Deferred<Result> }
+
+type Fetched = { body: string } | { failure: Result }
+
+type Progress = NonNullable<Result["progress"]>
+
+type Ci = NonNullable<Result["ci"]>
 
 const layer = Layer.effect(
   Service,
@@ -55,24 +69,20 @@ const layer = Layer.effect(
     })
 
     // GitHub and GitLab go through their CLIs, which hold the user's existing sign-in for each host.
-    const cli = Effect.fnUntraced(function* (
-      command: string,
-      route: string,
-      map: (body: string) => Result | undefined,
-      env?: Record<string, string>,
-    ) {
+    const request = Effect.fnUntraced(function* (command: string, args: string[], env?: Record<string, string>) {
       return yield* process
-        .run(ChildProcess.make(command, ["api", route], { stdin: "ignore", extendEnv: true, env }), {
+        .run(ChildProcess.make(command, args, { stdin: "ignore", extendEnv: true, env }), {
           timeout: REQUEST_TIMEOUT,
           maxOutputBytes: 1_000_000,
         })
         .pipe(
-          Effect.map((result) =>
-            result.exitCode === 0
-              ? (map(result.stdout.toString("utf8")) ?? unavailable)
-              : failureResult(result.stderr.toString("utf8")),
+          Effect.map(
+            (result): Fetched =>
+              result.exitCode === 0
+                ? { body: result.stdout.toString("utf8") }
+                : { failure: failureResult(result.stderr.toString("utf8")) },
           ),
-          Effect.orElseSucceed(() => unavailable),
+          Effect.orElseSucceed((): Fetched => ({ failure: unavailable })),
         )
     })
 
@@ -95,12 +105,101 @@ const layer = Layer.effect(
       )
     })
 
+    // The pull request, then its CI for the head revision. A failed CI lookup leaves the card itself intact.
+    const github = Effect.fnUntraced(function* (input: Input, route: string, base: string) {
+      const token = yield* githubToken()
+      const env = token ? { GH_TOKEN: token } : undefined
+      const item = yield* request("gh", ["api", route], env)
+      if ("failure" in item) return item.failure
+      const result = githubResult(input.kind, item.body) ?? unavailable
+      if (result.outcome !== "ok") return result
+
+      if (input.kind === "github-pr") {
+        const sha = githubHeadSha(item.body)
+        if (!sha) return result
+        const [runs, statuses] = yield* Effect.all(
+          [
+            request("gh", ["api", `${base}/commits/${sha}/check-runs?per_page=100&filter=latest`], env),
+            request("gh", ["api", `${base}/commits/${sha}/status?per_page=100`], env),
+          ],
+          { concurrency: 2 },
+        )
+        return { ...result, ci: githubCiResult(sha, runs, statuses) }
+      }
+
+      const summary = githubSubIssues(item.body)
+      if (input.kind !== "github-issue" || !summary || summary.total === 0) return result
+      // Without a closed child there is nothing to tell completed from not planned.
+      if (summary.completed === 0) return { ...result, progress: githubProgress(summary, []) }
+      const children: Record<string, unknown>[] = []
+
+      for (let page = 1; page <= MAX_CHILD_PAGES && children.length < summary.total; page++) {
+        const listed = yield* request(
+          "gh",
+          ["api", `${route}/sub_issues?per_page=${CHILD_PAGE_SIZE}&page=${page}`],
+          env,
+        )
+        const items = "body" in listed ? githubChildren(listed.body) : undefined
+        if (!items) break
+        children.push(...items)
+        if (items.length < CHILD_PAGE_SIZE) break
+      }
+
+      return { ...result, progress: githubProgress(summary, children) }
+    })
+
+    // `glab` reads the merge request, then its head pipeline's test report and jobs.
+    const gitlabCli = Effect.fnUntraced(function* (input: Input, route: string, project: string) {
+      const item = yield* request("glab", ["api", route])
+      if ("failure" in item) return item.failure
+      const result = gitlabResult(input.kind, item.body) ?? unavailable
+      if (result.outcome !== "ok") return result
+
+      if (input.kind === "gitlab-mr") {
+        const pipeline = gitlabPipeline(item.body)
+        if (!pipeline) return result
+        if (pipeline === "none") return { ...result, ci: noCi("jobs") }
+        const [summary, jobs] = yield* Effect.all(
+          [
+            request("glab", ["api", `projects/${project}/pipelines/${pipeline.id}/test_report_summary`]),
+            request("glab", ["api", `projects/${project}/pipelines/${pipeline.id}/jobs?per_page=100`]),
+          ],
+          { concurrency: 2 },
+        )
+        return { ...result, ci: gitlabCiResult(pipeline, summary, jobs) }
+      }
+
+      // Work items hold their children in a hierarchy widget, which only GraphQL exposes.
+      const [path, iid] = [decodeURIComponent(project), String(input.number)]
+      const children = yield* request("glab", [
+        "api",
+        "graphql",
+        "-f",
+        `query=${GITLAB_CHILDREN_QUERY}`,
+        "-f",
+        `path=${path}`,
+        "-f",
+        `iid=${iid}`,
+      ])
+      const progress = "body" in children ? gitlabChildren(children.body) : undefined
+      return progress === "none" ? result : { ...result, progress: progress ?? unavailableProgress }
+    })
+
     const compute = (input: Input) => {
       if (input.kind === "linear-issue" || input.kind === "linear-project") {
         if (!input.id) return Effect.succeed(unavailable)
-        return input.kind === "linear-project"
-          ? tool(/linear/i, "get_project", { query: input.id }, linearResult)
-          : tool(/linear/i, "get_issue", { id: input.id }, linearResult)
+        if (input.kind === "linear-project") return tool(/linear/i, "get_project", { query: input.id }, linearResult)
+        const id = input.id
+        // Sub-issues are the issues whose parent is this one. A lookup that fails just leaves the card without progress.
+        return tool(/linear/i, "get_issue", { id }, linearResult).pipe(
+          Effect.flatMap((result) =>
+            result.outcome !== "ok"
+              ? Effect.succeed(result)
+              : tool(/linear/i, "list_issues", { parentId: id, limit: 250 }, linearChildren).pipe(
+                  Effect.map((children) => (children.progress ? { ...result, progress: children.progress } : result)),
+                ),
+          ),
+        )
       }
       if (input.kind === "jira-issue") {
         if (!input.id || !JIRA_KEY.test(input.id) || !input.site || !JIRA_SITE.test(input.site))
@@ -113,7 +212,8 @@ const layer = Layer.effect(
       }
       if (input.kind === "gitlab-issue" || input.kind === "gitlab-mr") {
         const route = gitlabRoute(input)
-        if (!route) return Effect.succeed(unavailable)
+        const project = gitlabProject(input)
+        if (!route || !project) return Effect.succeed(unavailable)
         const mr = input.kind === "gitlab-mr"
         const name = mr ? "get_merge_request" : "get_work_item"
         const map = (body: string) => gitlabResult(input.kind, body)
@@ -126,18 +226,29 @@ const layer = Layer.effect(
                   name,
                   { url: `https://gitlab.com/${input.repository}/-/${mr ? "merge_requests" : "issues"}/${input.number}` },
                   map,
+                ).pipe(
+                  Effect.flatMap((result) =>
+                    mr || result.outcome !== "ok" || result.progress
+                      ? Effect.succeed(result)
+                      : // The work item itself does not list its children; the direct ones are the items under it.
+                        tool(
+                          /gitlab/i,
+                          "list_work_items",
+                          { project_id: input.repository, parent_iid: input.number, state: "all", first: 100 },
+                          gitlabListedChildren,
+                        ).pipe(
+                          Effect.map((children) => (children.progress ? { ...result, progress: children.progress } : result)),
+                        ),
+                  ),
                 )
-              : cli("glab", route, map),
+              : gitlabCli(input, route, project),
           ),
         )
       }
       const route = githubRoute(input)
-      if (!route) return Effect.succeed(unavailable)
-      return githubToken().pipe(
-        Effect.flatMap((token) =>
-          cli("gh", route, (body) => githubResult(input.kind, body), token ? { GH_TOKEN: token } : undefined),
-        ),
-      )
+      const base = githubBase(input)
+      if (!route || !base) return Effect.succeed(unavailable)
+      return github(input, route, base)
     }
 
     return Service.of({
@@ -155,6 +266,7 @@ const layer = Layer.effect(
         )
         // Failures are not worth remembering: the user may sign in to the CLI or connect the MCP server.
         if (result.outcome === "unavailable") cache.delete(key)
+        else entry.expires = Date.now() + (ciActive(result) ? ACTIVE_CI_TTL_MS : CACHE_TTL_MS)
         yield* Deferred.succeed(entry.result, result)
         return result
       }),
@@ -169,10 +281,15 @@ const unavailable: Result = { outcome: "unavailable" }
 const JsonValue = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
 
 // Only well-formed segments reach `gh api`, so a crafted reference can't steer the request to another endpoint.
-function githubRoute(input: Input) {
+function githubBase(input: Input) {
   const [owner, repo, ...rest] = input.repository?.split("/") ?? []
   if (!owner || !repo || rest.length || !SAFE_SEGMENT.test(owner) || !SAFE_SEGMENT.test(repo)) return
-  const base = `repos/${owner}/${repo}`
+  return `repos/${owner}/${repo}`
+}
+
+function githubRoute(input: Input) {
+  const base = githubBase(input)
+  if (!base) return
   if (input.kind === "github-release")
     return input.tag && SAFE_TAG.test(input.tag) ? `${base}/releases/tags/${encodeURIComponent(input.tag)}` : undefined
   if (!input.number) return
@@ -180,10 +297,15 @@ function githubRoute(input: Input) {
 }
 
 // GitLab addresses a project by its URL-encoded full path, which may include nested groups.
-function gitlabRoute(input: Input) {
+function gitlabProject(input: Input) {
   const segments = input.repository?.split("/") ?? []
-  if (segments.length < 2 || !segments.every((item) => SAFE_SEGMENT.test(item)) || !input.number) return
-  const project = encodeURIComponent(segments.join("/"))
+  if (segments.length < 2 || !segments.every((item) => SAFE_SEGMENT.test(item))) return
+  return encodeURIComponent(segments.join("/"))
+}
+
+function gitlabRoute(input: Input) {
+  const project = gitlabProject(input)
+  if (!project || !input.number) return
   return `projects/${project}/${input.kind === "gitlab-mr" ? "merge_requests" : "issues"}/${input.number}`
 }
 
@@ -238,7 +360,13 @@ export function gitlabResult(kind: Kind, body: string): Result | undefined {
     base: mr ? text(data.target_branch) : undefined,
     // `changes_count` is a string, and "1000+" past GitLab's diff limit.
     changedFiles: mr ? number(Number.parseInt(text(data.changes_count) ?? "", 10)) : undefined,
+    progress: mr ? undefined : childProgress(data.widgets),
   })
+}
+
+function childProgress(widgets: unknown) {
+  const progress = hierarchyProgress(widgets)
+  return progress === "none" ? undefined : progress
 }
 
 // The Atlassian MCP server answers with the Jira REST issue. Status categories map onto the same colours as Linear's.
@@ -351,6 +479,278 @@ function notionStateType(name: string) {
   if (/cancel|archiv|won.?t/i.test(name)) return "canceled"
   if (/progress|doing|review|active|started/i.test(name)) return "started"
   return "unstarted"
+}
+
+const unavailableProgress: Progress = { status: "unavailable", completed: 0, cancelled: 0, open: 0, total: 0, partial: true }
+
+/** A result whose CI is unfinished or cut short, so an open popup should look again soon. */
+export function ciActive(result: Result) {
+  return result.ci?.status === "ok" && (result.ci.pending > 0 || !result.ci.complete)
+}
+
+const GITLAB_CHILDREN_QUERY =
+  "query($path: ID!, $iid: String!) { project(fullPath: $path) { workItems(iid: $iid) { nodes { widgets { type ... on WorkItemWidgetHierarchy { children(first: 100) { pageInfo { hasNextPage } nodes { state } } } } } } } }"
+
+// GitHub's issue carries an authoritative aggregate of its direct sub-issues; absent on instances without them.
+export function githubSubIssues(body: string) {
+  const summary = record(record(Option.getOrUndefined(JsonValue(body)))?.sub_issues_summary)
+  const total = number(summary?.total)
+  const completed = number(summary?.completed)
+  return total === undefined || completed === undefined ? undefined : { total, completed }
+}
+
+export function githubChildren(body: string) {
+  const data = Option.getOrUndefined(JsonValue(body))
+  return Array.isArray(data) ? data.map(record).filter((item) => item !== undefined) : undefined
+}
+
+// The aggregate cannot tell a child closed as not planned from a completed one, so the listing does. When it does not
+// cover every child the aggregate stands in, and `partial` says its completed count may include not-planned children.
+export function githubProgress(summary: { total: number; completed: number }, children: Record<string, unknown>[]): Progress {
+  if (summary.completed === 0)
+    return { status: "ok", completed: 0, cancelled: 0, open: summary.total, total: summary.total, partial: false }
+  if (children.length < summary.total)
+    return {
+      status: "ok",
+      completed: summary.completed,
+      cancelled: 0,
+      open: summary.total - summary.completed,
+      total: summary.total,
+      partial: true,
+    }
+  const cancelled = children.filter((item) => item.state === "closed" && item.state_reason === "not_planned").length
+  const closed = children.filter((item) => item.state === "closed").length
+  return {
+    status: "ok",
+    completed: closed - cancelled,
+    cancelled,
+    open: children.length - closed,
+    total: children.length,
+    partial: false,
+  }
+}
+
+function tally(states: ("completed" | "cancelled" | "open")[], partial: boolean): Progress | undefined {
+  if (states.length === 0) return
+  const count = (state: string) => states.filter((item) => item === state).length
+  return {
+    status: "ok",
+    completed: count("completed"),
+    cancelled: count("cancelled"),
+    open: count("open"),
+    total: states.length,
+    partial,
+  }
+}
+
+// GitLab children are work items in the hierarchy widget; a closed one is done, as GitLab has no cancelled state.
+// `none` is an issue without children, undefined a lookup that did not answer.
+export function gitlabChildren(body: string): Progress | "none" | undefined {
+  const data = record(Option.getOrUndefined(JsonValue(body)))
+  const nodes = record(record(record(data?.data)?.project)?.workItems)?.nodes
+  if (!Array.isArray(nodes) || nodes.length === 0) return
+  return hierarchyProgress(record(nodes[0])?.widgets)
+}
+
+function hierarchyProgress(widgets: unknown): Progress | "none" | undefined {
+  const hierarchy = Array.isArray(widgets) ? widgets.map(record).find((item) => item?.type === "HIERARCHY") : undefined
+  const children = record(hierarchy?.children)
+  if (!children || !Array.isArray(children.nodes)) return
+  const states = children.nodes.map((item) => (text(record(item)?.state)?.toUpperCase() === "OPEN" ? "open" : "completed"))
+  return tally(states, record(children.pageInfo)?.hasNextPage === true) ?? "none"
+}
+
+// `list_work_items` under a parent: its direct children, as an array or wrapped in `nodes` or `items`.
+export function gitlabListedChildren(body: string): Result | undefined {
+  const data = Option.getOrUndefined(JsonValue(body))
+  const found = [data, ...["nodes", "items", "work_items", "workItems", "results"].map((key) => record(data)?.[key])]
+  const items = found.find((item) => Array.isArray(item))
+  if (!Array.isArray(items)) return
+  const states = items.map((item) =>
+    ["OPEN", "OPENED"].includes(text(record(item)?.state)?.toUpperCase() ?? "") ? "open" : "completed",
+  )
+  const more = record(record(data)?.pageInfo)?.hasNextPage === true
+  return compact({ outcome: "ok", progress: tally(states, more) })
+}
+
+// Linear lists the issues under a parent; its workflow status type separates completed from cancelled.
+export function linearChildren(body: string): Result | undefined {
+  const data = Option.getOrUndefined(JsonValue(body))
+  const issues = Array.isArray(data) ? data : record(data)?.issues
+  if (!Array.isArray(issues)) return
+  const states = issues.map((item) => {
+    const status = record(record(item)?.status)
+    const name = pick(record(item)?.status) ?? pick(record(item)?.state)
+    const type = pick(status?.type) ?? (name ? linearStateType(name) : undefined)
+    return type === "completed" ? "completed" : type === "canceled" ? "cancelled" : "open"
+  })
+  const progress = tally(states, record(data)?.hasNextPage === true)
+  return compact({ outcome: "ok", progress })
+}
+
+function providerUrl(value: unknown) {
+  const url = typeof value === "string" ? URL.parse(value) : null
+  return url?.protocol === "https:" && LINK_HOSTS.has(url.hostname) ? url.toString() : undefined
+}
+
+type Bucket = "passed" | "failed" | "pending" | "skipped" | "cancelled"
+
+type Item = { name: string; bucket: Bucket; url?: string }
+
+function summarise(unit: Ci["unit"], items: Item[], complete: boolean, sha?: string): Ci {
+  const count = (bucket: Bucket) => items.filter((item) => item.bucket === bucket).length
+  return {
+    // Nothing counted from a source that fell short is unknown, not an empty pipeline.
+    status: items.length > 0 ? "ok" : complete ? "none" : "unavailable",
+    unit,
+    passed: count("passed"),
+    failed: count("failed"),
+    pending: count("pending"),
+    skipped: count("skipped"),
+    cancelled: count("cancelled"),
+    total: items.length,
+    complete,
+    ...(sha ? { sha } : {}),
+    failures: items
+      .filter((item) => item.bucket === "failed")
+      .slice(0, MAX_FAILURES)
+      .map((item) => ({ name: item.name, ...(item.url ? { url: item.url } : {}) })),
+  }
+}
+
+function noCi(unit: Ci["unit"]) {
+  return summarise(unit, [], true)
+}
+
+function failedCi(unit: Ci["unit"], fetched: Fetched): Ci {
+  const forbidden = "failure" in fetched && fetched.failure.outcome === "forbidden"
+  return { ...summarise(unit, [], false), status: forbidden ? "forbidden" : "unavailable" }
+}
+
+export function githubHeadSha(body: string) {
+  return text(record(record(Option.getOrUndefined(JsonValue(body)))?.head)?.sha)
+}
+
+const checkConclusions: Record<string, Bucket> = {
+  success: "passed",
+  failure: "failed",
+  timed_out: "failed",
+  action_required: "failed",
+  startup_failure: "failed",
+  skipped: "skipped",
+  neutral: "skipped",
+  stale: "skipped",
+  cancelled: "cancelled",
+}
+
+const statusStates: Record<string, Bucket> = { success: "passed", failure: "failed", error: "failed", pending: "pending" }
+
+function githubChecks(fetched: Fetched) {
+  if (!("body" in fetched)) return
+  const data = record(Option.getOrUndefined(JsonValue(fetched.body)))
+  if (!data || !Array.isArray(data.check_runs)) return
+  const runs = data.check_runs.map(record).filter((item) => item !== undefined)
+  const items = runs.map((run): Item => ({
+    name: text(run.name) ?? "check",
+    // A run that has not completed has no conclusion yet, and an unknown conclusion is never counted as passing.
+    bucket: run.status === "completed" ? (checkConclusions[text(run.conclusion) ?? ""] ?? "pending") : "pending",
+    url: providerUrl(run.html_url),
+  }))
+  return { items, complete: (number(data.total_count) ?? runs.length) <= runs.length }
+}
+
+function githubStatuses(fetched: Fetched) {
+  if (!("body" in fetched)) return
+  const data = record(Option.getOrUndefined(JsonValue(fetched.body)))
+  if (!data || !Array.isArray(data.statuses)) return
+  const statuses = data.statuses.map(record).filter((item) => item !== undefined)
+  const items = statuses.map((status): Item => ({
+    name: text(status.context) ?? "status",
+    bucket: statusStates[text(status.state) ?? ""] ?? "pending",
+    url: providerUrl(status.target_url),
+  }))
+  return { items, complete: (number(data.total_count) ?? statuses.length) <= statuses.length }
+}
+
+// GitHub counts check runs, never tests. Runs come as the latest attempt of each check, so reruns are not counted
+// twice, and legacy commit statuses add the CI that does not report through check runs.
+export function githubCiResult(sha: string, runs: Fetched, statuses: Fetched): Ci {
+  const checks = githubChecks(runs)
+  const legacy = githubStatuses(statuses)
+  if (!checks && !legacy) return failedCi("checks", "failure" in runs ? runs : statuses)
+  return summarise(
+    "checks",
+    [...(checks?.items ?? []), ...(legacy?.items ?? [])],
+    !!checks && !!legacy && checks.complete && legacy.complete,
+    sha,
+  )
+}
+
+// The head pipeline of a merge request: `none` when GitLab says it has none, undefined when the answer is unreadable.
+export function gitlabPipeline(body: string) {
+  const data = record(Option.getOrUndefined(JsonValue(body)))
+  if (!data || !("head_pipeline" in data)) return
+  if (data.head_pipeline === null) return "none"
+  const pipeline = record(data.head_pipeline)
+  const id = number(pipeline?.id)
+  return id === undefined ? undefined : { id, status: text(pipeline?.status) ?? "", sha: text(pipeline?.sha) }
+}
+
+const jobStatuses: Record<string, Bucket> = {
+  success: "passed",
+  failed: "failed",
+  canceled: "cancelled",
+  canceling: "cancelled",
+  skipped: "skipped",
+  manual: "skipped",
+}
+
+function gitlabJobs(fetched: Fetched) {
+  if (!("body" in fetched)) return
+  const data = Option.getOrUndefined(JsonValue(fetched.body))
+  if (!Array.isArray(data)) return
+  const jobs = data.map(record).filter((item) => item !== undefined)
+  const items = jobs.map((job): Item => ({
+    name: text(job.name) ?? "job",
+    // Created, pending, running, waiting and scheduled jobs are all still to finish.
+    bucket: jobStatuses[text(job.status) ?? ""] ?? "pending",
+    url: providerUrl(job.web_url),
+  }))
+  // The jobs endpoint is paged without a total, so a full page may have more behind it.
+  return { items, complete: jobs.length < 100 }
+}
+
+// A test report counts individual tests; without one the pipeline's jobs are counted, and called jobs.
+export function gitlabCiResult(
+  pipeline: { id: number; status: string; sha?: string },
+  summary: Fetched,
+  jobs: Fetched,
+): Ci {
+  const list = gitlabJobs(jobs)
+  const total = "body" in summary ? record(record(Option.getOrUndefined(JsonValue(summary.body)))?.total) : undefined
+  const count = number(total?.count)
+
+  if (total && count) {
+    const passed = number(total.success) ?? 0
+    const skipped = number(total.skipped) ?? 0
+    return {
+      status: "ok",
+      unit: "tests",
+      passed,
+      failed: (number(total.failed) ?? 0) + (number(total.error) ?? 0),
+      pending: 0,
+      skipped,
+      cancelled: 0,
+      total: count,
+      // Tests of a pipeline that is still running keep arriving.
+      complete: GITLAB_FINISHED.has(pipeline.status),
+      ...(pipeline.sha ? { sha: pipeline.sha } : {}),
+      failures: list ? summarise("jobs", list.items, list.complete).failures : [],
+    }
+  }
+
+  if (!list) return failedCi("jobs", jobs)
+  return summarise("jobs", list.items, list.complete, pipeline.sha)
 }
 
 export function failureResult(message: string): Result {

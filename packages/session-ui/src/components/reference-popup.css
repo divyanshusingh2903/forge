@@ -2,7 +2,7 @@
   position: fixed;
   z-index: 1000;
   box-sizing: border-box;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border: 1px solid var(--v2-border-border-strong);
   border-radius: 10px;
   background: var(--v2-background-bg-base);
@@ -10,7 +10,7 @@
   color: var(--v2-text-text-base);
   font-size: var(--font-size-small);
   line-height: 1.4;
-  pointer-events: none;
+  user-select: text;
 
   [data-slot="reference-popup-pending"] {
     min-height: 44px;
@@ -34,7 +34,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 
   [data-slot="reference-card-head"] {
@@ -88,6 +88,16 @@
     }
     &[data-tone="accent"] {
       --tone: var(--v2-text-text-accent);
+    }
+  }
+
+  a[data-slot="reference-card-title"] {
+    color: inherit;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
   }
 
@@ -223,6 +233,223 @@
     color: var(--v2-text-text-muted);
     font-variant-numeric: tabular-nums;
   }
+
+  [data-slot="reference-card-section"] {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 6px;
+    border-top: 1px solid var(--v2-border-border-subtle, var(--v2-border-border-strong));
+  }
+
+  /* A small ring beside what it says: the headline, then the legend, which wraps only when it must. */
+  [data-slot="reference-card-chart"] {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  [data-slot="reference-card-chart-text"] {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    line-height: 1.3;
+  }
+
+  [data-slot="reference-card-headline"] {
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+
+    &[data-failing] {
+      color: var(--v2-state-fg-danger);
+    }
+  }
+
+  [data-slot="reference-card-note"] {
+    color: var(--v2-text-text-muted);
+  }
+
+  [data-component="reference-donut"] {
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    --slice-completed: var(--v2-purple-700);
+    --slice-passed: var(--v2-state-fg-success);
+    --slice-failed: var(--v2-state-fg-danger);
+    --slice-pending: var(--v2-state-fg-warning);
+    --slice-cancelled: var(--v2-text-text-muted);
+    --slice-skipped: var(--v2-border-border-strong);
+    --slice-open: var(--v2-border-border-strong);
+
+    circle {
+      stroke-width: 5;
+    }
+
+    [data-slot="reference-donut-track"] {
+      stroke: var(--v2-background-bg-layer-01);
+    }
+
+    [data-slice="completed"] {
+      stroke: var(--slice-completed);
+    }
+    [data-slice="passed"] {
+      stroke: var(--slice-passed);
+    }
+    [data-slice="failed"] {
+      stroke: var(--slice-failed);
+    }
+    [data-slice="pending"] {
+      stroke: var(--slice-pending);
+    }
+    [data-slice="cancelled"] {
+      stroke: var(--slice-cancelled);
+    }
+    [data-slice="skipped"] {
+      stroke: var(--slice-skipped);
+    }
+    [data-slice="open"] {
+      stroke: var(--slice-open);
+    }
+  }
+
+  [data-slot="reference-card-legend"],
+  [data-slot="reference-card-failures"] {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 10px;
+    color: var(--v2-text-text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  [data-slot="reference-card-legend"] li {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    &[data-slice="completed"] [data-slot="reference-card-glyph"],
+    &[data-slice="passed"] [data-slot="reference-card-glyph"] {
+      color: var(--v2-state-fg-success);
+    }
+    &[data-slice="failed"] [data-slot="reference-card-glyph"] {
+      color: var(--v2-state-fg-danger);
+    }
+    &[data-slice="pending"] [data-slot="reference-card-glyph"] {
+      color: var(--v2-state-fg-warning);
+    }
+  }
+
+  [data-slot="reference-card-glyph"] {
+    flex-shrink: 0;
+    display: inline-block;
+    width: 1em;
+    text-align: center;
+    font-weight: 700;
+  }
+
+  /* Failing checks sit side by side where they fit, each cut short rather than wrapped. */
+  [data-slot="reference-card-failures"] {
+    gap: 2px 14px;
+
+    li {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    a {
+      color: var(--v2-text-text-base);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+  }
+
+  [data-slot="reference-card-head-end"] {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  [data-slot="reference-card-stale"] {
+    color: var(--v2-state-fg-warning);
+  }
+
+  [data-slot="reference-card-refresh"] {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--v2-text-text-muted);
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: var(--v2-background-bg-layer-01);
+      color: var(--v2-text-text-base);
+    }
+
+    &:disabled {
+      cursor: default;
+    }
+  }
+}
+
+/* Bars standing in for the card during a refresh, spread over its height; a soft sweep runs across them. */
+[data-component="reference-skeleton"] {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  mask-image: linear-gradient(90deg, rgb(0 0 0 / 0.45) 35%, #000 50%, rgb(0 0 0 / 0.45) 65%);
+  mask-size: 300% 100%;
+  animation: reference-skeleton-sweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+
+  [data-bar] {
+    height: 12px;
+    border-radius: 6px;
+    background: var(--v2-background-bg-layer-02, var(--v2-background-bg-layer-01));
+  }
+
+  &:dir(rtl) {
+    animation-direction: reverse;
+  }
+}
+
+@keyframes reference-skeleton-sweep {
+  from {
+    mask-position: 100% 0;
+  }
+
+  to {
+    mask-position: 0% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-component="reference-skeleton"] {
+    animation: none;
+    mask-image: none;
+  }
+}
+
+:root[data-motion="reduce"] [data-component="reference-skeleton"] {
+  animation: none;
+  mask-image: none;
 }
 
 a[data-reference] {
