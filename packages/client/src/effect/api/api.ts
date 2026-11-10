@@ -2846,6 +2846,7 @@ export type LinkPreviewResolveOutput = {
   readonly location: Location.PublicRef
   readonly data: {
     readonly outcome: "ok" | "unavailable" | "forbidden" | "not-found"
+    readonly reason?: "authentication" | "rate-limit" | "temporary" | undefined
     readonly title?: string | undefined
     readonly state?: string | undefined
     readonly stateType?: string | undefined
@@ -2891,6 +2892,7 @@ export type LinkPreviewResolveOutput = {
     readonly ci?:
       | {
           readonly status: "ok" | "none" | "unavailable" | "forbidden"
+          readonly reason?: "authentication" | "rate-limit" | "temporary" | undefined
           readonly unit: "tests" | "checks" | "jobs"
           readonly passed: number
           readonly failed: number

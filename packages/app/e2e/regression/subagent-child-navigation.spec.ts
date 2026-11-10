@@ -176,7 +176,7 @@ test("keeps the active nested session visible in a narrow desktop header", async
 
 test("restores the project name after closing review in a nested session", async ({ page }) => {
   // Forge's rail and extra header buttons take room, so the name needs a wider window to show before review opens.
-  await page.setViewportSize({ width: 1300, height: 900 })
+  await page.setViewportSize({ width: 1360, height: 900 })
   await mockWorkspace(page, {
     name: "Project with a moderately long display name",
     directory,

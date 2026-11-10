@@ -240,13 +240,13 @@ test.describe("location", () => {
     // Keep the viewport fixed: a pane can narrow a session independently of the window.
     for (const state of [
       // Forge's header also holds Review, Terminal and MCP buttons, so every step collapses at a wider window.
-      { width: 1000, project: true, worktree: true, usage: true, truncated: false },
-      { width: 770, project: true, worktree: false, usage: true, truncated: false },
-      { width: 680, project: false, worktree: false, usage: true, truncated: false },
-      { width: 590, project: false, worktree: false, usage: false, truncated: false },
-      { width: 490, project: false, worktree: false, usage: false, truncated: true },
-      { width: 770, project: true, worktree: false, usage: true, truncated: false },
-      { width: 1000, project: true, worktree: true, usage: true, truncated: false },
+      { width: 1030, project: true, worktree: true, usage: true, truncated: false },
+      { width: 795, project: true, worktree: false, usage: true, truncated: false },
+      { width: 705, project: false, worktree: false, usage: true, truncated: false },
+      { width: 615, project: false, worktree: false, usage: false, truncated: false },
+      { width: 515, project: false, worktree: false, usage: false, truncated: true },
+      { width: 795, project: true, worktree: false, usage: true, truncated: false },
+      { width: 1030, project: true, worktree: true, usage: true, truncated: false },
     ]) {
       await row.evaluate((element, width) => (element.style.inlineSize = `${width}px`), state.width)
       await expect(project).toBeVisible({ visible: state.project })
@@ -300,7 +300,7 @@ test.describe("location", () => {
     await expect(worktreeName).toBeVisible()
 
     // A title change must refit even when the session container itself never resizes.
-    await row.evaluate((element) => (element.style.inlineSize = "600px"))
+    await row.evaluate((element) => (element.style.inlineSize = "630px"))
     await expect(project).toBeHidden()
     await header.getByRole("heading").click()
     await header.getByRole("textbox").fill("Short title")

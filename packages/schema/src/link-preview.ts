@@ -54,6 +54,7 @@ const Progress = Schema.Struct({
  */
 const Ci = Schema.Struct({
   status: Schema.Literals(["ok", "none", "unavailable", "forbidden"]),
+  reason: Schema.Literals(["authentication", "rate-limit", "temporary"]).pipe(optional),
   unit: Schema.Literals(["tests", "checks", "jobs"]),
   passed: Schema.Finite,
   failed: Schema.Finite,
@@ -76,6 +77,8 @@ const Ci = Schema.Struct({
 export interface Result extends Schema.Schema.Type<typeof Result> {}
 export const Result = Schema.Struct({
   outcome: Schema.Literals(["ok", "unavailable", "forbidden", "not-found"]),
+  /** Why a lookup is unavailable; never interpret an authentication or rate-limit failure as green CI. */
+  reason: Schema.Literals(["authentication", "rate-limit", "temporary"]).pipe(optional),
   title: Schema.String.pipe(optional),
   state: Schema.String.pipe(optional),
   stateType: Schema.String.pipe(optional),

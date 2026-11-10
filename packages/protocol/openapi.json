@@ -22482,6 +22482,10 @@
             "type": "string",
             "enum": ["ok", "unavailable", "forbidden", "not-found"]
           },
+          "reason": {
+            "type": "string",
+            "enum": ["authentication", "rate-limit", "temporary"]
+          },
           "title": {
             "type": "string"
           },
@@ -22649,6 +22653,10 @@
               "status": {
                 "type": "string",
                 "enum": ["ok", "none", "unavailable", "forbidden"]
+              },
+              "reason": {
+                "type": "string",
+                "enum": ["authentication", "rate-limit", "temporary"]
               },
               "unit": {
                 "type": "string",

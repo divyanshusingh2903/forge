@@ -39,7 +39,7 @@ function Launcher(props: { item: SessionPanelMenuItem }) {
       <IconButton
         icon={<Icon name={props.item.icon ?? "plus"} />}
         variant="ghost-muted"
-        size="small"
+        size="large"
         onClick={() => props.item.run()}
         aria-label={props.item.title}
       />

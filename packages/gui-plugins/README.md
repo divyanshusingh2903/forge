@@ -1,5 +1,18 @@
 # Built-in GUI plugins
 
+## Pull requests
+
+The `pull-requests` GUI plugin adds a **Pull requests** tab to the side region and a header icon that appears once the session tracks something, with a dot while CI is failing on an open item. The Forge-owned `forge.pull-requests` Core plugin owns the registry; the GUI never claims URLs from the transcript.
+
+- An item joins a session only when the agent creates it or the user asks to track it. Successful connected `create_pull_request` / `create_merge_request` tool results and standalone `gh pr create` / `glab mr create` shell calls are creations. CLI calls must exit successfully and return one canonical request URL on its own line, and a background shell is observed until it completes without rerunning the command. Read calls, failed commands, ordinary URL mentions and ambiguous scripts are never claimed. The user can track one by pasting a link in the tab, or by asking the agent, which uses the `pull_requests` tool.
+- The identity is provider + host + repository/project path + number (case-insensitive), kept per session. Storage is the plugin's KV, so it survives reloads and restarts, and repeated discovery keeps the first entry. Supported hosts match reference previews: `github.com` and `gitlab.com`. URLs with credentials or ports are refused.
+- The agent's `pull_requests` tool lists the items, refreshes one or all, tracks, untracks, and turns auto-fix on or off (the last two only on the user's request). A compact index is supplied again after a session reload or compaction.
+- Only an item that auto-fix is armed on is polled in the background: every 60 seconds, or 20 while its CI runs, one request at a time per lookup. The open tab also refreshes every 15 seconds while CI runs. Merged and closed items are refreshed once when they get there and then left alone; they stay inspectable in a collapsed group. A failed lookup keeps the last good status and is labelled stale with the reason (not signed in, no access, rate-limited, temporary). Failures back off from one minute to fifteen, and a rate-limited host is left alone for five minutes for every item on it.
+- **Auto-fix CI** is off by default and per item. When CI finishes failing (complete results, nothing pending) the plugin queues one prompt per failed head revision, at most three attempts, without cutting in on work in progress. Interrupting the fix run, or that run failing, pauses it until the user resumes; a fully green run resets it. The prompt treats CI names and logs as data. Existing permissions still apply, and nothing merges, closes, reruns CI or force-pushes.
+- Lifecycle access through the GitLab MCP server does not imply CI: a GitLab MR resolved that way has no CI section, so auto-fix on GitLab needs `glab`.
+
+Manual verification: create one PR and one MR through eligible tools, restart the server, and check the tab and `pull_requests`. Repeat the creation, mention an unrelated PR URL, and run a failing CLI command: none should add duplicates or claim unrelated requests. Arm auto-fix on a PR with a failing check and confirm one queued fix prompt after CI finishes and none for the same revision. Interrupt it and confirm it pauses. Check missing sign-in and rate limits without treating either as passing CI.
+
 Every feature of the desktop and web app that is not the core shell is a built-in GUI plugin: the terminal, review, files, the browser, SSH, WSL, the updater and more. Each one builds only on the GUI plugin SDK in [`packages/plugin/src/gui`](../plugin/src/gui), the same `@opencode/plugin/gui` that third-party plugins use. The SDK is typed so that the common bugs fail to compile or fail the lint, and every declaration has TSDoc, so editor hovers answer most questions. This guide shows how the parts fit, with code from the plugins that ship. [Build your first plugin](#build-your-first-plugin) walks through [`src/pairing`](src/pairing), a small built-in that uses both processes. `bun run lint` checks every code block marked with its source against that source.
 
 - Window SDK: `@opencode/plugin/gui` ([`index.ts`](../plugin/src/gui/index.ts))
@@ -735,6 +748,7 @@ export const builtins = compose({
   "microsoft-office": microsoftOffice,
   sources,
   goal,
+  "pull-requests": pullRequests,
 })
 ```
 
@@ -761,6 +775,7 @@ export const builtins = compose({
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
   plan: { ...plan, windowEntry: eager(planRenderer) },
+  "pull-requests": { ...pullRequests, windowEntry: eager(pullRequestsRenderer) },
 })
 ```
 

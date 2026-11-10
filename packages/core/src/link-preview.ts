@@ -224,21 +224,31 @@ const layer = Layer.effect(
               ? tool(
                   /gitlab/i,
                   name,
-                  { url: `https://gitlab.com/${input.repository}/-/${mr ? "merge_requests" : "issues"}/${input.number}` },
+                  {
+                    url: `https://gitlab.com/${input.repository}/-/${mr ? "merge_requests" : "issues"}/${input.number}`,
+                  },
                   map,
                 ).pipe(
                   Effect.flatMap((result) =>
-                    mr || result.outcome !== "ok" || result.progress
-                      ? Effect.succeed(result)
-                      : // The work item itself does not list its children; the direct ones are the items under it.
-                        tool(
-                          /gitlab/i,
-                          "list_work_items",
-                          { project_id: input.repository, parent_iid: input.number, state: "all", first: 100 },
-                          gitlabListedChildren,
-                        ).pipe(
-                          Effect.map((children) => (children.progress ? { ...result, progress: children.progress } : result)),
-                        ),
+                    mr && result.outcome === "ok"
+                      ? gitlabCli(input, route, project).pipe(
+                          Effect.map((cli) =>
+                            cli.outcome === "ok" ? cli : { ...result, ci: failedCi("jobs", { failure: cli }) },
+                          ),
+                        )
+                      : result.outcome !== "ok" || result.progress
+                        ? Effect.succeed(result)
+                        : // The work item itself does not list its children; the direct ones are the items under it.
+                          tool(
+                            /gitlab/i,
+                            "list_work_items",
+                            { project_id: input.repository, parent_iid: input.number, state: "all", first: 100 },
+                            gitlabListedChildren,
+                          ).pipe(
+                            Effect.map((children) =>
+                              children.progress ? { ...result, progress: children.progress } : result,
+                            ),
+                          ),
                   ),
                 )
               : gitlabCli(input, route, project),
@@ -264,9 +274,14 @@ const layer = Layer.effect(
             Effect.sync(() => cache.delete(key)).pipe(Effect.andThen(Deferred.interrupt(entry.result))),
           ),
         )
-        // Failures are not worth remembering: the user may sign in to the CLI or connect the MCP server.
-        if (result.outcome === "unavailable") cache.delete(key)
-        else entry.expires = Date.now() + (ciActive(result) ? ACTIVE_CI_TTL_MS : CACHE_TTL_MS)
+        // Failed lookups are bounded too: multiple windows must not hammer an unavailable or rate-limited provider.
+        entry.expires =
+          Date.now() +
+          (result.reason === "rate-limit" || result.ci?.reason === "rate-limit"
+            ? 300_000
+            : ciActive(result)
+              ? ACTIVE_CI_TTL_MS
+              : CACHE_TTL_MS)
         yield* Deferred.succeed(entry.result, result)
         return result
       }),
@@ -439,7 +454,9 @@ export function notionResult(body: string): Result | undefined {
   const title = text(data?.title)
   if (!data || !title) return
   const page = text(data.text) ?? ""
-  const properties = record(Option.getOrUndefined(JsonValue(page.match(/<properties>([\s\S]*?)<\/properties>/)?.[1] ?? "")))
+  const properties = record(
+    Option.getOrUndefined(JsonValue(page.match(/<properties>([\s\S]*?)<\/properties>/)?.[1] ?? "")),
+  )
   const values = Object.entries(properties ?? {}).flatMap(([key, value]) => {
     const name = key.startsWith("date:") ? (key.endsWith(":start") ? key.split(":")[1] : undefined) : key
     const shown = notionValue(value)
@@ -481,7 +498,14 @@ function notionStateType(name: string) {
   return "unstarted"
 }
 
-const unavailableProgress: Progress = { status: "unavailable", completed: 0, cancelled: 0, open: 0, total: 0, partial: true }
+const unavailableProgress: Progress = {
+  status: "unavailable",
+  completed: 0,
+  cancelled: 0,
+  open: 0,
+  total: 0,
+  partial: true,
+}
 
 /** A result whose CI is unfinished or cut short, so an open popup should look again soon. */
 export function ciActive(result: Result) {
@@ -506,7 +530,10 @@ export function githubChildren(body: string) {
 
 // The aggregate cannot tell a child closed as not planned from a completed one, so the listing does. When it does not
 // cover every child the aggregate stands in, and `partial` says its completed count may include not-planned children.
-export function githubProgress(summary: { total: number; completed: number }, children: Record<string, unknown>[]): Progress {
+export function githubProgress(
+  summary: { total: number; completed: number },
+  children: Record<string, unknown>[],
+): Progress {
   if (summary.completed === 0)
     return { status: "ok", completed: 0, cancelled: 0, open: summary.total, total: summary.total, partial: false }
   if (children.length < summary.total)
@@ -556,7 +583,9 @@ function hierarchyProgress(widgets: unknown): Progress | "none" | undefined {
   const hierarchy = Array.isArray(widgets) ? widgets.map(record).find((item) => item?.type === "HIERARCHY") : undefined
   const children = record(hierarchy?.children)
   if (!children || !Array.isArray(children.nodes)) return
-  const states = children.nodes.map((item) => (text(record(item)?.state)?.toUpperCase() === "OPEN" ? "open" : "completed"))
+  const states = children.nodes.map((item) =>
+    text(record(item)?.state)?.toUpperCase() === "OPEN" ? "open" : "completed",
+  )
   return tally(states, record(children.pageInfo)?.hasNextPage === true) ?? "none"
 }
 
@@ -624,7 +653,9 @@ function noCi(unit: Ci["unit"]) {
 
 function failedCi(unit: Ci["unit"], fetched: Fetched): Ci {
   const forbidden = "failure" in fetched && fetched.failure.outcome === "forbidden"
-  return { ...summarise(unit, [], false), status: forbidden ? "forbidden" : "unavailable" }
+  const result: Ci = { ...summarise(unit, [], false), status: forbidden ? "forbidden" : "unavailable" }
+  if ("failure" in fetched && fetched.failure.reason) return { ...result, reason: fetched.failure.reason }
+  return result
 }
 
 export function githubHeadSha(body: string) {
@@ -643,19 +674,26 @@ const checkConclusions: Record<string, Bucket> = {
   cancelled: "cancelled",
 }
 
-const statusStates: Record<string, Bucket> = { success: "passed", failure: "failed", error: "failed", pending: "pending" }
+const statusStates: Record<string, Bucket> = {
+  success: "passed",
+  failure: "failed",
+  error: "failed",
+  pending: "pending",
+}
 
 function githubChecks(fetched: Fetched) {
   if (!("body" in fetched)) return
   const data = record(Option.getOrUndefined(JsonValue(fetched.body)))
   if (!data || !Array.isArray(data.check_runs)) return
   const runs = data.check_runs.map(record).filter((item) => item !== undefined)
-  const items = runs.map((run): Item => ({
-    name: text(run.name) ?? "check",
-    // A run that has not completed has no conclusion yet, and an unknown conclusion is never counted as passing.
-    bucket: run.status === "completed" ? (checkConclusions[text(run.conclusion) ?? ""] ?? "pending") : "pending",
-    url: providerUrl(run.html_url),
-  }))
+  const items = runs.map(
+    (run): Item => ({
+      name: text(run.name) ?? "check",
+      // A run that has not completed has no conclusion yet, and an unknown conclusion is never counted as passing.
+      bucket: run.status === "completed" ? (checkConclusions[text(run.conclusion) ?? ""] ?? "pending") : "pending",
+      url: providerUrl(run.html_url),
+    }),
+  )
   return { items, complete: (number(data.total_count) ?? runs.length) <= runs.length }
 }
 
@@ -664,11 +702,13 @@ function githubStatuses(fetched: Fetched) {
   const data = record(Option.getOrUndefined(JsonValue(fetched.body)))
   if (!data || !Array.isArray(data.statuses)) return
   const statuses = data.statuses.map(record).filter((item) => item !== undefined)
-  const items = statuses.map((status): Item => ({
-    name: text(status.context) ?? "status",
-    bucket: statusStates[text(status.state) ?? ""] ?? "pending",
-    url: providerUrl(status.target_url),
-  }))
+  const items = statuses.map(
+    (status): Item => ({
+      name: text(status.context) ?? "status",
+      bucket: statusStates[text(status.state) ?? ""] ?? "pending",
+      url: providerUrl(status.target_url),
+    }),
+  )
   return { items, complete: (number(data.total_count) ?? statuses.length) <= statuses.length }
 }
 
@@ -678,12 +718,15 @@ export function githubCiResult(sha: string, runs: Fetched, statuses: Fetched): C
   const checks = githubChecks(runs)
   const legacy = githubStatuses(statuses)
   if (!checks && !legacy) return failedCi("checks", "failure" in runs ? runs : statuses)
-  return summarise(
+  const result = summarise(
     "checks",
     [...(checks?.items ?? []), ...(legacy?.items ?? [])],
     !!checks && !!legacy && checks.complete && legacy.complete,
     sha,
   )
+  const failed = [runs, statuses].find((item) => "failure" in item)
+  if (failed && "failure" in failed && failed.failure.reason) return { ...result, reason: failed.failure.reason }
+  return result
 }
 
 // The head pipeline of a merge request: `none` when GitLab says it has none, undefined when the answer is unreadable.
@@ -710,12 +753,14 @@ function gitlabJobs(fetched: Fetched) {
   const data = Option.getOrUndefined(JsonValue(fetched.body))
   if (!Array.isArray(data)) return
   const jobs = data.map(record).filter((item) => item !== undefined)
-  const items = jobs.map((job): Item => ({
-    name: text(job.name) ?? "job",
-    // Created, pending, running, waiting and scheduled jobs are all still to finish.
-    bucket: jobStatuses[text(job.status) ?? ""] ?? "pending",
-    url: providerUrl(job.web_url),
-  }))
+  const items = jobs.map(
+    (job): Item => ({
+      name: text(job.name) ?? "job",
+      // Created, pending, running, waiting and scheduled jobs are all still to finish.
+      bucket: jobStatuses[text(job.status) ?? ""] ?? "pending",
+      url: providerUrl(job.web_url),
+    }),
+  )
   // The jobs endpoint is paged without a total, so a full page may have more behind it.
   return { items, complete: jobs.length < 100 }
 }
@@ -750,15 +795,20 @@ export function gitlabCiResult(
   }
 
   if (!list) return failedCi("jobs", jobs)
-  return summarise("jobs", list.items, list.complete, pipeline.sha)
+  const result = summarise("jobs", list.items, list.complete, pipeline.sha)
+  if ("failure" in summary && summary.failure.reason) return { ...result, reason: summary.failure.reason }
+  return result
 }
 
 export function failureResult(message: string): Result {
+  if (/\b429\b|rate.limit|secondary rate|too many requests/i.test(message))
+    return { outcome: "unavailable", reason: "rate-limit" }
   if (/\b404\b|not found|does not exist/i.test(message)) return { outcome: "not-found" }
   // A CLI that is not signed in is unavailable rather than forbidden, so the lookup retries once the user signs in.
-  if (/auth login|not logged in|GH_TOKEN/i.test(message)) return unavailable
+  if (/auth login|not logged in|GH_TOKEN|\b401\b|authentication/i.test(message))
+    return { outcome: "unavailable", reason: "authentication" }
   if (/\b40[13]\b|forbidden|unauthori[sz]ed|permission/i.test(message)) return { outcome: "forbidden" }
-  return unavailable
+  return { outcome: "unavailable", reason: "temporary" }
 }
 
 function githubState(kind: Kind, data: Record<string, unknown>) {
