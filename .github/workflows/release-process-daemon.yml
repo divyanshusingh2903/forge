@@ -298,14 +298,17 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#process-daemon-v}"
+          npm_note=""
+          if [[ "$GITHUB_REPOSITORY" == "anomalyco/opencode" ]]; then npm_note=" Published to npm as @opencode/pty@$version."; fi
           gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --latest=false \
               --title "process-daemon v$version" \
-              --notes "opencode-pty $version (protocol $PROTOCOL_VERSION) from packages/process-daemon, published to npm as @opencode/pty@$version."
+              --notes "opencode-pty $version (protocol $PROTOCOL_VERSION) from packages/process-daemon.$npm_note"
           gh release upload "$GITHUB_REF_NAME" dist/*.tar.gz dist/SHA256SUMS dist/release-manifest.json --clobber --repo "$GITHUB_REPOSITORY"
           gh release edit "$GITHUB_REF_NAME" --draft=false --latest=false --repo "$GITHUB_REPOSITORY"
+      # Only anomalyco/opencode is the trusted publisher of @opencode/pty; elsewhere the GitHub release is the artifact.
       - name: Publish npm packages
-        if: startsWith(github.ref, 'refs/tags/process-daemon-v')
+        if: startsWith(github.ref, 'refs/tags/process-daemon-v') && github.repository == 'anomalyco/opencode'
         run: |
           version="${GITHUB_REF_NAME#process-daemon-v}"
           for package in dist/npm/opencode-pty-*; do

@@ -28,8 +28,12 @@ export async function resolveOpencodePty(target: Target): Promise<OpencodePtyAss
     .join("-")
   const name = `@opencode/pty-${suffix}`
   const local = process.env.OPENCODE_PTY_BIN
-  if (local && (target.platform !== process.platform || target.arch !== process.arch))
-    throw new Error("OPENCODE_PTY_BIN can only be embedded in a build for the current platform and architecture")
+  // The binary is assumed to run on this host. A cross-build (Windows arm64 on an x64 runner) names the target its
+  // binary was built for instead, so a binary for the wrong target is still refused.
+  const built = process.env.OPENCODE_PTY_BIN_TARGET ?? `${process.platform}-${process.arch}`
+  const wanted = `${target.platform}-${target.arch}`
+  if (local && built !== wanted)
+    throw new Error(`OPENCODE_PTY_BIN is a ${built} binary and cannot be embedded in a ${wanted} build`)
   const source = local
     ? path.resolve(local)
     : pty.resolve(`${name}/bin/${target.platform === "win32" ? "opencode-pty.exe" : "opencode-pty"}`)

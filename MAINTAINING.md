@@ -151,6 +151,22 @@ https://github.com/divyanshusingh2903/forge/releases/latest/download/forge-deskt
 https://github.com/divyanshusingh2903/forge/releases/latest/download/forge-desktop-linux-x86_64.AppImage
 ```
 
+### The terminal daemon
+
+Terminals live in a small background program, the PTY daemon. Run in terminal needs its shell integration, which upstream's published `@opencode/pty` does not have, so Forge embeds the daemon built from `packages/process-daemon`. `forge-release` downloads it from the `process-daemon-v<version>` GitHub release (`<version>` is `version` in `packages/process-daemon/Cargo.toml`) and fails with that instruction if the release does not exist. A daemon release is separate from a Forge release and only needs repeating when the daemon changes:
+
+1. Bump `version` in `packages/process-daemon/Cargo.toml`, `Cargo.lock` and `npm/package.json` (and every `optionalDependencies` entry there). The workflow fails if they disagree. Use a version upstream has not published.
+2. Merge it, then push the tag at the merged commit:
+
+   ```bash
+   git tag process-daemon-v0.4.1 && git push origin process-daemon-v0.4.1
+   ```
+
+3. Wait for **Process daemon release**. It builds all eight targets, creates a GitHub release that is never marked Latest, and does not publish to npm outside `anomalyco/opencode`.
+4. Run `forge-release`.
+
+An update leaves the previous daemon running, so terminals keep using it until it stops. To switch to the new one right away, quit Forge and stop the `opencode-pty daemon` process (this closes open terminals).
+
 ### If a release fails
 
 A failed run leaves a draft release and a pushed tag. The `forge.json` bump is already on `main`, so don't bump again:
@@ -199,6 +215,7 @@ Merge upstream's latest **V2 release tag**, not its `dev` branch. `dev` changes 
    - **Rebranding**: `packages/desktop/` (icons, `electron-builder.config.ts`, `package.json`), the product name in `packages/ui/src/i18n` and `packages/app` strings, `README.md`, `NOTICE.md`, `CONTRIBUTING.md`. Keep Forge's side. OpenCode's own services (Go, Console, Free) keep their names.
    - **`packages/tui/`**: keep the full-screen TUI and its default command removed. Take upstream's changes to the files `packages/cli` still imports.
    - **Forge features**: permission modes and plan mode (`forge.plan`, the mode picker, plan dock and review tab), memory (`forge.memory`, `packages/core/src/memory*`), the git review panel, the Projects sidebar, Linux window controls, MCP dialogs, the context breakdown. Merge carefully; take upstream's changes where they don't undo Forge's behaviour.
+   - **Terminal daemon**: keep Forge's `packages/process-daemon` version and its `shell_integration` feature. Upstream's `@opencode/pty` does not have it, so do not move to their published version without porting it; `forge-release` downloads Forge's own build (see above).
    - **Config fields**: a Forge config key must stay in the `nativeAtomic` list in `packages/core/src/config/normalize.ts`, or normalization silently drops it.
    - **Generated client**: don't hand-merge `packages/client` generated files. Take either side, then run `bun run generate` in `packages/client`.
    - **`bun.lock`**: take upstream's copy, then regenerate it so Forge's own dependencies are added back:
