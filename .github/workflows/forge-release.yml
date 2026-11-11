@@ -135,6 +135,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends rpm
 
+      # npm's @opencode/pty has no shell integration, so Run in terminal needs the daemon built from
+      # packages/process-daemon. It is built by the "Process daemon release" workflow when a process-daemon-v<version>
+      # tag is pushed, and this fails with that instruction when the tag for the current version does not exist.
+      - name: Fetch terminal daemon
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun packages/cli/script/forge-pty.ts "${{ matrix.settings.target }}"
+
       - name: Azure login
         if: runner.os == 'Windows' && env.AZURE_TRUSTED_SIGNING_ENDPOINT != ''
         uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
