@@ -4,9 +4,9 @@ import { decide, type LocalService } from "../src/service-probe"
 const protocolError =
   "Background service uses an incompatible health protocol. Update this client or explicitly restart the service."
 
-function service(input: Pick<LocalService, "state" | "compatible" | "version">) {
+function service(input: Pick<LocalService, "state" | "compatible" | "version"> & { readonly build?: string }) {
   return {
-    info: { url: "http://127.0.0.1:4096", pid: 4242, version: input.version },
+    info: { url: "http://127.0.0.1:4096", pid: 4242, version: input.version, build: input.build },
     endpoint: { url: "http://127.0.0.1:4096" },
     ...input,
   } satisfies LocalService
@@ -51,4 +51,20 @@ test("a version mismatch replaces the service, handing off terminals only when i
     _tag: "replace",
     pty: "clear",
   })
+})
+
+test("a required build is met only by a service that registered it", () => {
+  const ready = { version: "2.0.0", state: "ready", compatible: true } as const
+  const required = { version: "2.0.0", build: "2.0.0-v0.8.0" }
+  expect(decide(service({ ...ready, build: "2.0.0-v0.8.0" }), required)).toEqual({ _tag: "reuse" })
+  expect(decide(service({ ...ready, build: "2.0.0-v0.7.5" }), required)).toEqual({ _tag: "replace", pty: "handoff" })
+  // The server an older release left running registered no build at all, with the same version.
+  expect(decide(service(ready), required)).toEqual({ _tag: "replace", pty: "handoff" })
+  expect(decide(service({ ...ready, state: "waiting" }), required)).toEqual({ _tag: "replace", pty: "clear" })
+})
+
+test("no required build accepts any build", () => {
+  const ready = { version: "2.0.0", state: "ready", compatible: true } as const
+  expect(decide(service(ready), { version: "2.0.0" })).toEqual({ _tag: "reuse" })
+  expect(decide(service({ ...ready, build: "2.0.0-v0.7.5" }), { version: "2.0.0" })).toEqual({ _tag: "reuse" })
 })

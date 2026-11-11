@@ -2,7 +2,7 @@ import { homedir } from "node:os"
 import { join } from "node:path"
 import type { DiscoverOptions, Endpoint, Info } from "./service.js"
 import { defaultEnsureTiming } from "./service-timing.js"
-import { matchesVersion } from "./service-version.js"
+import { matchesService } from "./service-version.js"
 
 // Shared by the Effect and Promise clients. Keep this module free of Effect so the
 // Promise client never loads the Effect runtime.
@@ -20,7 +20,7 @@ export type LocalService = {
  * it starts, replace it because its version does not meet the requirement, or fail.
  */
 export function decide(service: LocalService, options: DiscoverOptions) {
-  if (!matchesVersion(service.version, options))
+  if (!matchesService(service, options))
     return { _tag: "replace", pty: service.state === "ready" ? "handoff" : "clear" } as const
   if (!service.compatible)
     return fail(

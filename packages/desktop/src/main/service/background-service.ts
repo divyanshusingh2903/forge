@@ -1,6 +1,6 @@
 import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
-import { CHANNEL } from "../constants"
+import { BUILD, CHANNEL } from "../constants"
 import { BackgroundServiceState } from "./background-service-state"
 import { cleanStages } from "./cli-stages"
 import { keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
@@ -59,6 +59,8 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     client.Service.ensure({
       file,
       version: required,
+      // Required wherever a version is: a reconnect takes whatever service is running.
+      build: required === undefined ? undefined : BUILD,
       // A fixed port makes a second contender fail to bind and back off; port 0 never collides, so two
       // services could boot against the same database.
       command: [

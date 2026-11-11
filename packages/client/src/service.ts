@@ -19,6 +19,11 @@ export type DiscoverOptions = {
   readonly file?: string
   /** Required exact service version or compatibility predicate. */
   readonly version?: string | ((version: string) => boolean)
+  /**
+   * Required exact build of the service. Builds of one version can differ, so a client that ships a
+   * specific build can refuse another's. A service that registered no build never meets it.
+   */
+  readonly build?: string
 }
 
 /** Reason ensuring the service requires a new process. */
@@ -48,6 +53,8 @@ export type Info = {
   readonly id?: string
   /** OpenCode version served by the process. */
   readonly version?: string
+  /** Build that produced the process, when the build records one. */
+  readonly build?: string
   /** Base URL advertised by the service. */
   readonly url: string
   /** Operating system process identifier. */

@@ -186,6 +186,8 @@ export default { path: file, version: ${JSON.stringify(opencodePty.version)}, sh
       OPENCODE_CLI_NAME: "'opencode'",
       OPENCODE_CHANNEL: `'${Script.channel}'`,
       OPENCODE_ARTIFACT: `'cli'`,
+      // Set by forge-release; see version.ts.
+      ...(process.env.FORGE_VERSION ? { FORGE_BUILD: JSON.stringify(process.env.FORGE_VERSION) } : {}),
       ...(highlights ? { OPENCODE_RELEASE_HIGHLIGHTS: JSON.stringify(highlights) } : {}),
       OPENCODE_LIBC: item.os === "linux" ? `'${item.abi ?? "glibc"}'` : "undefined",
       // FFF_LIBC selects the fff native lib variant: "musl" or "gnu".

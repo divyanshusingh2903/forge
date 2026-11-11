@@ -6,6 +6,9 @@ const raw = import.meta.env.OPENCODE_CHANNEL
 
 export const CHANNEL: Channel = raw === "local" || raw === "dev" || raw === "beta" || raw === "prod" ? raw : "dev"
 
+// The build the bundled server reports, when this release names one. Only a packaged app runs the bundled server.
+export const BUILD = app.isPackaged ? import.meta.env.FORGE_BUILD : undefined
+
 export const VERSION = app.isPackaged ? app.getVersion() : (process.env.OPENCODE_VERSION ?? app.getVersion())
 
 const appNames: Partial<Record<Channel, string>> = {
