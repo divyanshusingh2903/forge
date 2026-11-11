@@ -754,6 +754,18 @@ export interface SessionScreen {
   readonly comment: Comments
   /** The routed session's composer. */
   readonly composer: Composer
+  /**
+   * Scrolls the routed session's transcript to a message, loading older history when it is not on screen.
+   *
+   * @param input - `turnMessageID` is the user message that opened the turn. `messageID` is the message to land on
+   * inside it, when that is not the user message itself.
+   */
+  revealMessage(input: {
+    /** The user message that opened the turn. */
+    readonly turnMessageID: string
+    /** The message to land on inside the turn; omit it for the user message itself. */
+    readonly messageID?: string
+  }): void
 }
 
 /** The session screen, while it routes the mounted session. */

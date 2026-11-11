@@ -481,6 +481,7 @@ export function createSessionTimelineRowRenderer(input: {
                 content={content()}
                 contentID={ref()!.partID}
                 showAssistantCopyPartID={copyContentID(row().userMessageID)}
+                turnMessageID={row().userMessageID}
                 turnDurationMs={duration(row().userMessageID)}
                 sources={turnSourcesValue()}
                 onOpenSources={() => sourcesHost?.open(row().userMessageID)}

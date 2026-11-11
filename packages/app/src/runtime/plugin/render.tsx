@@ -1,10 +1,16 @@
 import { createMemo, ErrorBoundary, For, onMount, Show, untrack, type JSX, type ParentProps } from "solid-js"
 import { Portal } from "solid-js/web"
 import { MarkdownProvider, useMarkdown } from "@opencode/session-ui/context/markdown"
+import { MessageActionsProvider } from "@opencode/session-ui/context/message-actions"
 import { SourcesProvider } from "@opencode/session-ui/context/sources"
 import { sourcesExperiment } from "@opencode/session-ui/sources/experiment"
 import { Style, type MountedSession } from "@opencode/plugin/gui"
-import { BuiltinCodeBlockAction, BuiltinSlot, type BuiltinSlotMap } from "@opencode/plugin/gui/builtin"
+import {
+  BuiltinCodeBlockAction,
+  BuiltinMessageAction,
+  BuiltinSlot,
+  type BuiltinSlotMap,
+} from "@opencode/plugin/gui/builtin"
 import { PluginContext } from "@opencode/plugin/gui/host"
 import { usePluginHost } from "./host"
 import { createLinkCheck } from "./link-check"
@@ -99,6 +105,17 @@ export function PluginLinks(props: ParentProps<{ session: MountedSession; active
       })),
   )
 
+  const messageActions = createMemo(() =>
+    host.items(BuiltinMessageAction).map((item) => ({
+      id: `${item.plugin}:${item.value.id}`,
+      icon: item.value.icon,
+      label: item.value.label,
+      active: (messageID: string) => item.value.active({ session: props.session, messageID }),
+      run: (input: { messageID: string; turnMessageID: string; role: "user" | "assistant"; text: string }) =>
+        item.value.run({ session: props.session, ...input }),
+    })),
+  )
+
   // Checks untracked: markdown calls this inside its render effect, which must not follow the routed session.
   const localFileExists = createLinkCheck(
     () => props.active !== false,
@@ -117,7 +134,7 @@ export function PluginLinks(props: ParentProps<{ session: MountedSession; active
         icons={sourcesExperiment.icons}
         onOpen={(from) => void host.links.open({ href: from, origin: "sources", session: props.session })}
       >
-        {props.children}
+        <MessageActionsProvider actions={messageActions()}>{props.children}</MessageActionsProvider>
       </SourcesProvider>
     </MarkdownProvider>
   )

@@ -568,6 +568,11 @@
   }
 }
 
+/* A host action sits in its message's action row like the row's own buttons. */
+[data-slot="message-host-action"] {
+  display: contents;
+}
+
 [data-timeline-row="AssistantPart"][data-timeline-spacing="content"] [data-component="text-part"] {
   margin-top: 0;
 }

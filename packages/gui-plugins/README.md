@@ -1,5 +1,15 @@
 # Built-in GUI plugins
 
+## Chapters
+
+The `chapters` GUI plugin adds a pin to every message and a rail of notches at the transcript's top start corner, just under the session name, one per chapter. There is no tab. The Forge-owned `forge.chapters` Core plugin owns the chapters and keeps them in its KV, per session.
+
+- A chapter is a titled marker on one message. The user pins any user message, or the final reply of any turn, to start one there; pinning it again removes it. The title starts as the message's first line and can be renamed from the rail.
+- Forge also starts a chapter by itself, always on the agent's own message and never on the user's: on the first agent message after a compaction, and on the first agent message after a user message that links a github.com or gitlab.com issue or pull/merge request the session has not met. A link the session already met, a bare `#12`, and Forge's own synthetic prompts start nothing. A reference chapter is titled `owner/repo#12` until the lookup names it.
+- The agent is not involved: there is no tool and no prompt text, and no model call names a chapter.
+- A chapter is removed with its session, and when a revert removes its message. Forks and child sessions start without chapters.
+- The rail shows the notches in transcript order and nothing for a session without chapters. The notch of the chapter the viewport is in is bolder. Pointing at them, or focusing them, opens the titled list over them; a row jumps to its message through `SessionScreen.revealMessage`, which pages older history in, and can be renamed or removed. The rail fills `session.timeline.rail`, an experimental built-in slot, and the pin is a `BuiltinMessageAction`, an experimental built-in registry the host renders beside a message's copy action.
+
 ## Pull requests
 
 The `pull-requests` GUI plugin adds a **Pull requests** tab to the side region and a header icon that appears once the session tracks something, with a dot while CI is failing on an open item. The Forge-owned `forge.pull-requests` Core plugin owns the registry; the GUI never claims URLs from the transcript.
@@ -747,6 +757,7 @@ export const builtins = compose({
   wsl: { ...wsl, mainEntry: () => import("./wsl/main") },
   "microsoft-office": microsoftOffice,
   sources,
+  chapters,
   goal,
   "pull-requests": pullRequests,
 })
@@ -773,6 +784,7 @@ export const builtins = compose({
   wsl: { ...wsl, windowEntry: eager(wslRenderer) },
   "microsoft-office": { ...microsoftOffice, windowEntry: eager(microsoftOfficeRenderer) },
   sources: { ...sources, windowEntry: eager(sourcesRenderer) },
+  chapters: { ...chapters, windowEntry: eager(chaptersRenderer) },
   goal: { ...goal, windowEntry: eager(goalRenderer) },
   plan: { ...plan, windowEntry: eager(planRenderer) },
   "pull-requests": { ...pullRequests, windowEntry: eager(pullRequestsRenderer) },

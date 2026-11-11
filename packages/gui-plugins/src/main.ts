@@ -13,6 +13,7 @@ import ssh from "./ssh"
 import wsl from "./wsl"
 import microsoftOffice from "./microsoft-office"
 import sources from "./sources"
+import chapters from "./chapters"
 import goal from "./goal"
 import pullRequests from "./pull-requests"
 
@@ -32,6 +33,7 @@ export const builtins = compose({
   wsl: { ...wsl, mainEntry: () => import("./wsl/main") },
   "microsoft-office": microsoftOffice,
   sources,
+  chapters,
   goal,
   "pull-requests": pullRequests,
 })

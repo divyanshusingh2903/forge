@@ -99,6 +99,7 @@ import { CommandPlugin } from "./command.js"
 import { IdentityPlugin } from "./identity.js"
 import { ForgeModePlugin } from "./forge-mode.js"
 import { ForgeMcpPlugin } from "./forge-mcp.js"
+import { ForgeChaptersPlugin } from "./forge-chapters.js"
 import { ForgeMemoryPlugin } from "./forge-memory.js"
 import { LinkPreview } from "../link-preview.js"
 import { ForgePlanPlugin } from "./forge-plan.js"
@@ -250,6 +251,7 @@ const pre = [
   CommandPlugin.Plugin,
   GoalPlugin.Plugin,
   ForgePullRequestsPlugin.Plugin,
+  ForgeChaptersPlugin.Plugin,
   SkillPlugin.Plugin,
   VcsHgPlugin.Plugin,
   ModelsDevPlugin,
