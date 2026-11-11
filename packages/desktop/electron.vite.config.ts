@@ -55,6 +55,9 @@ export default defineConfig(async ({ command }) => {
       define: {
         // Local renderer/server mode still uses the dev application identity and updater policy.
         "import.meta.env.OPENCODE_CHANNEL": JSON.stringify(channel === "local" ? "dev" : channel),
+        // The bundled server is stamped with the same value (packages/cli/script/build.ts), so an app update replaces
+        // a server left running by an older release of the same OpenCode version. Unset for any other build.
+        "import.meta.env.FORGE_BUILD": JSON.stringify(process.env.FORGE_VERSION),
       },
       build: {
         minify: command === "build",

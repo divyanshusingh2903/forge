@@ -121,7 +121,7 @@ To see the version the next release would get, without changing anything:
 ./script/forge-version.ts
 ```
 
-The desktop app reports the combined version. The bundled server keeps reporting the plain OpenCode version, because the opencode.ai API checks it.
+The desktop app reports the combined version. The bundled server keeps reporting the plain OpenCode version, because the opencode.ai API checks it. It also records the full `<opencode>-v<forge>` build in its service registration (`FORGE_VERSION` at release time), and the desktop only reuses a running server with that exact build. Without it, an update between two releases of one OpenCode version would adopt the old release's server, which still runs after the app quits and lacks the new routes.
 
 ## Releasing
 

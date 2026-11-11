@@ -2,7 +2,7 @@ import { readFile, rm } from "node:fs/promises"
 import type { DiscoverOptions, Endpoint, Info, EnsureOptions, StopOptions } from "../service.js"
 import { contenderPool, spawnServiceContender } from "../service-contender.js"
 import { defaultEnsureTiming, ensureTiming, type EnsureTiming } from "../service-timing.js"
-import { matchesVersion } from "../service-version.js"
+import { matchesService } from "../service-version.js"
 import { PtyHandoff } from "../pty-handoff.js"
 import { decide, fallback, headers, probeResult, same } from "../service-probe.js"
 
@@ -20,7 +20,7 @@ export async function discover(options: DiscoverOptions = {}) {
   const found = (await registered(options.file)).service
   if (found?.state !== "ready") return undefined
   if (!found.compatible) return undefined
-  if (!matchesVersion(found.version, options)) return undefined
+  if (!matchesService(found, options)) return undefined
   return found.endpoint
 }
 

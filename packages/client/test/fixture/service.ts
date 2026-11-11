@@ -47,6 +47,8 @@ let version = "test"
 if (mode === "old" || mode === "handoff") version = "old"
 if (mode === "incompatible") version = "1.9.0"
 if (mode === "compatible" || mode === "delayed-compatible") version = "2.1.0-next.1"
+// A build is what tells two releases of one version apart; a service from before builds were recorded has none.
+const build = mode === "old-build" ? "2.2.5-v0.7.5" : mode === "new-build" ? "2.2.5-v0.8.0" : undefined
 const id = crypto.randomUUID()
 const handoff = {
   directory: registration + ".daemon",
@@ -114,6 +116,7 @@ await writeFile(
   JSON.stringify({
     id,
     version,
+    build,
     url: server.url.toString(),
     pid: process.pid,
     password: "private",

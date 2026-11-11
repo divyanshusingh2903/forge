@@ -107,6 +107,54 @@ test("replaces an incompatible registered service", async () => {
   expect(starts).toEqual(["version-mismatch"])
 })
 
+test("replaces a service that registered no build when the caller requires one", async () => {
+  await using fixture = await serviceFixture()
+  const registration = fixture.registration
+  const existing = fixture.spawn("legacy")
+  await fixture.waitForFile()
+
+  const starts: EnsureReason[] = []
+  const endpoint = await run(
+    ensure({
+      file: registration,
+      version: "test",
+      build: "2.2.5-v0.8.0",
+      command: fixture.command("new-build"),
+      onStart: (reason) => starts.push(reason),
+    }),
+  )
+  const replacement = await Bun.file(registration).json()
+  fixture.track(replacement.pid)
+
+  expect(await existing.exited).toBe(stoppedExitCode)
+  expect(replacement.build).toBe("2.2.5-v0.8.0")
+  expect(endpoint.url).toBe(replacement.url)
+  expect(starts).toEqual(["version-mismatch"])
+})
+
+test("keeps a service that registered the required build", async () => {
+  await using fixture = await serviceFixture()
+  const registration = fixture.registration
+  const existing = fixture.spawn("new-build")
+  await fixture.waitForFile()
+  const original = await Bun.file(registration).json()
+
+  const starts: EnsureReason[] = []
+  const endpoint = await run(
+    ensure({
+      file: registration,
+      version: "test",
+      build: "2.2.5-v0.8.0",
+      command: [],
+      onStart: (reason) => starts.push(reason),
+    }),
+  )
+
+  expect(endpoint.url).toBe(original.url)
+  expect(starts).toEqual([])
+  expect(existing.exitCode).toBeNull()
+})
+
 test("waits for a registered service to finish starting", async () => {
   await using fixture = await serviceFixture()
   const registration = fixture.registration
