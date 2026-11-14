@@ -181,6 +181,43 @@ export default {
       )
       expect(await latestHtml.text()).toContain("<h1>v2</h1>")
 
+      // Every publish is a retained version, newest first
+      expect(updated.data.version).toBe(2)
+      const versions = await api.experimental.artifacts.versions({ artifactID: created.data.id })
+      expect(versions.data.map((item) => item.version)).toEqual([2, 1])
+      const first = await api.experimental.artifacts.version({ artifactID: created.data.id, version: "1" })
+      expect(first.data.files["assets/app.js"]).toBe("window.VERSION = 1")
+      await expect(
+        api.experimental.artifacts.version({ artifactID: created.data.id, version: "9" }),
+      ).rejects.toMatchObject({ _tag: "ArtifactNotFoundError" })
+
+      // A version serves under its own prefix, so its relative assets resolve to the same version
+      const versionPrefix = `/api/experimental/artifacts/${created.data.id}/versions/1/view`
+      const versionRedirect = await handler(new Request(`http://opencode.local${versionPrefix}`))
+      expect(versionRedirect.status).toBe(308)
+      expect(versionRedirect.headers.get("location")).toBe(`${versionPrefix}/`)
+      const versionHtml = await handler(new Request(`http://opencode.local${versionPrefix}/`))
+      expect(versionHtml.headers.get("content-security-policy")).toBe("sandbox allow-scripts")
+      expect(await versionHtml.text()).toContain("<h1>v1</h1>")
+      const versionJs = await handler(new Request(`http://opencode.local${versionPrefix}/assets/app.js`))
+      expect(await versionJs.text()).toBe("window.VERSION = 1")
+      const missingVersion = await handler(
+        new Request(`http://opencode.local/api/experimental/artifacts/${created.data.id}/versions/9/view/`),
+      )
+      expect(missingVersion.status).toBe(404)
+
+      // Restoring publishes version 1's files as version 3
+      const restored = await api.experimental.artifacts.restore({
+        artifactID: created.data.id,
+        version: "1",
+        sessionID: session.id,
+      })
+      expect(restored.data).toMatchObject({ version: 3, url: created.data.url })
+      const restoredJs = await handler(
+        new Request(`http://opencode.local/api/experimental/artifacts/${created.data.id}/view/assets/app.js`),
+      )
+      expect(await restoredJs.text()).toBe("window.VERSION = 1")
+
       // Per-request override to plugin-registered "s3" provider
       const remote = await api.experimental.artifacts.create({
         location: { directory: enabled },

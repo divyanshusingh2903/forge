@@ -55,7 +55,17 @@ export const PersistentPtyHandler = HttpApiBuilder.group(Api, "server.experiment
       .handle("artifacts.get", (ctx) => artifact.get(ctx.params.artifactID, ctx.query, ctx.request))
       .handle("artifacts.update", (ctx) => artifact.update(ctx.params.artifactID, ctx.query, ctx.payload, ctx.request))
       .handle("artifacts.delete", (ctx) => artifact.remove(ctx.params.artifactID, ctx.query, ctx.request))
+      .handle("artifacts.versions", (ctx) => artifact.versions(ctx.params.artifactID, ctx.query, ctx.request))
+      .handle("artifacts.version", (ctx) =>
+        artifact.version(ctx.params.artifactID, ctx.params.version, ctx.query, ctx.request),
+      )
+      .handle("artifacts.restore", (ctx) =>
+        artifact.restore(ctx.params.artifactID, ctx.params.version, ctx.query, ctx.payload, ctx.request),
+      )
       .handleRaw("artifacts.view", (ctx) => artifact.view(ctx.params.artifactID, ctx.query, ctx.request))
+      .handleRaw("artifacts.viewVersion", (ctx) =>
+        artifact.viewVersion(ctx.params.artifactID, ctx.params.version, ctx.query, ctx.request),
+      )
       .handle("schedule.create", (ctx) => schedule.create(ctx.payload))
       .handle("schedule.list", (ctx) => schedule.list(ctx.query.sessionID))
       .handle("schedule.get", (ctx) => schedule.get(ctx.params.scheduleID))

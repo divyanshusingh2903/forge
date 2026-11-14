@@ -87,6 +87,7 @@ export const effectOmitEndpoints = new Set([
   "fs.write",
   "media.get",
   "artifacts.view",
+  "artifacts.viewVersion",
   "pty.connect",
   "persistentPty.connect",
   "mcp.client",
