@@ -1,5 +1,6 @@
 import { Artifact } from "@opencode/schema/artifact"
 import { Location } from "@opencode/schema/location"
+import { PositiveInt } from "@opencode/schema/schema"
 import { Session } from "@opencode/schema/session"
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiSchema, OpenApi } from "effect/http-api"
@@ -19,6 +20,10 @@ const EXPERIMENTAL =
   "Experimental: needs experimental.artifacts in the Location's config and may change without notice."
 
 const params = { artifactID: Artifact.ID }
+const versionParams = {
+  artifactID: Artifact.ID,
+  version: Schema.NumberFromString.pipe(Schema.decodeTo(PositiveInt)),
+}
 
 const ListQuery = Schema.Struct({
   ...LocationQuery.fields,
@@ -92,6 +97,37 @@ export const ArtifactEndpoints = [
   })
     .annotateMerge(locationQueryOpenApi)
     .annotateMerge(annotations("delete", "Delete artifact", "Remove an artifact and its stored files.")),
+  HttpApiEndpoint.get("artifacts.versions", "/api/experimental/artifacts/:artifactID/versions", {
+    params,
+    query: LocationQuery,
+    success: Location.response(Schema.Array(Artifact.Version)),
+    error: itemErrors,
+  })
+    .annotateMerge(locationQueryOpenApi)
+    .annotateMerge(annotations("versions", "List artifact versions", "List an artifact's retained versions, newest first.")),
+  HttpApiEndpoint.get("artifacts.version", "/api/experimental/artifacts/:artifactID/versions/:version", {
+    params: versionParams,
+    query: LocationQuery,
+    success: Location.response(Artifact.VersionContent),
+    error: itemErrors,
+  })
+    .annotateMerge(locationQueryOpenApi)
+    .annotateMerge(annotations("version", "Read artifact version", "Read one version's metadata and file contents.")),
+  HttpApiEndpoint.post("artifacts.restore", "/api/experimental/artifacts/:artifactID/versions/:version/restore", {
+    params: versionParams,
+    query: LocationQuery,
+    payload: Schema.Struct({ sessionID: Schema.optional(Session.ID) }),
+    success: Location.response(Artifact.Info),
+    error: [InvalidRequestError, SessionNotFoundError, ...itemErrors],
+  })
+    .annotateMerge(locationQueryOpenApi)
+    .annotateMerge(
+      annotations(
+        "restore",
+        "Restore artifact version",
+        "Publish an earlier version's files again as a new version, keeping the history.",
+      ),
+    ),
   HttpApiEndpoint.get("artifacts.view", "/api/experimental/artifacts/:artifactID/view/*", {
     params,
     query: LocationQuery,
@@ -100,4 +136,14 @@ export const ArtifactEndpoints = [
   })
     .annotateMerge(locationQueryOpenApi)
     .annotateMerge(annotations("view", "View local artifact", "Serve HTML and static files from the local provider.")),
+  HttpApiEndpoint.get("artifacts.viewVersion", "/api/experimental/artifacts/:artifactID/versions/:version/view/*", {
+    params: versionParams,
+    query: LocationQuery,
+    success: Schema.Uint8Array.pipe(HttpApiSchema.asUint8Array()),
+    error: [FileNotFoundError, InvalidRequestError, ...itemErrors],
+  })
+    .annotateMerge(locationQueryOpenApi)
+    .annotateMerge(
+      annotations("viewVersion", "View local artifact version", "Serve HTML and static files of one retained version."),
+    ),
 ] as const

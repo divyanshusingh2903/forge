@@ -14,6 +14,8 @@ import {
   Provider,
   ProviderID,
   UpdateInput,
+  Version,
+  VersionContent,
 } from "@opencode/schema/artifact"
 import type { SessionID } from "@opencode/schema/session-id"
 import { Global } from "@opencode/util/global"
@@ -27,10 +29,12 @@ import { Mime } from "./mime.js"
 import { Session } from "./session.js"
 import { State } from "./state.js"
 
-export { Capability, Content, CreateInput, Event, ID, Info, Provider, ProviderID, UpdateInput }
+export { Capability, Content, CreateInput, Event, ID, Info, Provider, ProviderID, UpdateInput, Version, VersionContent }
 
 export const LocalProviderID = ProviderID.make("local")
 const ItemPrefix = "artifact:item:"
+/** Versions kept per artifact. Publishing past it drops the oldest; the latest is never dropped. */
+export const MaxVersions = 50
 
 export interface ProviderCreateInput {
   readonly id: ID
@@ -95,6 +99,18 @@ export class NotFoundError extends Schema.TaggedError<NotFoundError>()("Artifact
   }
 }
 
+export class VersionNotFoundError extends Schema.TaggedError<VersionNotFoundError>()(
+  "Artifact.VersionNotFoundError",
+  {
+    artifactID: ID,
+    version: Schema.Finite,
+  },
+) {
+  override get message() {
+    return `Artifact version not found: ${this.artifactID} version ${this.version}`
+  }
+}
+
 export class FileMissingError extends Schema.TaggedError<FileMissingError>()("Artifact.FileMissingError", {
   artifactID: ID,
   path: Schema.String,
@@ -138,6 +154,7 @@ export class ProviderError extends Schema.TaggedError<ProviderError>()("Artifact
 export type Error =
   | DisabledError
   | NotFoundError
+  | VersionNotFoundError
   | FileMissingError
   | ProviderNotFoundError
   | InvalidError
@@ -171,16 +188,34 @@ export interface Interface extends State.Transformable<Editor> {
   readonly info: (id: ID) => Effect.Effect<Info, DisabledError | NotFoundError>
   readonly update: (id: ID, input: UpdateInput) => Effect.Effect<Info, Error>
   readonly remove: (id: ID) => Effect.Effect<void, DisabledError | NotFoundError | ProviderError>
+  /** The artifact's retained versions, newest first. */
+  readonly versions: (id: ID) => Effect.Effect<readonly Version[], DisabledError | NotFoundError>
+  readonly version: (
+    id: ID,
+    version: number,
+  ) => Effect.Effect<VersionContent, DisabledError | NotFoundError | VersionNotFoundError>
+  /** Publishes an earlier version's files again as a new version. History is never rewritten. */
+  readonly restore: (
+    id: ID,
+    version: number,
+    sessionID?: SessionID,
+  ) => Effect.Effect<Info, Error>
+  /** Reads a file of the latest version, or of `version` when given, from the local provider. */
   readonly readLocalFile: (
     id: ID,
     subpath?: string,
-  ) => Effect.Effect<LocalFile, DisabledError | NotFoundError | FileMissingError | InvalidError>
+    version?: number,
+  ) => Effect.Effect<LocalFile, DisabledError | NotFoundError | VersionNotFoundError | FileMissingError | InvalidError>
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/Artifact") {}
 
 const StoredRecord = Schema.Struct({
-  info: Info,
+  // Records written before versions existed have no version: they are version 1, with no retained history.
+  info: Schema.Struct({
+    ...Info.fields,
+    version: Info.fields.version.pipe(Schema.withDecodingDefaultKey(Effect.succeed(1))),
+  }),
   directory: Schema.String,
   projectID: Schema.String,
 })
@@ -188,6 +223,9 @@ type StoredRecord = typeof StoredRecord.Type
 
 const decodeStoredRecord = Schema.decodeUnknownOption(StoredRecord)
 const encodeStoredRecord = Schema.encodeSync(StoredRecord)
+const VersionJson = Schema.fromJsonString(Version)
+const decodeVersionJson = Schema.decodeUnknownOption(VersionJson)
+const encodeVersionJson = Schema.encodeSync(VersionJson)
 const encoder = new TextEncoder()
 
 /** Resolves the stored directory of an artifact for HTTP routes without an explicit location query. */
@@ -212,6 +250,37 @@ const layer = Layer.effect(
 
     const rootDir = path.join(global.data, "artifacts")
     const itemDir = (id: ID) => path.join(rootDir, id)
+    // Versions are kept by the service, not the provider, so every provider gets a history. Each version directory
+    // holds `version.json` and the version's files under `files/`.
+    const historyDir = (id: ID) => path.join(global.data, "artifact-versions", id)
+    const versionDir = (id: ID, version: number) => path.join(historyDir(id), String(version))
+
+    const writeVersion = (id: ID, version: Version, files: Readonly<Record<string, Uint8Array>>) =>
+      replaceDirectoryFiles(versionDir(id, version.version), {
+        "version.json": encoder.encode(encodeVersionJson(version)),
+        ...Object.fromEntries(Object.entries(files).map(([filePath, bytes]) => [`files/${filePath}`, bytes])),
+      }).pipe(
+        Effect.andThen(pruneVersions(id, version.version)),
+        Effect.orDie,
+      )
+
+    const pruneVersions = (id: ID, latest: number) =>
+      Effect.promise(async () => {
+        const stale = (await retainedVersionNumbers(historyDir(id))).filter((item) => item <= latest - MaxVersions)
+        await Promise.all(stale.map((item) => fs.rm(versionDir(id, item), { recursive: true, force: true })))
+      })
+
+    const readVersionInfo = (id: ID, version: number) =>
+      Effect.promise(() =>
+        fs.readFile(path.join(versionDir(id, version), "version.json"), "utf8").catch(() => undefined),
+      ).pipe(
+        Effect.flatMap((text) => {
+          const decoded = text === undefined ? Option.none() : decodeVersionJson(text)
+          return Option.isSome(decoded)
+            ? Effect.succeed(decoded.value)
+            : Effect.fail(new VersionNotFoundError({ artifactID: id, version }))
+        }),
+      )
 
     const localProvider: ProviderImplementation = {
       id: LocalProviderID,
@@ -285,7 +354,7 @@ const layer = Layer.effect(
     const checkSession = (sessionID?: SessionID) =>
       sessionID === undefined ? Effect.void : sessions.get(sessionID).pipe(Effect.asVoid)
 
-    return Service.of({
+    const service: Interface = Service.of({
       transform: state.transform,
       reload: state.reload,
       enabled: isEnabled,
@@ -340,6 +409,17 @@ const layer = Layer.effect(
         const provider = yield* resolveProvider(input.provider)
         const id = ID.create()
         const now = yield* Clock.currentTimeMillis
+        yield* writeVersion(
+          id,
+          Version.make({
+            version: 1,
+            ...(input.sessionID === undefined ? {} : { sessionID: input.sessionID }),
+            title,
+            entry,
+            time: { created: now },
+          }),
+          files,
+        )
         const created = yield* provider
           .create({ id, title, entry, files, sessionID: input.sessionID })
           .pipe(Effect.mapError((cause) => new ProviderError({ providerID: provider.id, cause })))
@@ -350,6 +430,7 @@ const layer = Layer.effect(
           title,
           entry,
           url: created.url ?? `/api/experimental/artifacts/${encodeURIComponent(id)}/view/`,
+          version: 1,
           time: { created: now, updated: now },
         })
         yield* kv.set(
@@ -360,6 +441,7 @@ const layer = Layer.effect(
             projectID: location.project.id,
           }),
         )
+        yield* bus.publish(Event.ItemCreated, { artifact: info })
         return info
       }),
       info: Effect.fn("Artifact.info")(function* (id) {
@@ -396,6 +478,18 @@ const layer = Layer.effect(
         const provider = yield* resolveProvider(existing.info.provider)
         const now = yield* Clock.currentTimeMillis
         const sessionID = input.sessionID ?? existing.info.sessionID
+        const version = existing.info.version + 1
+        yield* writeVersion(
+          id,
+          Version.make({
+            version,
+            ...(sessionID === undefined ? {} : { sessionID }),
+            title,
+            entry,
+            time: { created: now },
+          }),
+          files,
+        )
         const updated = yield* provider
           .update(id, { title, entry, files, sessionID })
           .pipe(Effect.mapError((cause) => new ProviderError({ providerID: provider.id, cause })))
@@ -406,6 +500,7 @@ const layer = Layer.effect(
           title,
           entry,
           url: updated.url ?? existing.info.url,
+          version,
           time: { created: existing.info.time.created, updated: now },
         })
         yield* kv.set(
@@ -416,6 +511,7 @@ const layer = Layer.effect(
             projectID: existing.projectID,
           }),
         )
+        yield* bus.publish(Event.ItemUpdated, { artifact: info })
         return info
       }),
       remove: Effect.fn("Artifact.remove")(function* (id) {
@@ -429,8 +525,42 @@ const layer = Layer.effect(
             .pipe(Effect.mapError((cause) => new ProviderError({ providerID: provider.id, cause })))
         }
         yield* kv.remove(ItemPrefix + id)
+        yield* Effect.promise(() => fs.rm(historyDir(id), { recursive: true, force: true }))
+        yield* bus.publish(Event.ItemDeleted, {
+          artifactID: id,
+          ...(existing.info.sessionID === undefined ? {} : { sessionID: existing.info.sessionID }),
+        })
       }),
-      readLocalFile: Effect.fn("Artifact.readLocalFile")(function* (id, subpath) {
+      versions: Effect.fn("Artifact.versions")(function* (id) {
+        yield* requireEnabled()
+        const existing = yield* loadProjectRecord(kv, id, location.project.id)
+        if (!existing) return yield* new NotFoundError({ artifactID: id })
+        const numbers = yield* Effect.promise(() => retainedVersionNumbers(historyDir(id)))
+        const found = yield* Effect.forEach(numbers, (item) => readVersionInfo(id, item).pipe(Effect.option))
+        return found.flatMap((item) => (Option.isSome(item) ? [item.value] : [])).toSorted((a, b) => b.version - a.version)
+      }),
+      version: Effect.fn("Artifact.version")(function* (id, version) {
+        yield* requireEnabled()
+        const existing = yield* loadProjectRecord(kv, id, location.project.id)
+        if (!existing) return yield* new NotFoundError({ artifactID: id })
+        const info = yield* readVersionInfo(id, version)
+        const files = yield* readDirectoryFiles(path.join(versionDir(id, version), "files"))
+        return VersionContent.make({ version: info, files: decodeReadFiles(files) })
+      }),
+      restore: Effect.fn("Artifact.restore")(function* (id, version, sessionID) {
+        yield* requireEnabled()
+        const existing = yield* loadProjectRecord(kv, id, location.project.id)
+        if (!existing) return yield* new NotFoundError({ artifactID: id })
+        const info = yield* readVersionInfo(id, version)
+        const files = yield* readDirectoryFiles(path.join(versionDir(id, version), "files"))
+        return yield* service.update(id, {
+          title: info.title,
+          entry: info.entry,
+          files: decodeReadFiles(files),
+          sessionID,
+        })
+      }),
+      readLocalFile: Effect.fn("Artifact.readLocalFile")(function* (id, subpath, version) {
         yield* requireEnabled()
         const existing = yield* loadProjectRecord(kv, id, location.project.id)
         if (!existing) return yield* new NotFoundError({ artifactID: id })
@@ -440,8 +570,10 @@ const layer = Layer.effect(
             field: "artifactID",
           })
         }
-        const requested = subpath?.trim() ? yield* normalizePath(subpath) : existing.info.entry
-        const target = path.join(itemDir(id), ...requested.split("/"))
+        const pinned = version === undefined ? undefined : yield* readVersionInfo(id, version)
+        const root = pinned === undefined ? itemDir(id) : path.join(versionDir(id, pinned.version), "files")
+        const requested = subpath?.trim() ? yield* normalizePath(subpath) : (pinned?.entry ?? existing.info.entry)
+        const target = path.join(root, ...requested.split("/"))
         const exists = yield* Effect.promise(() =>
           fs
             .stat(target)
@@ -453,6 +585,7 @@ const layer = Layer.effect(
         return { bytes, mime: detectFileMime(requested, bytes) }
       }),
     })
+    return service
   }),
 )
 
@@ -593,6 +726,12 @@ function replaceDirectoryFiles(baseDir: string, files: Readonly<Record<string, U
       throw err
     }
   })
+}
+
+/** The version numbers that still have a directory under an artifact's history directory, in no particular order. */
+async function retainedVersionNumbers(dir: string) {
+  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+  return entries.flatMap((entry) => (entry.isDirectory() && /^[1-9]\d*$/u.test(entry.name) ? [Number(entry.name)] : []))
 }
 
 function readDirectoryFiles(baseDir: string) {

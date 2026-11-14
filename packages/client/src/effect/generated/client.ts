@@ -273,6 +273,12 @@ import type {
   ExperimentalArtifactsUpdateOutput,
   ExperimentalArtifactsDeleteInput,
   ExperimentalArtifactsDeleteOutput,
+  ExperimentalArtifactsVersionsInput,
+  ExperimentalArtifactsVersionsOutput,
+  ExperimentalArtifactsVersionInput,
+  ExperimentalArtifactsVersionOutput,
+  ExperimentalArtifactsRestoreInput,
+  ExperimentalArtifactsRestoreOutput,
   ShellListInput,
   ShellListOutput,
   ShellCreateInput,
@@ -1764,6 +1770,34 @@ const EndpointExperimentalArtifactsDelete =
       }).pipe(Effect.mapError(mapClientError)),
     )
 
+const EndpointExperimentalArtifactsVersions =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalArtifactsVersionsInput) =>
+    preserveEffect<ExperimentalArtifactsVersionsOutput>()(
+      raw["artifacts.versions"]({
+        params: { artifactID: input["artifactID"] },
+        query: { location: input["location"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointExperimentalArtifactsVersion =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalArtifactsVersionInput) =>
+    preserveEffect<ExperimentalArtifactsVersionOutput>()(
+      raw["artifacts.version"]({
+        params: { artifactID: input["artifactID"], version: input["version"] },
+        query: { location: input["location"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointExperimentalArtifactsRestore =
+  (raw: RawClient["server.experimental"]) => (input: ExperimentalArtifactsRestoreInput) =>
+    preserveEffect<ExperimentalArtifactsRestoreOutput>()(
+      raw["artifacts.restore"]({
+        params: { artifactID: input["artifactID"], version: input["version"] },
+        query: { location: input["location"] },
+        payload: { sessionID: input["sessionID"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
 const adaptGroupExperimental = (raw: RawClient["server.experimental"]) => ({
   persistentPty: {
     run: EndpointExperimentalPersistentPtyRun(raw),
@@ -1794,6 +1828,9 @@ const adaptGroupExperimental = (raw: RawClient["server.experimental"]) => ({
     get: EndpointExperimentalArtifactsGet(raw),
     update: EndpointExperimentalArtifactsUpdate(raw),
     delete: EndpointExperimentalArtifactsDelete(raw),
+    versions: EndpointExperimentalArtifactsVersions(raw),
+    version: EndpointExperimentalArtifactsVersion(raw),
+    restore: EndpointExperimentalArtifactsRestore(raw),
   },
 })
 

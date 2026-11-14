@@ -87,6 +87,8 @@ export const makeArtifact = Effect.gen(function* () {
           Effect.fail(new ForbiddenError({ message: error.message })),
         "Artifact.NotFoundError": (error: Artifact.NotFoundError) =>
           Effect.fail(new ArtifactNotFoundError({ artifactID: error.artifactID, message: error.message })),
+        "Artifact.VersionNotFoundError": (error: Artifact.VersionNotFoundError) =>
+          Effect.fail(new ArtifactNotFoundError({ artifactID: error.artifactID, message: error.message })),
         "Artifact.ProviderNotFoundError": (error: Artifact.ProviderNotFoundError) =>
           Effect.fail(new ProviderNotFoundError({ providerID: error.providerID, message: error.message })),
         "Artifact.InvalidError": (error: Artifact.InvalidError) =>
@@ -98,6 +100,46 @@ export const makeArtifact = Effect.gen(function* () {
         "Session.NotFoundError": (error: Session.NotFoundError) => Effect.fail(missingSession(error)),
       } as never),
     )
+
+  /** Serves the latest version's files, or one retained version's, under a prefix that keeps relative URLs working. */
+  const serve = (
+    artifactID: Artifact.ID,
+    version: number | undefined,
+    query: { readonly location?: { readonly directory?: string } },
+    request: HttpServerRequest.HttpServerRequest,
+  ) =>
+    inLocation(
+      request,
+      { location: query.location, artifactID },
+      Effect.gen(function* () {
+        const artifacts = yield* Artifact.Service
+        const parsed = new URL(request.url, "http://localhost")
+        const prefix = viewPrefix(artifactID, version)
+        if (parsed.pathname === prefix) {
+          yield* artifacts.info(artifactID)
+          return HttpServerResponse.empty({
+            status: 308,
+            headers: { location: `${prefix}/${parsed.search}` },
+          })
+        }
+        const subpath = extractViewSubpath(request.url, `${prefix}/`)
+        const file = yield* artifacts.readLocalFile(artifactID, subpath, version).pipe(
+          Effect.catchTag("Artifact.FileMissingError", (error) =>
+            Effect.fail(new FileNotFoundError({ path: error.path, message: error.message })),
+          ),
+        )
+        return HttpServerResponse.uint8Array(file.bytes, {
+          status: 200,
+          contentType: file.mime,
+          headers: {
+            "access-control-allow-origin": "*",
+            "cache-control": "private, no-cache",
+            "content-security-policy": "sandbox allow-scripts",
+            "x-content-type-options": "nosniff",
+          },
+        })
+      }),
+    ).pipe(mapCommon)
 
   return {
     providers: (
@@ -188,7 +230,7 @@ export const makeArtifact = Effect.gen(function* () {
         }),
       ).pipe(mapCommon),
 
-    view: (
+    versions: (
       artifactID: Artifact.ID,
       query: { readonly location?: { readonly directory?: string } },
       request: HttpServerRequest.HttpServerRequest,
@@ -198,39 +240,63 @@ export const makeArtifact = Effect.gen(function* () {
         { location: query.location, artifactID },
         Effect.gen(function* () {
           const artifacts = yield* Artifact.Service
-          const parsed = new URL(request.url, "http://localhost")
-          const prefix = `/api/experimental/artifacts/${encodeURIComponent(artifactID)}/view`
-          if (parsed.pathname === prefix) {
-            yield* artifacts.info(artifactID)
-            return HttpServerResponse.empty({
-              status: 308,
-              headers: { location: `${prefix}/${parsed.search}` },
-            })
-          }
-          const subpath = extractViewSubpath(request.url, artifactID)
-          const file = yield* artifacts.readLocalFile(artifactID, subpath).pipe(
-            Effect.catchTag("Artifact.FileMissingError", (error) =>
-              Effect.fail(new FileNotFoundError({ path: error.path, message: error.message })),
-            ),
-          )
-          return HttpServerResponse.uint8Array(file.bytes, {
-            status: 200,
-            contentType: file.mime,
-            headers: {
-              "access-control-allow-origin": "*",
-              "cache-control": "private, no-cache",
-              "content-security-policy": "sandbox allow-scripts",
-              "x-content-type-options": "nosniff",
-            },
-          })
+          return yield* response(artifacts.versions(artifactID))
         }),
       ).pipe(mapCommon),
+
+    version: (
+      artifactID: Artifact.ID,
+      version: number,
+      query: { readonly location?: { readonly directory?: string } },
+      request: HttpServerRequest.HttpServerRequest,
+    ) =>
+      inLocation(
+        request,
+        { location: query.location, artifactID },
+        Effect.gen(function* () {
+          const artifacts = yield* Artifact.Service
+          return yield* response(artifacts.version(artifactID, version))
+        }),
+      ).pipe(mapCommon),
+
+    restore: (
+      artifactID: Artifact.ID,
+      version: number,
+      query: { readonly location?: { readonly directory?: string } },
+      payload: { readonly sessionID?: Session.ID },
+      request: HttpServerRequest.HttpServerRequest,
+    ) =>
+      inLocation(
+        request,
+        { location: query.location, sessionID: payload.sessionID, artifactID },
+        Effect.gen(function* () {
+          const artifacts = yield* Artifact.Service
+          return yield* response(artifacts.restore(artifactID, version, payload.sessionID))
+        }),
+      ).pipe(mapCommon),
+
+    view: (
+      artifactID: Artifact.ID,
+      query: { readonly location?: { readonly directory?: string } },
+      request: HttpServerRequest.HttpServerRequest,
+    ) => serve(artifactID, undefined, query, request),
+
+    viewVersion: (
+      artifactID: Artifact.ID,
+      version: number,
+      query: { readonly location?: { readonly directory?: string } },
+      request: HttpServerRequest.HttpServerRequest,
+    ) => serve(artifactID, version, query, request),
   }
 })
 
-function extractViewSubpath(url: string, artifactID: Artifact.ID) {
+function viewPrefix(artifactID: Artifact.ID, version: number | undefined) {
+  const base = `/api/experimental/artifacts/${encodeURIComponent(artifactID)}`
+  return version === undefined ? `${base}/view` : `${base}/versions/${version}/view`
+}
+
+function extractViewSubpath(url: string, prefix: string) {
   const pathname = new URL(url, "http://localhost").pathname
-  const prefix = `/api/experimental/artifacts/${encodeURIComponent(artifactID)}/view/`
   if (!pathname.startsWith(prefix)) return undefined
   const raw = pathname.slice(prefix.length)
   if (!raw) return undefined

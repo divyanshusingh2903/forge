@@ -273,8 +273,16 @@ import type {
   ExperimentalArtifactsUpdateOutput,
   ExperimentalArtifactsDeleteInput,
   ExperimentalArtifactsDeleteOutput,
+  ExperimentalArtifactsVersionsInput,
+  ExperimentalArtifactsVersionsOutput,
+  ExperimentalArtifactsVersionInput,
+  ExperimentalArtifactsVersionOutput,
+  ExperimentalArtifactsRestoreInput,
+  ExperimentalArtifactsRestoreOutput,
   ExperimentalArtifactsViewInput,
   ExperimentalArtifactsViewOutput,
+  ExperimentalArtifactsViewVersionInput,
+  ExperimentalArtifactsViewVersionOutput,
   ShellListInput,
   ShellListOutput,
   ShellCreateInput,
@@ -1740,11 +1748,61 @@ export function make(options: ClientOptions) {
             },
             requestOptions,
           ),
+        versions: (input: ExperimentalArtifactsVersionsInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalArtifactsVersionsOutput>(
+            {
+              method: "GET",
+              path: `/api/experimental/artifacts/${encodeURIComponent(input.artifactID)}/versions`,
+              query: { location: input["location"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403, 404, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        version: (input: ExperimentalArtifactsVersionInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalArtifactsVersionOutput>(
+            {
+              method: "GET",
+              path: `/api/experimental/artifacts/${encodeURIComponent(input.artifactID)}/versions/${encodeURIComponent(input.version)}`,
+              query: { location: input["location"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403, 404, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
+        restore: (input: ExperimentalArtifactsRestoreInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalArtifactsRestoreOutput>(
+            {
+              method: "POST",
+              path: `/api/experimental/artifacts/${encodeURIComponent(input.artifactID)}/versions/${encodeURIComponent(input.version)}/restore`,
+              query: { location: input["location"] },
+              body: { sessionID: input["sessionID"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403, 404, 503],
+              empty: false,
+            },
+            requestOptions,
+          ),
         view: (input: ExperimentalArtifactsViewInput, requestOptions?: RequestOptions) =>
           request<ExperimentalArtifactsViewOutput>(
             {
               method: "GET",
               path: `/api/experimental/artifacts/${encodeURIComponent(input.artifactID)}/view/${encodePath(input.path)}`,
+              query: { location: input["location"] },
+              successStatus: 200,
+              declaredStatuses: [400, 401, 403, 404, 503],
+              empty: false,
+              binary: true,
+            },
+            requestOptions,
+          ),
+        viewVersion: (input: ExperimentalArtifactsViewVersionInput, requestOptions?: RequestOptions) =>
+          request<ExperimentalArtifactsViewVersionOutput>(
+            {
+              method: "GET",
+              path: `/api/experimental/artifacts/${encodeURIComponent(input.artifactID)}/versions/${encodeURIComponent(input.version)}/view/${encodePath(input.path)}`,
               query: { location: input["location"] },
               successStatus: 200,
               declaredStatuses: [400, 401, 403, 404, 503],

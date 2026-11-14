@@ -2175,6 +2175,9 @@ export type EventSubscribeInput = {
         | "form.cancelled"
         | "websearch.updated"
         | "artifact.updated"
+        | "artifact.item.created"
+        | "artifact.item.updated"
+        | "artifact.item.deleted"
         | "git.changed"
         | "session.status"
         | "session.idle"
@@ -2576,6 +2579,42 @@ export type ExperimentalArtifactsDeleteOperation<E = never> = (
   input: ExperimentalArtifactsDeleteInput,
 ) => Effect.Effect<ExperimentalArtifactsDeleteOutput, E>
 
+export type ExperimentalArtifactsVersionsInput = {
+  readonly artifactID: Artifact.ID
+  readonly location?: { readonly directory?: string | undefined } | undefined
+}
+export type ExperimentalArtifactsVersionsOutput = {
+  readonly location: Location.PublicRef
+  readonly data: ReadonlyArray<Artifact.Version>
+}
+export type ExperimentalArtifactsVersionsOperation<E = never> = (
+  input: ExperimentalArtifactsVersionsInput,
+) => Effect.Effect<ExperimentalArtifactsVersionsOutput, E>
+
+export type ExperimentalArtifactsVersionInput = {
+  readonly artifactID: Artifact.ID
+  readonly version: number
+  readonly location?: { readonly directory?: string | undefined } | undefined
+}
+export type ExperimentalArtifactsVersionOutput = {
+  readonly location: Location.PublicRef
+  readonly data: Artifact.VersionContent
+}
+export type ExperimentalArtifactsVersionOperation<E = never> = (
+  input: ExperimentalArtifactsVersionInput,
+) => Effect.Effect<ExperimentalArtifactsVersionOutput, E>
+
+export type ExperimentalArtifactsRestoreInput = {
+  readonly artifactID: Artifact.ID
+  readonly version: number
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly sessionID?: Session.ID | undefined
+}
+export type ExperimentalArtifactsRestoreOutput = { readonly location: Location.PublicRef; readonly data: Artifact.Info }
+export type ExperimentalArtifactsRestoreOperation<E = never> = (
+  input: ExperimentalArtifactsRestoreInput,
+) => Effect.Effect<ExperimentalArtifactsRestoreOutput, E>
+
 export interface ExperimentalApi<E = never> {
   readonly persistentPty: {
     readonly run: ExperimentalPersistentPtyRunOperation<E>
@@ -2606,6 +2645,9 @@ export interface ExperimentalApi<E = never> {
     readonly get: ExperimentalArtifactsGetOperation<E>
     readonly update: ExperimentalArtifactsUpdateOperation<E>
     readonly delete: ExperimentalArtifactsDeleteOperation<E>
+    readonly versions: ExperimentalArtifactsVersionsOperation<E>
+    readonly version: ExperimentalArtifactsVersionOperation<E>
+    readonly restore: ExperimentalArtifactsRestoreOperation<E>
   }
 }
 

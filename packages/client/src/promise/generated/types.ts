@@ -346,6 +346,10 @@ export type FormWhen1 = { key: string; op: "eq" | "neq"; value: string | number 
 
 export type FormValue1 = string | number | boolean | Array<string>
 
+export type ArtifactID = string
+
+export type ArtifactTime = { created: number; updated: number }
+
 export type SessionStatus =
   | { type: "idle" }
   | {
@@ -400,10 +404,6 @@ export type ScheduleStatus = "active" | "paused" | "done"
 export type ScheduleOutcome = "fired" | "late" | "checked" | "expired" | "skipped" | "disabled" | "failed"
 
 export type ArtifactCapability = "static" | "server-code" | "sqlite" | "durable-objects"
-
-export type ArtifactID = string
-
-export type ArtifactTime = { created: number; updated: number }
 
 export type ReferenceGitSource = { type: "git"; repository: string; branch?: string }
 
@@ -537,6 +537,14 @@ export type ConfigModelVariantSettings = { compaction?: ProviderCompaction; enco
 export type PermissionRule = { action: string; resource: string; effect: PermissionEffect }
 
 export type PluginInfo = { id?: PluginID; source: PluginSource; features: PluginFeatures; state: PluginState }
+
+export type ArtifactVersion = {
+  version: number
+  sessionID?: SessionID
+  title: string
+  entry: string
+  time: { created: number }
+}
 
 export type SessionForkBoundary =
   | { type: "before"; messageID: SessionMessageID }
@@ -1045,6 +1053,17 @@ export type FormMultiselectField1 = {
 
 export type FormAnswer1 = { [x: string]: FormValue1 }
 
+export type ArtifactInfo = {
+  id: ArtifactID
+  provider: string
+  sessionID?: SessionID
+  title: string
+  entry: string
+  url: string
+  version: number
+  time: ArtifactTime
+}
+
 export type PersistentPtyRunStatus = {
   state: "unsupported" | "unknown" | "ready" | "dirty" | "running"
   shell: "bash" | "zsh" | "fish" | "powershell" | null
@@ -1060,16 +1079,6 @@ export type ScheduleCondition = ScheduleConditionShell | ScheduleConditionCode
 export type ScheduleAction = ScheduleActionPrompt
 
 export type ArtifactProvider = { id: string; name: string; capabilities: Array<ArtifactCapability>; default: boolean }
-
-export type ArtifactInfo = {
-  id: ArtifactID
-  provider: string
-  sessionID?: SessionID
-  title: string
-  entry: string
-  url: string
-  time: ArtifactTime
-}
 
 export type VcsInfo = { provider?: string; branch: VcsBranch }
 
@@ -1186,6 +1195,8 @@ export type ModelVariant = {
 }
 
 export type PermissionRuleset = Array<PermissionRule>
+
+export type ArtifactVersionContent = { version: ArtifactVersion; files: { [x: string]: string } }
 
 export type UsageLimitsBudget = {
   id: string
@@ -2079,6 +2090,15 @@ export type ArtifactUpdated = {
   data: {}
 }
 
+export type ArtifactItemDeleted = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "artifact.item.deleted"
+  location?: LocationRef
+  data: { artifactID: ArtifactID; sessionID?: SessionID }
+}
+
 export type GitChanged = {
   id: EventID
   created: number
@@ -2337,9 +2357,27 @@ export type FormReplied = {
   data: { id: FormID; sessionID: string; answer: FormAnswer1 }
 }
 
-export type ScheduleWhen = ScheduleWhenIn | ScheduleWhenAt | ScheduleWhenEvery | ScheduleWhenCron
+export type ArtifactItemCreated = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "artifact.item.created"
+  location?: LocationRef
+  data: { artifact: ArtifactInfo }
+}
+
+export type ArtifactItemUpdated = {
+  id: EventID
+  created: number
+  metadata?: { [x: string]: any }
+  type: "artifact.item.updated"
+  location?: LocationRef
+  data: { artifact: ArtifactInfo }
+}
 
 export type ArtifactContent = { info: ArtifactInfo; files: { [x: string]: string } }
+
+export type ScheduleWhen = ScheduleWhenIn | ScheduleWhenAt | ScheduleWhenEvery | ScheduleWhenCron
 
 export type GitState = { branch?: string; changes: Array<GitChange>; remote: GitRemote }
 
@@ -3031,6 +3069,9 @@ export type V2Event =
   | FormCancelled
   | WebsearchUpdated
   | ArtifactUpdated
+  | ArtifactItemCreated
+  | ArtifactItemUpdated
+  | ArtifactItemDeleted
   | GitChanged
   | SessionStatusUpdated
   | SessionIdle
@@ -4549,6 +4590,9 @@ export type EventSubscribeInput = {
         | "form.cancelled"
         | "websearch.updated"
         | "artifact.updated"
+        | "artifact.item.created"
+        | "artifact.item.updated"
+        | "artifact.item.deleted"
         | "git.changed"
         | "session.status"
         | "session.idle"
@@ -4831,6 +4875,30 @@ export type ExperimentalArtifactsDeleteInput = {
 
 export type ExperimentalArtifactsDeleteOutput = void
 
+export type ExperimentalArtifactsVersionsInput = {
+  readonly artifactID: string
+  readonly location?: { readonly directory?: string | undefined } | undefined
+}
+
+export type ExperimentalArtifactsVersionsOutput = { location: LocationPublicRef; data: Array<ArtifactVersion> }
+
+export type ExperimentalArtifactsVersionInput = {
+  readonly artifactID: string
+  readonly version: string
+  readonly location?: { readonly directory?: string | undefined } | undefined
+}
+
+export type ExperimentalArtifactsVersionOutput = { location: LocationPublicRef; data: ArtifactVersionContent }
+
+export type ExperimentalArtifactsRestoreInput = {
+  readonly artifactID: string
+  readonly version: string
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly sessionID?: string | undefined
+}
+
+export type ExperimentalArtifactsRestoreOutput = { location: LocationPublicRef; data: ArtifactInfo }
+
 export type ExperimentalArtifactsViewInput = {
   readonly artifactID: string
   readonly location?: { readonly directory?: string | undefined } | undefined
@@ -4838,6 +4906,15 @@ export type ExperimentalArtifactsViewInput = {
 }
 
 export type ExperimentalArtifactsViewOutput = globalThis.Uint8Array
+
+export type ExperimentalArtifactsViewVersionInput = {
+  readonly artifactID: string
+  readonly version: string
+  readonly location?: { readonly directory?: string | undefined } | undefined
+  readonly path: string
+}
+
+export type ExperimentalArtifactsViewVersionOutput = globalThis.Uint8Array
 
 export type ShellListInput = { readonly location?: { readonly directory?: string | undefined } | undefined }
 

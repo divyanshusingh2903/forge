@@ -3,7 +3,7 @@ export * as Artifact from "./artifact.js"
 import { Schema } from "effect"
 import { ephemeral, inventory } from "./event.js"
 import { ascending } from "./identifier.js"
-import { optional, statics } from "./schema.js"
+import { optional, PositiveInt, statics } from "./schema.js"
 import { SessionID } from "./session-id.js"
 
 export const ID = Schema.String.check(Schema.isStartingWith("art_")).pipe(
@@ -48,6 +48,8 @@ export const Info = Schema.Struct({
   title: Schema.String,
   entry: Schema.String,
   url: Schema.String,
+  /** The latest published version. The first publish is version 1; every update adds one. */
+  version: PositiveInt,
   time: Time,
 }).annotate({ identifier: "Artifact.Info" })
 
@@ -56,6 +58,22 @@ export const Content = Schema.Struct({
   info: Info,
   files: Schema.Record(Schema.String, Schema.String),
 }).annotate({ identifier: "Artifact.Content" })
+
+/** One published version of an artifact. Its files are read separately. */
+export interface Version extends Schema.Schema.Type<typeof Version> {}
+export const Version = Schema.Struct({
+  version: PositiveInt,
+  sessionID: SessionID.pipe(optional),
+  title: Schema.String,
+  entry: Schema.String,
+  time: Schema.Struct({ created: Schema.Finite }),
+}).annotate({ identifier: "Artifact.Version" })
+
+export interface VersionContent extends Schema.Schema.Type<typeof VersionContent> {}
+export const VersionContent = Schema.Struct({
+  version: Version,
+  files: Schema.Record(Schema.String, Schema.String),
+}).annotate({ identifier: "Artifact.VersionContent" })
 
 export interface CreateInput extends Schema.Schema.Type<typeof CreateInput> {}
 export const CreateInput = Schema.Struct({
@@ -74,8 +92,28 @@ export const UpdateInput = Schema.Struct({
   sessionID: SessionID.pipe(optional),
 }).annotate({ identifier: "Artifact.UpdateInput" })
 
+/** The set of artifact providers or the default provider changed. */
 const Updated = ephemeral({
   type: "artifact.updated",
   schema: {},
 })
-export const Event = { Updated, Definitions: inventory(Updated) }
+const ItemCreated = ephemeral({
+  type: "artifact.item.created",
+  schema: { artifact: Info },
+})
+/** A new version was published, by an update or a restore. */
+const ItemUpdated = ephemeral({
+  type: "artifact.item.updated",
+  schema: { artifact: Info },
+})
+const ItemDeleted = ephemeral({
+  type: "artifact.item.deleted",
+  schema: { artifactID: ID, sessionID: SessionID.pipe(optional) },
+})
+export const Event = {
+  Updated,
+  ItemCreated,
+  ItemUpdated,
+  ItemDeleted,
+  Definitions: inventory(Updated, ItemCreated, ItemUpdated, ItemDeleted),
+}
